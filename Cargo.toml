@@ -1,0 +1,19 @@
+[package]
+name = "login_ng"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "login-ng_cli"
+path = "src/login-ng_cli/main.rs"
+
+[[bin]]
+name = "login-ng_cmd"
+path = "src/login-ng_cmd/main.rs"
+
+[dependencies]
+greetd_ipc = { version = "0.10.3", features = ["sync-codec"]}
+rpassword = "7.3.1"
+getopts = "0.2.21"
+enquote = "1.1"
+nix = "0.29"
