@@ -1,0 +1,138 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'login_ng'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=login_ng"
+                ],
+                "filter": {
+                    "name": "login_ng",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'login-ng_cli'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=login-ng_cli",
+                    "--package=login_ng"
+                ],
+                "filter": {
+                    "name": "login-ng_cli",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'login-ng_cli'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=login-ng_cli",
+                    "--package=login_ng"
+                ],
+                "filter": {
+                    "name": "login-ng_cli",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'login-ng_cmd'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=login-ng_cmd",
+                    "--package=login_ng"
+                ],
+                "filter": {
+                    "name": "login-ng_cmd",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'login-ng_cmd'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=login-ng_cmd",
+                    "--package=login_ng"
+                ],
+                "filter": {
+                    "name": "login-ng_cmd",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'login-ng_ctl'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=login-ng_ctl",
+                    "--package=login_ng"
+                ],
+                "filter": {
+                    "name": "login-ng_ctl",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'login-ng_ctl'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=login-ng_ctl",
+                    "--package=login_ng"
+                ],
+                "filter": {
+                    "name": "login-ng_ctl",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

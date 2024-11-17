@@ -17,7 +17,7 @@ fn main() {
     let program = args[0].clone();
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
-    opts.optopt("c", "cmd", "command to run", "COMMAND");
+    opts.optopt("c", "cmd", format!("command to run, defaults to {}", login_ng::DEFAULT_CMD).as_str(), "COMMAND");
     opts.optopt(
         "f",
         "max-failures",
@@ -37,7 +37,7 @@ fn main() {
         std::process::exit(0);
     }
 
-    let cmd_res = Command::new("sh")
+    let _cmd_res = Command::new("sh")
         .arg("-c")
         .arg("echo hello")
         .exec();

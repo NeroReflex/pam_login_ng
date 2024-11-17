@@ -11,9 +11,21 @@ path = "src/login-ng_cli/main.rs"
 name = "login-ng_cmd"
 path = "src/login-ng_cmd/main.rs"
 
+[[bin]]
+name = "login-ng_ctl"
+path = "src/login-ng_ctl/main.rs"
+
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 greetd_ipc = { version = "0.10.3", features = ["sync-codec"]}
-rpassword = "7.3.1"
-getopts = "0.2.21"
-enquote = "1.1"
-nix = "0.29"
+rpassword = "^7.3"
+getopts = "^0.2"
+thiserror = "^1.0"
+enquote = "^1.1"
+nix = "^0.29"
+aes-gcm = "^0.10"
+bcrypt = "^0.15"
+hkdf = { version = "^0.12", features = ["std"] }
+sha2 = "0.10.8"
+clap = { version ="4.5.21", features = ["cargo"] }

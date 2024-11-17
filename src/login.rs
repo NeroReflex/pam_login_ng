@@ -9,19 +9,21 @@ pub enum LoginResult {
     Failure,
 }
 
-pub struct Login {
+pub struct Login<T> {
     username: String,
     cmd: String,
 
-    prompt: Box<dyn Fn(&String) -> Result<String, Box<dyn std::error::Error>>>,
+    prompt: Box<dyn Fn(&String, T) -> Result<String, Box<dyn std::error::Error>>>,
 }
 
-impl Login {
+impl<T> Login<T>
+where
+    T: Clone {
 
     pub fn new(
         username: String,
         cmd: String,
-        data_prompt: impl Fn(&String) -> Result<String, Box<dyn std::error::Error>> + 'static
+        data_prompt: impl Fn(&String, T) -> Result<String, Box<dyn std::error::Error>> + 'static
     ) -> Self {
         Self {
             username,
@@ -31,7 +33,8 @@ impl Login {
     }
 
     pub fn execute(
-        &self
+        &self,
+        param: T
     ) -> Result<LoginResult, Box<dyn std::error::Error>> {
         let mut stream = UnixStream::connect(env::var("GREETD_SOCK")?)?;
     
@@ -48,8 +51,8 @@ impl Login {
                     auth_message_type,
                 } => {
                     let response = match auth_message_type {
-                        AuthMessageType::Visible => Some((self.prompt)(&auth_message)?),
-                        AuthMessageType::Secret => Some((self.prompt)(&auth_message)?),
+                        AuthMessageType::Visible => Some((self.prompt)(&auth_message, param.clone())?),
+                        AuthMessageType::Secret => Some((self.prompt)(&auth_message, param.clone())?),
                         AuthMessageType::Info => {
                             eprintln!("info: {}", auth_message);
                             None
