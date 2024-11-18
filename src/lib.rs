@@ -2,13 +2,18 @@ pub mod login;
 pub mod user;
 pub mod auth;
 pub mod error;
+pub mod conversation;
 
 pub(crate) mod tests;
 
 pub const DEFAULT_CMD: &str = "/bin/sh";
 
+use std::io::BufRead;
+
 use hkdf::*;
 use sha2::Sha256;
+
+pub use rpassword::prompt_password;
 
 pub(crate) fn derive_key(input: &str, salt: &[u8]) -> [u8; 32] {
     // Create an HKDF instance with SHA-256 as the hash function
@@ -34,4 +39,11 @@ pub(crate) fn vec_to_password(vec: &Vec<u8>) -> String {
 // this MUST be implemented and used because entering invalid strings can be a security hole (see lossy_utf8)
 pub fn is_valid_password(password: &String) -> bool {
     vec_to_password(password_to_vec(password).as_ref()) == password.clone()
+}
+
+pub fn prompt_stderr(prompt: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let stdin = std::io::stdin();
+    let mut stdin_iter = stdin.lock().lines();
+    eprint!("{}", prompt);
+    Ok(stdin_iter.next().ok_or("no input")??)
 }

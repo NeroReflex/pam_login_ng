@@ -1,21 +1,11 @@
-use std::{
-    env,
-    io::{self, BufRead},
-};
+use std::env;
 
 use getopts::Options;
 
 use login_ng::login::*;
 use login_ng::user::*;
 
-use rpassword::prompt_password;
-
-fn prompt_stderr(prompt: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let stdin = io::stdin();
-    let mut stdin_iter = stdin.lock().lines();
-    eprint!("{}", prompt);
-    Ok(stdin_iter.next().ok_or("no input")??)
-}
+use login_ng::prompt_password;
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
@@ -69,7 +59,7 @@ fn main() {
 
         let username = match matches.opt_str("username") {
             Some(account) => account,
-            None => match prompt_stderr(&format!("login: ")) {
+            None => match login_ng::prompt_stderr(&format!("login: ")) {
                 Ok(typed_username) => {
                     typed_username
                 },

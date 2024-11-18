@@ -18,6 +18,7 @@ use crate::auth::*;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MainPassword {
+    main_hash: String,
     enc_main: Vec<u8>,
     enc_main_nonce: [u8; 12],
     
@@ -31,6 +32,10 @@ impl MainPassword {
         intermediate_key: &String,
         intermediate_salt: &[u8; 32]
     ) -> Result<Self, UserOperationError> {
+        let main_hash = hash(main, DEFAULT_COST).map_err(|err| UserOperationError::HashingError(err))?;
+
+        let intermediate_key_hash = hash(intermediate_key, DEFAULT_COST).map_err(|err| UserOperationError::HashingError(err))?;
+
         let intermediate_derived_key = crate::derive_key(&intermediate_key.as_str(), intermediate_salt);
 
         let key = Key::<Aes256Gcm>::from_slice(&intermediate_derived_key);
@@ -39,34 +44,43 @@ impl MainPassword {
         let main_nonce = Aes256Gcm::generate_nonce(&mut OsRng);
 
         match main_cipher.encrypt(&main_nonce, main.as_ref()) {
-            Ok(main_enc) =>  match hash(intermediate_derived_key, DEFAULT_COST) {
-                Ok(hash_res) => Ok(
-                    Self{
-                        enc_main: main_enc,
-                        enc_main_nonce: main_nonce.into(),
-                        intermediate_key_salt: intermediate_salt.clone(),
-                        intermediate_key_hash: hash_res,
-                    }
-                ),
-                Err(err) => Err(UserOperationError::HashingError(err))
-            },
+            Ok(enc_main) => Ok(Self{
+                main_hash,
+                enc_main,
+                enc_main_nonce: main_nonce.into(),
+                intermediate_key_salt: intermediate_salt.clone(),
+                intermediate_key_hash,
+            }),
             Err(err) => Err(UserOperationError::EncryptionError(err))
         }
     }
 
-    pub fn plain(&self, intermediate_key: &String) -> Result<Vec<u8>, UserOperationError> {
-        let intermediate_derived_key = crate::derive_key(&intermediate_key.as_str(), &self.intermediate_key_salt);
+    pub fn plain(&self, ik_or_main: &String) -> Result<Vec<u8>, UserOperationError> {
+        if verify(ik_or_main, &self.main_hash.as_str()).map_err(|err| UserOperationError::HashingError(err))? {
+            return Ok(crate::password_to_vec(&ik_or_main))
+        }
 
-        if !verify(intermediate_derived_key, self.intermediate_key_hash.as_str()).map_err(|err| UserOperationError::HashingError(err))? {
+        // provided data was not the main password itself: threat it as the intermediate key
+        let intermediate_key = ik_or_main;
+
+        if !verify(intermediate_key, self.intermediate_key_hash.as_str()).map_err(|err| UserOperationError::HashingError(err))? {
             return Err(UserOperationError::User(Error::WrongIntermediateKey))
         }
+        
+        let intermediate_derived_key = crate::derive_key(&intermediate_key.as_str(), &self.intermediate_key_salt);
 
         let key = Key::<Aes256Gcm>::from_slice(&intermediate_derived_key);
 
         let main_cipher = Aes256Gcm::new(key);
         let main_nonce = Nonce::from_slice(self.enc_main_nonce.as_slice());
 
-        Ok(main_cipher.decrypt(main_nonce, self.enc_main.as_ref()).map_err(|err| UserOperationError::EncryptionError(err))?)
+        let decrypted_main = main_cipher.decrypt(main_nonce, self.enc_main.as_ref()).map_err(|err| UserOperationError::EncryptionError(err))?;
+
+        if !verify(decrypted_main.as_slice(), &self.main_hash).map_err(|err| UserOperationError::HashingError(err))? {
+            return Err(UserOperationError::User(Error::WrongIntermediateKey))
+        }
+
+       Ok(decrypted_main)
     }
 }
 
@@ -97,7 +111,11 @@ impl User {
         intermediate: &String,
         secondary_password: &String
     ) -> Result<(), UserOperationError> {
-        // this makes the check about correctness of the intermediate password
+        if !crate::is_valid_password(secondary_password) {
+            return Err(UserOperationError::User(Error::InvalidPassword))
+        }
+
+        // this makes the check about correctness of the intermediate key
         let _ = self.main(intermediate)?;
 
         let secondary_auth_method = SecondaryPassword::new(intermediate, secondary_password)?;
@@ -117,6 +135,14 @@ impl User {
     ) -> Result<String, UserOperationError> {
         let main = self.main.as_ref().ok_or(UserOperationError::User(Error::MainPasswordNotSet))?;
         
+        if let Some(provided_pw) = secondary_password {
+            if !crate::is_valid_password(provided_pw) {
+                return Err(UserOperationError::User(Error::InvalidPassword))
+            } else if let Ok(main_pw) = main.plain(provided_pw) {
+                return Ok(crate::vec_to_password(&main_pw))
+            }
+        }
+
         for sec_auth in (&self.auth).into_iter() {
             if let Ok(intermediate) = sec_auth.intermediate(secondary_password) {
                 if let Ok(main_pw_as_vec) = main.plain(&intermediate) {
@@ -132,6 +158,10 @@ impl User {
         &self,    
         intermediate_key: &String
     ) -> Result<String, UserOperationError> {
+        if !crate::is_valid_password(intermediate_key) {
+            return Err(UserOperationError::User(Error::InvalidPassword))
+        }
+
         match &self.main {
             Some(main) => Ok(crate::vec_to_password((main.plain(intermediate_key)?).as_ref())),
             None => Err(UserOperationError::User(Error::MainPasswordNotSet))
@@ -143,6 +173,14 @@ impl User {
         main: &String,
         intermediate_key: &String
     ) -> Result<(), UserOperationError> {
+        if !crate::is_valid_password(main) {
+            return Err(UserOperationError::User(Error::InvalidPassword))
+        }
+
+        if !crate::is_valid_password(intermediate_key) {
+            return Err(UserOperationError::User(Error::InvalidPassword))
+        }
+
         match &self.main {
             Some(m) => {
                 if !verify(intermediate_key, &m.intermediate_key_hash).map_err(|err| UserOperationError::HashingError(err))? {

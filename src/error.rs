@@ -36,7 +36,8 @@ pub enum Error {
     WrongIntermediateKey,
     MainPasswordNotSet,
     CouldNotAuthenticate,
-    MatchingAuthNotProvided
+    MatchingAuthNotProvided,
+    InvalidPassword,
 }
 
 impl std::fmt::Display for Error {
@@ -45,7 +46,8 @@ impl std::fmt::Display for Error {
             Self::WrongIntermediateKey => write!(f, "Wrong intermediate key"),
             Self::MainPasswordNotSet => write!(f, "Main password not set"),
             Self::CouldNotAuthenticate => write!(f, "Could not authenticate"),
-            Self::MatchingAuthNotProvided => write!(f, "Authentication method unsupported")
+            Self::MatchingAuthNotProvided => write!(f, "Authentication method unsupported"),
+            Self::InvalidPassword => write!(f, "Invalid password (probably contains invalid characters)")
         }
     }
 }

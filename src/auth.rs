@@ -32,6 +32,8 @@ impl SecondaryPassword {
             Aes256Gcm::generate_key(&mut OsRng).to_vec().as_slice()
         ).unwrap();
 
+        let password_hash = hash(password.as_str(), DEFAULT_COST).map_err(|err| UserOperationError::HashingError(err))?;
+
         let password_derived_key = crate::derive_key(&password.as_str(), &password_salt);
 
         let key = Key::<Aes256Gcm>::from_slice(&password_derived_key);
@@ -41,8 +43,6 @@ impl SecondaryPassword {
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
 
         let enc_intermediate = cipher.encrypt(&nonce, crate::password_to_vec(intermediate).as_ref()).map_err(|err|  UserOperationError::EncryptionError(err))?;
-
-        let password_hash = hash(&password_derived_key, DEFAULT_COST).map_err(|err| UserOperationError::HashingError(err))?;
 
         Ok(
             Self {
@@ -59,11 +59,11 @@ impl SecondaryPassword {
         &self,
         password: &String
     ) -> Result<String, UserOperationError> {
-        let password_derived_key = crate::derive_key(&password.as_str(), &self.password_salt);
-
-        if !verify(&password_derived_key, &self.password_hash.as_str()).map_err(|err| UserOperationError::HashingError(err))? {
+        if !verify(password.as_str(), &self.password_hash.as_str()).map_err(|err| UserOperationError::HashingError(err))? {
             return Err(UserOperationError::User(Error::CouldNotAuthenticate))
         }
+
+        let password_derived_key = crate::derive_key(&password.as_str(), &self.password_salt);
 
         let key = Key::<Aes256Gcm>::from_slice(&password_derived_key);
         let cipher = Aes256Gcm::new(key);
