@@ -8,25 +8,31 @@ name = "login-ng_cli"
 path = "src/login-ng_cli/main.rs"
 
 [[bin]]
-name = "login-ng_cmd"
-path = "src/login-ng_cmd/main.rs"
-
-[[bin]]
 name = "login-ng_ctl"
 path = "src/login-ng_ctl/main.rs"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-greetd_ipc = { version = "0.10.3", features = ["sync-codec"]}
 rpassword = "^7.3"
-getopts = "^0.2"
 thiserror = "^1.0"
-enquote = "^1.1"
-nix = "^0.29"
 aes-gcm = "^0.10"
 bcrypt = "^0.15"
 hkdf = { version = "^0.12", features = ["std"] }
 sha2 = "0.10.8"
 pam-client2 = { version = "0.5.2", features = [] }
 argh = "0.1.12"
+
+# Conditional dependencies
+[features]
+greetd = ["greetd_ipc", "nix"]
+
+# Optional dependencies
+[dependencies.greetd_ipc]
+version = "0.10.3"
+features = ["sync-codec"]
+optional = true
+
+[dependencies.nix]
+version = "^0.29"
+optional = true

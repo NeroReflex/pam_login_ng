@@ -1,8 +1,11 @@
+#[cfg(feature = "greetd")]
 pub mod login;
+
 pub mod user;
 pub mod auth;
 pub mod error;
 pub mod conversation;
+pub mod user_conversation;
 
 pub(crate) mod tests;
 
