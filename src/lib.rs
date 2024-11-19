@@ -37,7 +37,7 @@ pub(crate) fn vec_to_password(vec: &Vec<u8>) -> String {
 }
 
 // this MUST be implemented and used because entering invalid strings can be a security hole (see lossy_utf8)
-pub fn is_valid_password(password: &String) -> bool {
+pub(crate) fn is_valid_password(password: &String) -> bool {
     vec_to_password(password_to_vec(password).as_ref()) == password.clone()
 }
 
