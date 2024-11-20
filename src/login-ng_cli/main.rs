@@ -38,8 +38,8 @@ fn login_greetd(
     greetd_sock: String,
     prompter: Arc<Mutex<dyn LoginUserInteractionHandler>>,
     maybe_username: &Option<String>,
-    cmd: &String
-) -> Result<LoginResult, Box<dyn std::error::Error>> {
+    cmd: &Option<String>
+) -> Result<LoginResult, LoginError> {
     use login_ng::greetd::GreetdLoginExecutor;
 
     let mut login_executor = GreetdLoginExecutor::new(greetd_sock, prompter);
@@ -50,8 +50,8 @@ fn login_greetd(
 fn login_pam(
     prompter: Arc<Mutex<dyn LoginUserInteractionHandler>>,
     maybe_username: &Option<String>,
-    cmd: &String
-) -> Result<LoginResult, Box<dyn std::error::Error>> {
+    cmd: &Option<String>
+) -> Result<LoginResult, LoginError> {
     let conversation = ProxyLoginUserInteractionHandlerConversation::new(prompter);
 
     let mut login_executer = PamLoginExecutor::new(conversation);
@@ -65,8 +65,6 @@ fn main() {
     let allow_autologin = args.autologin.unwrap_or(false);
 
     let max_failures = args.failures.unwrap_or(5);
-
-    let cmd = args.cmd.unwrap_or(String::from("/bin/sh"));
 
     let prompter = Arc::new(
         Mutex::new(
@@ -86,24 +84,21 @@ fn main() {
                     println!("Running over greetd, but greetd support has been compile-time disabled.")
                 }
 
-                login_pam(prompter.clone(), &args.user, &cmd)
+                login_pam(prompter.clone(), &args.user, &args.cmd)
             }
 
             #[cfg(feature = "greetd")]
             {
                 match env::var("GREETD_SOCK") {
-                    Ok(greetd_sock) => login_greetd(greetd_sock, prompter.clone(), &args.user, &cmd),
-                    Err(_) => login_pam(prompter.clone(), &args.user, &cmd)
+                    Ok(greetd_sock) => login_greetd(greetd_sock, prompter.clone(), &args.user, &args.cmd),
+                    Err(_) => login_pam(prompter.clone(), &args.user, &args.cmd)
                 }
             }
         };
 
         match login_result {
             Ok(succeeded) => match succeeded {
-                LoginResult::Success => {
-                    println!("Login attempt {attempt}/{max_failures} succeeded.");
-                    break 'login_attempt
-                },
+                LoginResult::Success => break 'login_attempt,
                 LoginResult::Failure => eprintln!("Login attempt {attempt}/{max_failures} failed.")
             },
             Err(err) => eprintln!("Login attempt {attempt}/{max_failures} errored: {}", err)

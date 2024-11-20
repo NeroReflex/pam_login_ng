@@ -1,9 +1,25 @@
 use std::sync::{Arc, Mutex};
 
+use thiserror::Error;
+
+use crate::{greetd::GreetdLoginError, pam::PamLoginError};
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum LoginResult {
     Success,
     Failure,
+}
+
+#[derive(Debug, Error)]
+pub enum LoginError {
+    #[error("Error with greetd: {0}")]
+    GreetdError(GreetdLoginError),
+
+    #[error("Error with pam: {0}")]
+    PamError(PamLoginError),
+
+    #[error("Error in username discovery")]
+    UserDiscoveryError,
 }
 
 pub trait LoginUserInteractionHandler {
@@ -20,10 +36,12 @@ pub trait LoginUserInteractionHandler {
 
 }
 
+/// Interface that allows a user to authenticate and perform actions
 pub trait LoginExecutor {
 
     fn prompt(&self) -> Arc<Mutex<dyn LoginUserInteractionHandler>>;
 
-    fn execute(&mut self, maybe_username: &Option<String>, cmd: &std::string::String) -> Result<LoginResult, Box<dyn std::error::Error>>;
+    /// Authenticate the user and execute the given command, or launch shell if one is not being provided.
+    fn execute(&mut self, maybe_username: &Option<String>, cmd: &Option<String>) -> Result<LoginResult, LoginError>;
 
 }
