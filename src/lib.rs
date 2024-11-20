@@ -5,7 +5,11 @@ pub mod user;
 pub mod auth;
 pub mod error;
 pub mod conversation;
-pub mod user_conversation;
+pub mod cli;
+pub mod pam;
+
+#[cfg(feature = "greetd")]
+pub mod greetd;
 
 pub(crate) mod tests;
 

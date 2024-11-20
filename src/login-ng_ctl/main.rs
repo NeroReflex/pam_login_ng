@@ -1,8 +1,10 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use login_ng::cli::TrivialCommandLineConversationPrompter;
 use login_ng::conversation::*;
 use login_ng::user::*;
+use login_ng::cli::*;
 use login_ng::prompt_password;
 
 use pam_client2::{Context, Flag};
@@ -67,7 +69,7 @@ fn main() {
 
     let answerer = Arc::new(
         Mutex::new(
-            SimpleConversationPromptAnswerer::new(
+            TrivialCommandLineConversationPrompter::new(
                 args.user.clone(),
                 args.password.clone(),
             )
@@ -80,7 +82,7 @@ fn main() {
         )
     );
 
-    let conversation = Conversation::new(Some(answerer), Some(interaction_recorder.clone()));
+    let conversation = CommandLineConversation::new(Some(answerer), Some(interaction_recorder.clone()));
 
     let mut context = Context::new(
         "system-login",

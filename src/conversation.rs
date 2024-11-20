@@ -1,6 +1,6 @@
 use std::ffi::{CStr, CString};
 
-use crate::{prompt_stderr, prompt_password};
+use crate::login::LoginUserInteractionHandler;
 
 use pam_client2::{ConversationHandler, ErrorCode};
 
@@ -68,128 +68,69 @@ impl ConversationRecorder for SimpleConversationRecorder {
     }
 }
 
-pub trait ConversationPromptAnswerer {
+pub trait ConversationPrompter {
     
     fn echo_on_prompt(&mut self, prompt: &String) -> Option<String>;
 
     fn echo_off_prompt(&mut self, prompt: &String) -> Option<String>;
 
+    fn display_info(&mut self, prompt: &String);
+
+    fn display_error(&mut self, prompt: &String);
+
 }
 
-pub struct SimpleConversationPromptAnswerer {
-    plain: Option<String>,
-    hidden: Option<String>
+#[derive(Clone)]
+pub struct ProxyLoginUserInteractionHandlerConversation {
+
+    inner: Arc<Mutex<dyn LoginUserInteractionHandler>>,
+
 }
 
-impl SimpleConversationPromptAnswerer {
-    pub fn new(
-        plain: Option<String>,
-        hidden: Option<String>
-    ) -> Self {
+impl ProxyLoginUserInteractionHandlerConversation {
+    pub fn new(inner: Arc<Mutex<dyn LoginUserInteractionHandler>>) -> Self {
         Self {
-            plain,
-            hidden
+            inner
         }
     }
 }
 
-impl ConversationPromptAnswerer for SimpleConversationPromptAnswerer {
-
-    fn echo_on_prompt(&mut self, _prompt: &String) -> Option<String> {
-        self.plain.clone()
-    }
-
-    fn echo_off_prompt(&mut self, _prompt: &String) -> Option<String> {
-        self.hidden.clone()
-    }
-
-}
-
-pub struct Conversation {
-    answerer: Option<Arc<Mutex<dyn ConversationPromptAnswerer>>>,
-    recorder: Option<Arc<Mutex<dyn ConversationRecorder>>>,
-}
-
-impl Conversation {
-    /// Creates a new null conversation handler
-	#[must_use]
-	pub fn new(
-        answerer: Option<Arc<Mutex<dyn ConversationPromptAnswerer>>>,
-        recorder: Option<Arc<Mutex<dyn ConversationRecorder>>>
-    ) -> Self {
-		Self {
-            answerer,
-            recorder
-        }
-	}
-
-    pub fn attach_recorder(&mut self, recorder: Arc<Mutex<dyn ConversationRecorder>>) {
-        self.recorder = Some(recorder)
-    }
-}
-
-impl Default for Conversation {
-	fn default() -> Self {
-		Self::new(None, None)
-	}
-}
-
-impl ConversationHandler for Conversation {
+impl ConversationHandler for ProxyLoginUserInteractionHandlerConversation {
 	fn prompt_echo_on(&mut self, msg: &CStr) -> Result<CString, ErrorCode> {
-        let prompt = format!("{}", msg.to_string_lossy());
+        let msg = format!("{}", msg.to_string_lossy());
 
-		let response: String = match self.answerer {
-            Some(ref ans) => match ans.lock() {
-                Ok(mut guard) => match guard.echo_on_prompt(&prompt) {
-                    Some(answer) => answer,
-                    None => prompt_stderr(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?
-                },
-                Err(_) => prompt_stderr(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?
-            },
-            None => prompt_stderr(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?
-        };
-
-        if let Some(recorder) = &self.recorder {
-            if let Ok(mut guard) = recorder.lock() {
-                guard.record_echo_on(prompt, response.clone());
-            }
+        let mut guard = self.inner.lock().map_err(|_| ErrorCode::CONV_ERR)?;
+        match guard.prompt_plain(&msg) {
+            Some(response) => Ok(CString::new(response).map_err(|_err| ErrorCode::CONV_ERR)?),
+            None => Err(ErrorCode::CONV_ERR)
         }
-
-        Ok(CString::new(response).map_err(|_err| ErrorCode::CONV_ERR)?)
 	}
 
 	fn prompt_echo_off(&mut self, msg: &CStr) -> Result<CString, ErrorCode> {
-		let prompt = format!("{}", msg.to_string_lossy());
+		let msg = format!("{}", msg.to_string_lossy());
 
-        let response: String = match self.answerer {
-            Some(ref ans) => match ans.lock() {
-                Ok(mut guard) => match guard.echo_off_prompt(&prompt) {
-                    Some(answer) => answer,
-                    None => prompt_password(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?
-                },
-                Err(_) => prompt_password(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?
-            },
-            None => prompt_password(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?
-        };
-
-        if let Some(recorder) = &self.recorder {
-            if let Ok(mut guard) = recorder.lock() {
-                guard.record_echo_off(prompt, response.clone());
-            }
+        let mut guard = self.inner.lock().map_err(|_| ErrorCode::CONV_ERR)?;
+        match guard.prompt_secret(&msg) {
+            Some(response) => Ok(CString::new(response).map_err(|_err| ErrorCode::CONV_ERR)?),
+            None => Err(ErrorCode::CONV_ERR)
         }
-
-        Ok(CString::new(response).map_err(|_err| ErrorCode::CONV_ERR)?)
 	}
 
 	fn text_info(&mut self, msg: &CStr) {
-        let string = format!("{}", msg.to_string_lossy());
+        let msg = format!("{}", msg.to_string_lossy());
 
-        println!("{}", string);
+        match self.inner.lock().map_err(|_| ErrorCode::CONV_ERR) {
+            Ok(mut guard) => guard.print_info(&msg),
+            Err(err) => eprintln!("had to info about '{}', but an error occurred: {:?}", msg, err)
+        }
     }
 
 	fn error_msg(&mut self, msg: &CStr) {
-        let string = format!("{}", msg.to_string_lossy());
+        let msg = format!("{}", msg.to_string_lossy());
 
-        eprintln!("{}", string);
+        match self.inner.lock().map_err(|_| ErrorCode::CONV_ERR) {
+            Ok(mut guard) => guard.print_error(&msg),
+            Err(err) => eprintln!("had to info about '{}', but an error occurred: {:?}", msg, err)
+        }
     }
 }

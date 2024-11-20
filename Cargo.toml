@@ -22,9 +22,11 @@ hkdf = { version = "^0.12", features = ["std"] }
 sha2 = "0.10.8"
 pam-client2 = { version = "0.5.2", features = [] }
 argh = "0.1.12"
+users = "0.11.0"
 
 # Conditional dependencies
 [features]
+default = ["greetd"]  # Enable greetd feature by default
 greetd = ["greetd_ipc", "nix"]
 
 # Optional dependencies

@@ -1,8 +1,13 @@
 use std::env;
+use std::sync::Arc;
+use std::sync::Mutex;
 
-use login_ng::user::*;
+use login_ng::cli::CommandLineLoginUserInteractionHandler;
+use login_ng::conversation::ProxyLoginUserInteractionHandlerConversation;
+use login_ng::login::*;
 
 use argh::FromArgs;
+use login_ng::pam::PamLoginExecutor;
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Command line tool for managing login-ng authentication methods
@@ -28,79 +33,80 @@ struct Args {
     failures: Option<usize>,
 }
 
+#[cfg(feature = "greetd")]
+fn login_greetd(
+    greetd_sock: String,
+    prompter: Arc<Mutex<dyn LoginUserInteractionHandler>>,
+    maybe_username: &Option<String>,
+    cmd: &String
+) -> Result<LoginResult, Box<dyn std::error::Error>> {
+    use login_ng::greetd::GreetdLoginExecutor;
 
-use login_ng::prompt_password;
+    let mut login_executor = GreetdLoginExecutor::new(greetd_sock, prompter);
 
+    login_executor.execute(maybe_username, cmd)
+}
 
+fn login_pam(
+    prompter: Arc<Mutex<dyn LoginUserInteractionHandler>>,
+    maybe_username: &Option<String>,
+    cmd: &String
+) -> Result<LoginResult, Box<dyn std::error::Error>> {
+    let conversation = ProxyLoginUserInteractionHandlerConversation::new(prompter);
+
+    let mut login_executer = PamLoginExecutor::new(conversation);
+
+    login_executer.execute(maybe_username, cmd)
+}
 
 fn main() {
     let args: Args = argh::from_env();
 
     let allow_autologin = args.autologin.unwrap_or(false);
-/*
-    let cmd = match matches.opt_default("cmd", "login-ng_cmd") {
-        Some(cmd) => cmd,
-        None => String::from("login-ng_cmd")
-    };
-*/
+
     let max_failures = args.failures.unwrap_or(5);
 
-    //let uts = uname().unwrap();
+    let cmd = args.cmd.unwrap_or(String::from("/bin/sh"));
+
+    let prompter = Arc::new(
+        Mutex::new(
+            CommandLineLoginUserInteractionHandler::new(
+                allow_autologin,
+                args.user.clone()
+            )
+        )
+    );
+
     'login_attempt: for attempt in 0..max_failures {
 
-        #[cfg(not(feature = "greetd"))]
-        {
-            // Code that runs when the greeter feature is not enabled
-            println!("Greeter feature is not enabled. Running in default mode.");
-        }
-
-        #[cfg(feature = "greetd")]
-        {
-            use login_ng::login::*;
-
-            let username = match args.user {
-                Some(account) => account,
-                None => match login_ng::prompt_stderr(&format!("login: ")) {
-                    Ok(typed_username) => {
-                        typed_username
-                    },
-                    Err(err) => {
-                        println!("Login failed: {}\n", err);
-                        continue 'login_attempt
-                    }
+        let login_result = {
+            #[cfg(not(feature = "greetd"))]
+            {
+                if let Ok(_) = env::var("GREETD_SOCK") {
+                    println!("Running over greetd, but greetd support has been compile-time disabled.")
                 }
-            };
 
-            let login_data = Login::new(
-                username.clone(),
-                cmd.clone(),
-                move |str: &String, param: (String, usize)| -> Result<String, Box<dyn std::error::Error>> {
-                    let (username, attempt) = param;
-                    
-                    let file_path = format!("/etc/login-ng/{}.conf", username.clone());
+                login_pam(prompter.clone(), &args.user, &cmd)
+            }
 
-                    // try to autologin searching for a secondary password that is the empty string
-                    if attempt == 0 && allow_autologin {
-                        if let Ok(user_cfg) = User::load_from_file(file_path) {
-                            let empty_password = Some(String::new());
-                            if let Ok(main_password) = user_cfg.main_by_auth(&empty_password) {
-                                return Ok(main_password)
-                            }
-                        }
-                    }
-
-                    Ok(prompt_password(format!("{}", str)).map_err(|err| Box::new(err))?)
-                }
-            );
-
-            match login_data.execute((username.clone(), attempt)) {
-                Ok(LoginResult::Success) => break,
-                Ok(LoginResult::Failure) => eprintln!("Login incorrect\n"),
-                Err(e) => {
-                    eprintln!("error: {}", e);
-                    std::process::exit(1);
+            #[cfg(feature = "greetd")]
+            {
+                match env::var("GREETD_SOCK") {
+                    Ok(greetd_sock) => login_greetd(greetd_sock, prompter.clone(), &args.user, &cmd),
+                    Err(_) => login_pam(prompter.clone(), &args.user, &cmd)
                 }
             }
-        }
+        };
+
+        match login_result {
+            Ok(succeeded) => match succeeded {
+                LoginResult::Success => {
+                    println!("Login attempt {attempt}/{max_failures} succeeded.");
+                    break 'login_attempt
+                },
+                LoginResult::Failure => eprintln!("Login attempt {attempt}/{max_failures} failed.")
+            },
+            Err(err) => eprintln!("Login attempt {attempt}/{max_failures} errored: {}", err)
+        };
     }
 }
