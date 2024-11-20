@@ -101,7 +101,7 @@ impl LoginExecutor for GreetdLoginExecutor {
 
                         let command = match &cmd {
                             Some(cmd) => cmd.clone(),
-                            None => format!("{}", logged_user.shell().to_str().map_or(String::from("/bin/sh"), |shell| shell.to_string())),
+                            None => format!("{}", logged_user.shell().to_str().map_or(String::from(crate::DEFAULT_CMD), |shell| shell.to_string())),
                         };
 
                         next_request = Request::StartSession {
