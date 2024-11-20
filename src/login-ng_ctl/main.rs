@@ -1,3 +1,5 @@
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -23,6 +25,14 @@ struct Args {
     /// main password for authentication (the one accepted by PAM)
     password: Option<String>,
 
+    #[argh(option)]
+    /// force update of the user configuration if required
+    update_as_needed: Option<bool>,
+
+    #[argh(option)]
+    /// ignore the failure about the user running this software and the target user not being the same
+    ignore_user: Option<bool>,
+
     #[argh(subcommand)]
     command: Command,
 }
@@ -31,11 +41,19 @@ struct Args {
 #[argh(subcommand)]
 /// Subcommands for managing authentication methods
 enum Command {
-    Add(AddAuthCommand)
+    Inspect(InspectCommand),
+    Add(AddAuthCommand),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
-/// Command to add a new authentication method
+/// Inspects user login settings
+#[argh(subcommand, name = "inspect")]
+struct InspectCommand {
+    
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Add a new authentication method
 #[argh(subcommand, name = "add")]
 struct AddAuthCommand {
     #[argh(option)]
@@ -116,7 +134,11 @@ fn main() {
         }
     };
 
+    let mut write_file = args.update_as_needed;
     match args.command {
+        Command::Inspect(_) => {
+
+        },
         Command::Add(add_cmd) => {
             let intermediate_password = add_cmd.intermediate.clone().unwrap_or_else(|| {
                 prompt_password("Intermediate key:").expect("Failed to read intermediate key")
@@ -143,7 +165,7 @@ fn main() {
     
                             let repeat = prompt_password("Secondary password (repeat):").expect("Failed to read secondary password (repeat)");
                             if secondary_password != repeat {
-                                println!("Passwords do not match.\nAborting.");
+                                eprintln!("Passwords do not match.\nAborting.");
                                 std::process::exit(-1)
                             }
     
@@ -152,21 +174,48 @@ fn main() {
                     };
 
                     if !user_cfg.has_main() {
-                        println!("Cannot add a secondary password for an account with no main password.\nAborting.");
+                        eprintln!("Cannot add a secondary password for an account with no main password.\nAborting.");
                         std::process::exit(-1);
                     }
     
                     match user_cfg.add_secondary_password(&intermediate_password, &secondary_password) {
                         Ok(_) => {
-                            user_cfg.store_to_file(Path::new(&file_path)).expect("Error saving the updated configuration");
+                            write_file = Some(true);
                             println!("Secondary password added.");
                         },
                         Err(err) => {
-                            println!("Error adding a secondary password: {}.\nAborting.", err);
+                            eprintln!("Error adding a secondary password: {}.\nAborting.", err);
+                            std::process::exit(-1);
                         }
                     }
                 },
             }
         }
+    }
+
+    let selected_user = users::get_user_by_name(&username).expect("Could not identify the specified user by its username.\nAborting.");
+
+    let uid = selected_user.uid();
+
+    if write_file.unwrap_or_default() {
+        let current_uid = users::get_current_uid();
+
+        if uid != current_uid {
+            eprintln!("Configuration is not relevant to the user invoking the command.\nAborting.");
+            std::process::exit(-1);
+        }
+
+        let file_path = Path::new(&file_path);
+        user_cfg.store_to_file(file_path).expect("Error saving the updated configuration.\nAborting.");
+        
+        let gid = selected_user.primary_group_id();
+
+        // set the new file to 640 to avoid other users to read about supported authentication methods
+        let mut perms = fs::metadata(file_path).expect("Could not read stored file permissions.\nAborting.").permissions();
+        perms.set_mode(0o640);
+        
+        perms.set_readonly(true);
+
+        std::os::unix::fs::chown(file_path, Some(uid), Some(gid)).expect("Cannot change user configuration file ownership.\nAborting.");
     }
 }

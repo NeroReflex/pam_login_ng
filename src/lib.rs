@@ -1,6 +1,4 @@
-#[cfg(feature = "greetd")]
 pub mod login;
-
 pub mod user;
 pub mod auth;
 pub mod error;

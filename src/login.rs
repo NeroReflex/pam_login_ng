@@ -2,8 +2,6 @@ use std::sync::{Arc, Mutex};
 
 use thiserror::Error;
 
-use crate::{greetd::GreetdLoginError, pam::PamLoginError};
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum LoginResult {
     Success,
@@ -12,11 +10,12 @@ pub enum LoginResult {
 
 #[derive(Debug, Error)]
 pub enum LoginError {
+    #[cfg(feature = "greetd")]
     #[error("Error with greetd: {0}")]
-    GreetdError(GreetdLoginError),
+    GreetdError(crate::greetd::GreetdLoginError),
 
     #[error("Error with pam: {0}")]
-    PamError(PamLoginError),
+    PamError(crate::pam::PamLoginError),
 
     #[error("Error in username discovery")]
     UserDiscoveryError,
