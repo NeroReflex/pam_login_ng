@@ -100,5 +100,4 @@ impl LoginExecutor for PamLoginExecutor {
 
         Ok(LoginResult::Success)
     }
-    
 }

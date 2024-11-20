@@ -85,16 +85,9 @@ impl MainPassword {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Command {
-    command: String,
-    arguments: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
     main: Option<MainPassword>,
-    auth: Vec<SecondaryAuth>,
-    cmd: Option<Command>
+    auth: Vec<SecondaryAuth>
 }
 
 impl User {
@@ -102,7 +95,6 @@ impl User {
         Self {
             main: None,
             auth: vec![],
-            cmd: None
         }
     }
 
@@ -219,22 +211,8 @@ impl User {
         let file = File::open(path).map_err(|err| UserOperationError::Io(err))?;
 
         let reader = std::io::BufReader::new(file);
-    
-        let res = serde_json::from_reader::<BufReader<File>, User>(reader).map_err(|err| UserOperationError::Serde(err))?;
-        
-        if let Some(m) = &res.main {
-            let nonce_len = m.enc_main_nonce.len();
-            if nonce_len != 12 {
-                return Err(UserOperationError::Validation(
-                    ValidationError::new(
-                        String::from("main_nonce"),
-                        format!("Invalid length (expected 96, got {})", nonce_len)
-                    )
-                ));
-            }
-        }
 
-        Ok(res)
+        Ok(serde_json::from_reader::<BufReader<File>, User>(reader).map_err(|err| UserOperationError::Serde(err))?)
     }
 
     pub fn store_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), UserOperationError> {
@@ -245,25 +223,6 @@ impl User {
         let writer = BufWriter::new(file);
         
         // Serialize the User struct to JSON and write it to the file
-        serde_json::to_writer(writer, self).map_err(|err| UserOperationError::Serde(err))?;
-        
-        Ok(())
-    }
-
-    pub fn set_cmd(&mut self, cmd: Command) -> Result<(), UserOperationError> {
-        self.cmd = Some(cmd);
-
-        Ok(())
-    }
-
-    pub fn cmd(&self) -> Result<Option<Command>, UserOperationError> {
-        Ok(self.cmd.clone())
-    }
-
-    pub fn cmd_or_default(&self, default: Command) -> Result<Command, UserOperationError> {
-        match self.cmd.clone() {
-            Some(command) => Ok(command),
-            None => Ok(default)
-        }
+        Ok(serde_json::to_writer_pretty(writer, self).map_err(|err| UserOperationError::Serde(err))?)
     }
 }
