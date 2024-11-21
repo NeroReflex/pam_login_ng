@@ -368,4 +368,16 @@ impl UserAuthData {
     pub(crate) fn main_password(&self) -> &Option<MainPassword> {
         &self.main
     }
+
+    pub(crate) fn secondary(&self) -> std::slice::Iter::<SecondaryAuth> {
+        self.auth.iter()
+    }
+
+    pub(crate) fn push_main(&mut self, value: MainPassword) {
+        self.main = Some(value);
+    }
+
+    pub(crate) fn push_secondary(&mut self, value: SecondaryAuth) {
+        self.auth.push(value);
+    }
 }

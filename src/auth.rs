@@ -1,3 +1,5 @@
+use bytevec::*;
+
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Nonce, Key
@@ -8,14 +10,16 @@ use bcrypt::{DEFAULT_COST, hash, verify};
 
 use crate::{error::*, user::{AuthDataNonce, AuthDataSalt, UserAuthDataError}};
 
-#[derive(Debug, Clone)]
-pub struct SecondaryPassword {
-    enc_intermediate_nonce: AuthDataNonce,
-    enc_intermediate: Vec<u8>, // this is encrypted with the (password, enc_intermediate_nonce)
-    
-    password_salt: AuthDataSalt,
+bytevec_decl! {
+    #[derive(Debug, Eq, PartialEq, Clone)]
+    pub struct SecondaryPassword {
+        enc_intermediate_nonce: AuthDataNonce,
+        enc_intermediate: Vec<u8>, // this is encrypted with the (password, enc_intermediate_nonce)
+        
+        password_salt: AuthDataSalt,
 
-    password_hash: String // this is used to check the entered password
+        password_hash: String // this is used to check the entered password
+    }
 }
 
 impl SecondaryPassword {
