@@ -6,14 +6,14 @@ use aes_gcm::{
 extern crate bcrypt;
 use bcrypt::{DEFAULT_COST, hash, verify};
 
-use crate::{error::*, user::UserAuthDataError};
+use crate::{error::*, user::{AuthDataNonce, AuthDataSalt, UserAuthDataError}};
 
 #[derive(Debug, Clone)]
 pub struct SecondaryPassword {
-    enc_intermediate_nonce: [u8; 12],
+    enc_intermediate_nonce: AuthDataNonce,
     enc_intermediate: Vec<u8>, // this is encrypted with the (password, enc_intermediate_nonce)
     
-    password_salt: [u8; 32],
+    password_salt: AuthDataSalt,
 
     password_hash: String // this is used to check the entered password
 }
@@ -26,13 +26,13 @@ impl SecondaryPassword {
         intermediate: &String,
         password: &String
     ) -> Result<Self, UserOperationError> {
-        let password_salt = <[u8; 32]>::try_from(
+        let password_salt_arr = <[u8; 32]>::try_from(
             Aes256Gcm::generate_key(&mut OsRng).to_vec().as_slice()
         ).unwrap();
 
         let password_hash = hash(password.as_str(), DEFAULT_COST).map_err(|err| UserOperationError::HashingError(err))?;
 
-        let password_derived_key = crate::derive_key(&password.as_str(), &password_salt);
+        let password_derived_key = crate::derive_key(&password.as_str(), &password_salt_arr);
 
         let key = Key::<Aes256Gcm>::from_slice(&password_derived_key);
 
@@ -42,9 +42,13 @@ impl SecondaryPassword {
 
         let enc_intermediate = cipher.encrypt(&nonce, crate::password_to_vec(intermediate).as_ref()).map_err(|err|  UserOperationError::EncryptionError(err))?;
 
+        let temp: [u8; 32] = password_salt_arr.into();
+        let password_salt = AuthDataSalt::from(temp);
+        let temp: [u8; 12] = nonce.into();
+        let enc_intermediate_nonce = AuthDataNonce::from(temp);
         Ok(
             Self {
-                enc_intermediate_nonce: nonce.into(),
+                enc_intermediate_nonce,
                 enc_intermediate,
                 password_salt,
                 password_hash
@@ -61,12 +65,14 @@ impl SecondaryPassword {
             return Err(UserOperationError::User(UserAuthDataError::CouldNotAuthenticate))
         }
 
-        let password_derived_key = crate::derive_key(&password.as_str(), &self.password_salt);
+        let temp: [u8; 32] = self.password_salt.into();
+        let password_derived_key = crate::derive_key(&password.as_str(), temp.as_slice());
 
         let key = Key::<Aes256Gcm>::from_slice(&password_derived_key);
         let cipher = Aes256Gcm::new(key);
 
-        let nonce = Nonce::from_slice(&self.enc_intermediate_nonce.as_slice());
+        let temp: [u8; 12] = self.enc_intermediate_nonce.into();
+        let nonce = Nonce::from_slice(temp.as_slice());
 
         let dec_result = cipher.decrypt(nonce, self.enc_intermediate.as_ref()).map_err(|err| UserOperationError::EncryptionError(err))?;
 

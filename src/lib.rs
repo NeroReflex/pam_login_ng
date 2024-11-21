@@ -12,6 +12,8 @@ pub mod greetd;
 
 pub(crate) mod tests;
 
+extern crate bytevec;
+
 pub const DEFAULT_CMD: &str = "/bin/sh";
 
 pub const DEFAULT_XATTR_NAME: &str = "user.login-ng";
