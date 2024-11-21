@@ -1,5 +1,3 @@
-use serde::{Deserialize, Serialize};
-
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
     Aes256Gcm, Nonce, Key
@@ -8,9 +6,9 @@ use aes_gcm::{
 extern crate bcrypt;
 use bcrypt::{DEFAULT_COST, hash, verify};
 
-use crate::error::*;
+use crate::{error::*, user::UserAuthDataError};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct SecondaryPassword {
     enc_intermediate_nonce: [u8; 12],
     enc_intermediate: Vec<u8>, // this is encrypted with the (password, enc_intermediate_nonce)
@@ -60,7 +58,7 @@ impl SecondaryPassword {
         password: &String
     ) -> Result<String, UserOperationError> {
         if !verify(password.as_str(), &self.password_hash.as_str()).map_err(|err| UserOperationError::HashingError(err))? {
-            return Err(UserOperationError::User(Error::CouldNotAuthenticate))
+            return Err(UserOperationError::User(UserAuthDataError::CouldNotAuthenticate))
         }
 
         let password_derived_key = crate::derive_key(&password.as_str(), &self.password_salt);
@@ -76,7 +74,7 @@ impl SecondaryPassword {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub enum SecondaryAuth {
     Password(SecondaryPassword)
 }
@@ -90,7 +88,7 @@ impl SecondaryAuth {
             SecondaryAuth::Password(pwd) => {
                 match &secondary_password {
                     Some(provided_secondary) => pwd.intermediate(provided_secondary),
-                    None => Err(UserOperationError::User(Error::MatchingAuthNotProvided))
+                    None => Err(UserOperationError::User(UserAuthDataError::MatchingAuthNotProvided))
                 }
             }
         }

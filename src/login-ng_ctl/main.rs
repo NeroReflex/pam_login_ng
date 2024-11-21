@@ -1,17 +1,19 @@
-use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
 use std::sync::Mutex;
 
 use login_ng::cli::TrivialCommandLineConversationPrompter;
 use login_ng::conversation::*;
-use login_ng::user::*;
+use login_ng::storage::{
+    load_user_auth_data,
+    remove_user_auth_data,
+    save_user_auth_data
+};
+use login_ng::storage::StorageSource;
 use login_ng::cli::*;
 use login_ng::prompt_password;
 
 use pam_client2::{Context, Flag};
 
-use std::path::Path;
 use argh::FromArgs;
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -41,8 +43,16 @@ struct Args {
 #[argh(subcommand)]
 /// Subcommands for managing authentication methods
 enum Command {
+    Reset(ResetCommand),
     Inspect(InspectCommand),
     Add(AddAuthCommand),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Reset additional authentication data also destroying the intermediate key
+#[argh(subcommand, name = "reset")]
+struct ResetCommand {
+    
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -100,12 +110,10 @@ fn main() {
         )
     );
 
-    let conversation = CommandLineConversation::new(Some(answerer), Some(interaction_recorder.clone()));
-
     let mut context = Context::new(
         "system-login",
         args.user.as_deref(),
-        conversation
+        CommandLineConversation::new(Some(answerer), Some(interaction_recorder.clone()))
     ).expect("Failed to initialize PAM context");
 
     context.set_user_prompt(user_prompt).unwrap();
@@ -120,24 +128,37 @@ fn main() {
         interaction_recorder.lock().unwrap().recorded_username(&user_prompt).unwrap()
     });
 
-    let file_path = format!("/etc/login-ng/{}.json", &username);
-    let mut user_cfg = match Path::new(&file_path).exists() {
-        true => match User::load_from_file(&file_path) {
-            Ok(user_cfg) => user_cfg,
-            Err(err) => {
-                eprintln!("There is a problem loading your configuration file: {}.\nAborting.", err);
-                std::process::exit(-1)
-            }
-        },
-        false => {
-            User::new()
+    let storage_source = StorageSource::Username(username.clone());
+    let mut user_cfg = match load_user_auth_data(&storage_source) {
+        Ok(user_cfg) => user_cfg,
+        Err(err) => {
+            eprintln!("There is a problem loading your configuration file: {}.\nAborting.", err);
+            std::process::exit(-1)
         }
     };
 
     let mut write_file = args.update_as_needed;
     match args.command {
+        Command::Reset(_) => {
+            match remove_user_auth_data(&storage_source) {
+                Ok(_) => {},
+                Err(err) => {
+                    eprintln!("Error in resetting user additional athentication methods: {}", err);
+                    std::process::exit(-1)
+                }
+            }
+            
+            // Do NOT rewrite the User structure that was created while authenticating the user
+            write_file = Some(false)
+        },
         Command::Inspect(_) => {
-
+            match load_user_auth_data(&storage_source) {
+                Ok(user) => {},
+                Err(err) => {
+                    eprintln!("Error in fetching user additional athentication methods: {}", err);
+                    std::process::exit(-1)
+                }
+            }
         },
         Command::Add(add_cmd) => {
             let intermediate_password = add_cmd.intermediate.clone().unwrap_or_else(|| {
@@ -205,17 +226,6 @@ fn main() {
             std::process::exit(-1);
         }
 
-        let file_path = Path::new(&file_path);
-        user_cfg.store_to_file(file_path).expect("Error saving the updated configuration.\nAborting.");
-        
-        let gid = selected_user.primary_group_id();
-
-        // set the new file to 640 to avoid other users to read about supported authentication methods
-        let mut perms = fs::metadata(file_path).expect("Could not read stored file permissions.\nAborting.").permissions();
-        perms.set_mode(0o640);
-        
-        perms.set_readonly(true);
-
-        std::os::unix::fs::chown(file_path, Some(uid), Some(gid)).expect("Cannot change user configuration file ownership.\nAborting.");
+        save_user_auth_data(user_cfg, &storage_source).expect("Error saving the updated configuration.\nAborting.");
     }
 }

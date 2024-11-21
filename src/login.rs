@@ -12,12 +12,12 @@ pub enum LoginResult {
 pub enum LoginError {
     #[cfg(feature = "greetd")]
     #[error("Error with greetd: {0}")]
-    GreetdError(crate::greetd::GreetdLoginError),
+    GreetdError(#[from] crate::greetd::GreetdLoginError),
 
     #[error("Error with pam: {0}")]
-    PamError(crate::pam::PamLoginError),
+    PamError(#[from] crate::pam::PamLoginError),
 
-    #[error("Error in username discovery")]
+    #[error("Username not recognised")]
     UserDiscoveryError,
 }
 

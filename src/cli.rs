@@ -1,9 +1,9 @@
-use std::{ffi::{CStr, CString}, path::Path, sync::{Arc, Mutex}};
+use std::{ffi::{CStr, CString}, sync::{Arc, Mutex}};
 
 use pam_client2::{ConversationHandler, ErrorCode};
 use rpassword::prompt_password;
 
-use crate::{conversation::*, login::LoginUserInteractionHandler, prompt_stderr, user::User};
+use crate::{conversation::*, login::LoginUserInteractionHandler, prompt_stderr, storage::{load_user_auth_data, StorageSource}, user::UserAuthData};
 
 pub struct TrivialCommandLineConversationPrompter {
     plain: Option<String>,
@@ -147,19 +147,8 @@ pub struct CommandLineLoginUserInteractionHandler {
 
     maybe_username: Option<String>,
 
-    maybe_user: Option<User>,
+    maybe_user: Option<UserAuthData>,
 
-}
-
-fn attempt_load_user(username: &String) -> Option<User> {
-    let file_path = format!("/etc/login-ng/{}.json", &username);
-    match Path::new(&file_path).exists() {
-        true => match User::load_from_file(&file_path) {
-            Ok(user_cfg) => Some(user_cfg),
-            Err(_err) => None,
-        },
-        false => None,
-    }
 }
 
 impl CommandLineLoginUserInteractionHandler {
@@ -172,7 +161,9 @@ impl CommandLineLoginUserInteractionHandler {
             attempt_autologin,
             maybe_username: maybe_username.clone(),
             maybe_user: match &maybe_username {
-                Some(username) => attempt_load_user(username),
+                Some(username) => load_user_auth_data(
+                    &StorageSource::Username(username.clone())
+                ).map_or(None, |a| Some(a)),
                 None => None
             }
         }
@@ -189,7 +180,9 @@ impl Default for CommandLineLoginUserInteractionHandler {
 impl LoginUserInteractionHandler for CommandLineLoginUserInteractionHandler {
 
     fn provide_username(&mut self, username: &String) {
-        self.maybe_user = attempt_load_user(username)
+        self.maybe_user = load_user_auth_data(
+            &StorageSource::Username(username.clone())
+        ).map_or(None, |a| Some(a))
     }
 
     fn prompt_secret(&mut self, msg: &String) -> Option<String> {

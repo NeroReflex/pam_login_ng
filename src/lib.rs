@@ -2,6 +2,7 @@ pub mod login;
 pub mod user;
 pub mod auth;
 pub mod error;
+pub mod storage;
 pub mod conversation;
 pub mod cli;
 pub mod pam;
@@ -12,6 +13,8 @@ pub mod greetd;
 pub(crate) mod tests;
 
 pub const DEFAULT_CMD: &str = "/bin/sh";
+
+pub const DEFAULT_XATTR_NAME: &str = "user.login-ng";
 
 use std::io::BufRead;
 

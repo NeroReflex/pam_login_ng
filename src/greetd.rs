@@ -10,10 +10,10 @@ use users::{get_user_by_name, os::unix::UserExt};
 #[derive(Debug, Error)]
 pub enum GreetdLoginError {
     #[error("Error connecting to greetd: {0}")]
-    GreetdConnectionError(std::io::Error),
+    GreetdConnectionError(#[from] std::io::Error),
 
     #[error("Error in greetd connection: {0}")]
-    GreetdIpcError(greetd_ipc::codec::Error),
+    GreetdIpcError(#[from] greetd_ipc::codec::Error),
 
     #[error("Unknown error in greetd: {0}")]
     GreetdUnknownError(String),

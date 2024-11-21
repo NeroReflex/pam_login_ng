@@ -4,7 +4,7 @@ fn test_main_password_change() {
     let second_main = format!("2nd main password :B");
     let intermediate = format!("intermediate_key");
 
-    let mut user_cfg = crate::user::User::new();
+    let mut user_cfg = crate::user::UserAuthData::new();
     
     // set the main password
     user_cfg.set_main(&first_main, &intermediate).unwrap();
@@ -18,7 +18,7 @@ fn test_main_password_auth() {
     let first_main = format!("main password <3");
     let intermediate = format!("intermediate_key");
 
-    let mut user_cfg = crate::user::User::new();
+    let mut user_cfg = crate::user::UserAuthData::new();
     
     // set the main password
     user_cfg.set_main(&first_main, &intermediate).unwrap();

@@ -4,7 +4,7 @@ fn test_autologin() {
     let intermediate = format!("intermediate_key");
     let autologin = format!("");
 
-    let mut user_cfg = crate::user::User::new();
+    let mut user_cfg = crate::user::UserAuthData::new();
     user_cfg.set_main(&correct_main, &intermediate).unwrap();
     user_cfg.add_secondary_password(&intermediate, &autologin).unwrap();
 
@@ -21,7 +21,7 @@ fn test_secondary() {
         format!("sfaffsss")
     ];
 
-    let mut user_cfg = crate::user::User::new();
+    let mut user_cfg = crate::user::UserAuthData::new();
     user_cfg.set_main(&correct_main, &intermediate).unwrap();
 
     // register every secondary password in the test vector
