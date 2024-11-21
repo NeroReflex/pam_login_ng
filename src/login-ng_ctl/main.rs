@@ -12,6 +12,7 @@ use login_ng::storage::StorageSource;
 use login_ng::cli::*;
 use login_ng::prompt_password;
 
+use login_ng::user::UserAuthData;
 use pam_client2::{Context, Flag};
 
 use argh::FromArgs;
@@ -130,7 +131,10 @@ fn main() {
 
     let storage_source = StorageSource::Username(username.clone());
     let mut user_cfg = match load_user_auth_data(&storage_source) {
-        Ok(user_cfg) => user_cfg,
+        Ok(load_res) => match load_res {
+            Some(auth_data) => auth_data,
+            None => UserAuthData::new()
+        },
         Err(err) => {
             eprintln!("There is a problem loading your configuration file: {}.\nAborting.", err);
             std::process::exit(-1)

@@ -28,7 +28,7 @@ fn test_main_password_serialization() {
     match load_user_auth_data(&source) {
         Ok(reloaded) => {
             std::fs::remove_dir(dir_name).unwrap();
-            assert_eq!(reloaded.main_by_auth(&provided_password).unwrap(), first_main)
+            assert_eq!(reloaded.as_ref().unwrap().main_by_auth(&provided_password).unwrap(), first_main)
         },
         Err(error) => {
             std::fs::remove_dir(dir_name).unwrap();
@@ -64,27 +64,25 @@ fn test_secondary_password_serialization() {
         save_user_auth_data(user_cfg, &source).unwrap();
     }
 
+    let mut tested: usize = 0;
     match load_user_auth_data(&source) {
         Ok(reloaded) => {
             std::fs::remove_dir(dir_name).unwrap();
             
             // attempt to login with each secondary password
-            let mut tested: usize = 0;
+            
             for sp in secondary_passwords.iter() {
                 let secondary_password = Some(sp.clone());
-                assert_eq!(reloaded.main_by_auth(&secondary_password).unwrap(), correct_main);
+                assert_eq!(reloaded.as_ref().unwrap().main_by_auth(&secondary_password).unwrap(), correct_main);
                 tested += 1;
             }
-
-            assert_eq!(tested, secondary_passwords.len());
         },
         Err(error) => {
             std::fs::remove_dir(dir_name).unwrap();
             let error_str = format!("{}", error);
             eprintln!("{}", error_str);
-            assert_eq!(1, 2)
         }
     }
 
-    
+    assert_eq!(tested, secondary_passwords.len());
 }

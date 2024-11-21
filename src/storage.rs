@@ -11,9 +11,6 @@ pub enum StorageError {
     #[error("Uhandled data version")]
     UnhandledVersion,
 
-    #[error("No data has been find")]
-    NoData,
-
     #[error("Username not recognised")]
     UserDiscoveryError,
 
@@ -73,7 +70,7 @@ fn homedir_by_username(username: &String) -> Result<OsString, StorageError> {
     }
 }
 
-pub fn load_user_auth_data(source: &StorageSource) -> Result<UserAuthData, StorageError> {
+pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData>, StorageError> {
     let home_dir_path = match source {
         StorageSource::Username(username) => homedir_by_username(&username)?,
         StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string()
@@ -81,12 +78,12 @@ pub fn load_user_auth_data(source: &StorageSource) -> Result<UserAuthData, Stora
 
     let manifest = xattr::get_deref(home_dir_path.as_os_str(), format!("{}.manifest", crate::DEFAULT_XATTR_NAME)).map_err(|err| StorageError::XAttrError(err))?;
     if let None = manifest {
-        return Err(StorageError::NoData)
+        return Ok(None)
     }
 
     let main = xattr::get_deref(home_dir_path.as_os_str(), format!("{}.main", crate::DEFAULT_XATTR_NAME)).map_err(|err| StorageError::XAttrError(err))?;
     if let None = main {
-        return Err(StorageError::NoData)
+        return Ok(None)
     }
 
     let mut auth_data = UserAuthData::new();
@@ -96,7 +93,7 @@ pub fn load_user_auth_data(source: &StorageSource) -> Result<UserAuthData, Stora
             let main = MainPassword::decode::<u16>(a.as_slice()).map_err(|err| StorageError::SerializationError(err))?;
             auth_data.push_main(main);
         },
-        None => return Err(StorageError::NoData)
+        None => return Ok(None)
     };
 
     let xattrs = xattr::list_deref(home_dir_path.as_os_str()).map_err(|err| StorageError::XAttrError(err))?;
@@ -138,7 +135,7 @@ pub fn load_user_auth_data(source: &StorageSource) -> Result<UserAuthData, Stora
         }
     }
 
-    Ok(auth_data)
+    Ok(Some(auth_data))
 }
 
 pub fn remove_user_auth_data(source: &StorageSource) -> Result<(), StorageError> {

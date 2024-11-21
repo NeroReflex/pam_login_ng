@@ -162,7 +162,7 @@ impl CommandLineLoginUserInteractionHandler {
         let maybe_user = match &maybe_username {
             Some(username) => load_user_auth_data(
                 &StorageSource::Username(username.clone())
-            ).map_or(None, |a| Some(a)),
+            ).map_or(None, |a| a),
             None => None
         };
 
@@ -192,7 +192,7 @@ impl LoginUserInteractionHandler for CommandLineLoginUserInteractionHandler {
     fn provide_username(&mut self, username: &String) {
         self.maybe_user = load_user_auth_data(
             &StorageSource::Username(username.clone())
-        ).map_or(None, |a| Some(a))
+        ).map_or(None, |a| a)
     }
 
     fn prompt_secret(&mut self, msg: &String) -> Option<String> {
