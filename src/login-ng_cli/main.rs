@@ -70,7 +70,8 @@ fn main() {
         Mutex::new(
             CommandLineLoginUserInteractionHandler::new(
                 allow_autologin,
-                args.user.clone()
+                args.user.clone(),
+                args.password.clone()
             )
         )
     );

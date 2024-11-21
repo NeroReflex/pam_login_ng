@@ -145,27 +145,32 @@ pub struct CommandLineLoginUserInteractionHandler {
 
     attempt_autologin: bool,
 
-    maybe_username: Option<String>,
-
     maybe_user: Option<UserAuthData>,
 
+    maybe_username: Option<String>,
+
+    maybe_password: Option<String>,
 }
 
 impl CommandLineLoginUserInteractionHandler {
 
     pub fn new(
         attempt_autologin: bool,
-        maybe_username: Option<String>
+        maybe_username: Option<String>,
+        maybe_password: Option<String>
     ) -> Self {
+        let maybe_user = match &maybe_username {
+            Some(username) => load_user_auth_data(
+                &StorageSource::Username(username.clone())
+            ).map_or(None, |a| Some(a)),
+            None => None
+        };
+
         Self {
             attempt_autologin,
-            maybe_username: maybe_username.clone(),
-            maybe_user: match &maybe_username {
-                Some(username) => load_user_auth_data(
-                    &StorageSource::Username(username.clone())
-                ).map_or(None, |a| Some(a)),
-                None => None
-            }
+            maybe_user,
+            maybe_username,
+            maybe_password,
         }
     }
 
@@ -173,7 +178,12 @@ impl CommandLineLoginUserInteractionHandler {
 
 impl Default for CommandLineLoginUserInteractionHandler {
     fn default() -> Self {
-        Self { attempt_autologin: bool::default(), maybe_username: Default::default(), maybe_user: Default::default() }
+        Self {
+            attempt_autologin: bool::default(),
+            maybe_user: Default::default(),
+            maybe_username: Default::default(),
+            maybe_password: Default::default(),
+        }
     }
 }
 
@@ -194,15 +204,24 @@ impl LoginUserInteractionHandler for CommandLineLoginUserInteractionHandler {
             }
         }
 
-        match prompt_password(msg.as_str()) {
-            Ok(provided_secret) => match &self.maybe_user {
-                Some(user_cfg) => match user_cfg.main_by_auth(&Some(provided_secret.clone())) {
+        match &self.maybe_password {
+            Some(password) => match &self.maybe_user {
+                Some(user_cfg) => match user_cfg.main_by_auth(&Some(password.clone())) {
                     Ok(main_password) => Some(main_password),
-                    Err(_) => Some(provided_secret)
+                    Err(_) => Some(password.clone())
                 },
-                None => Some(provided_secret)
+                None => Some(password.clone())
             },
-            Err(_) => None
+            None => match prompt_password(msg.as_str()) {
+                Ok(provided_secret) => match &self.maybe_user {
+                    Some(user_cfg) => match user_cfg.main_by_auth(&Some(provided_secret.clone())) {
+                        Ok(main_password) => Some(main_password),
+                        Err(_) => Some(provided_secret)
+                    },
+                    None => Some(provided_secret)
+                },
+                Err(_) => None
+            }
         }
     }
 
