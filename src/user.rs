@@ -257,6 +257,7 @@ impl UserAuthData {
 
     pub fn add_secondary_password(
         &mut self,
+        name: &str,
         intermediate: &String,
         secondary_password: &String
     ) -> Result<(), UserOperationError> {
@@ -269,7 +270,7 @@ impl UserAuthData {
 
         self.auth.push(
             SecondaryAuth::new_password(
-                "test",
+                name,
                 None,
                 SecondaryPassword::new(intermediate, secondary_password)?
             )

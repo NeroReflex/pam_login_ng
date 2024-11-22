@@ -31,11 +31,11 @@ struct Args {
     /// main password for authentication (the one accepted by PAM)
     password: Option<String>,
 
-    #[argh(option)]
+    #[argh(switch)]
     /// force update of the user configuration if required
     update_as_needed: Option<bool>,
 
-    #[argh(option)]
+    #[argh(switch)]
     /// ignore the failure about the user running this software and the target user not being the same
     ignore_user: Option<bool>,
 
@@ -70,6 +70,10 @@ struct InspectCommand {
 /// Add a new authentication method
 #[argh(subcommand, name = "add")]
 struct AddAuthCommand {
+    #[argh(option)]
+    /// name of the authentication method
+    name: String,
+
     #[argh(option)]
     /// intermediate key (the key used to unlock the main password)
     intermediate: Option<String>,
@@ -202,7 +206,7 @@ fn main() {
                         std::process::exit(-1);
                     }
     
-                    match user_cfg.add_secondary_password(&intermediate_password, &secondary_password) {
+                    match user_cfg.add_secondary_password(&add_cmd.name, &intermediate_password, &secondary_password) {
                         Ok(_) => {
                             write_file = Some(true);
                             println!("Secondary password added.");
