@@ -163,8 +163,26 @@ fn main() {
             write_file = Some(false)
         },
         Command::Inspect(_) => {
+            let methods_count = user_cfg.secondary().len();
+            match methods_count {
+                0 => {
+                    println!("No authentication methods configured.");
+                }
+                1 => {
+                    println!("There is 1 authentication method: ");
+                    println!("-----------------------------------------------------------");
+                },
+                _ => {
+                    println!("There are {} authentication methods: ", user_cfg.secondary().len());
+                    println!("-----------------------------------------------------------");
+                }
+            }
+            
             for s in user_cfg.secondary() {
-                println!("{}\n    created at: {:?}", s.name(), Local.timestamp_opt(s.creation_date() as i64, 0).unwrap().to_string());
+                println!("name: {}", s.name());
+                println!("    created at: {:?}", Local.timestamp_opt(s.creation_date() as i64, 0).unwrap().to_string());
+                println!("    type: {}", s.type_name());
+                println!("-----------------------------------------------------------");
             }
         },
         Command::Add(add_cmd) => {
