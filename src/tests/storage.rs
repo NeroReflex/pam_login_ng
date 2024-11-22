@@ -52,8 +52,8 @@ fn test_secondary_password_serialization() {
         user_cfg.set_main(&correct_main, &intermediate).unwrap();
 
         // register every secondary password in the test vector
-        for sp in secondary_passwords.iter() {
-            user_cfg.add_secondary_password(&intermediate, sp).unwrap();
+        for (idx, sp) in secondary_passwords.iter().enumerate() {
+            user_cfg.add_secondary_password(format!("test{}", idx).as_str(), &intermediate, sp).unwrap();
         }
 
         std::fs::create_dir(dir_name).unwrap();

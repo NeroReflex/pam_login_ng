@@ -6,7 +6,7 @@ fn test_autologin() {
 
     let mut user_cfg = crate::user::UserAuthData::new();
     user_cfg.set_main(&correct_main, &intermediate).unwrap();
-    user_cfg.add_secondary_password(&intermediate, &autologin).unwrap();
+    user_cfg.add_secondary_password("prova", &intermediate, &autologin).unwrap();
 
     let secondary_password = Some(autologin);
     assert_eq!(user_cfg.main_by_auth(&secondary_password).unwrap(), correct_main);
@@ -25,8 +25,8 @@ fn test_secondary() {
     user_cfg.set_main(&correct_main, &intermediate).unwrap();
 
     // register every secondary password in the test vector
-    for sp in secondary_passwords.iter() {
-        user_cfg.add_secondary_password(&intermediate, sp).unwrap();
+    for (idx, sp) in secondary_passwords.iter().enumerate() {
+        user_cfg.add_secondary_password(format!("test{}", idx).as_str(), &intermediate, sp).unwrap();
     }
     
     // attempt to login with each secondary password
