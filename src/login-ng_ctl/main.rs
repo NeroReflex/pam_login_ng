@@ -1,6 +1,9 @@
+use std::fmt::Debug;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use chrono::Local;
+use chrono::TimeZone;
 use login_ng::cli::TrivialCommandLineConversationPrompter;
 use login_ng::conversation::*;
 use login_ng::storage::{
@@ -156,12 +159,8 @@ fn main() {
             write_file = Some(false)
         },
         Command::Inspect(_) => {
-            match load_user_auth_data(&storage_source) {
-                Ok(user) => {},
-                Err(err) => {
-                    eprintln!("Error in fetching user additional athentication methods: {}", err);
-                    std::process::exit(-1)
-                }
+            for s in user_cfg.secondary() {
+                println!("{}\n    created at: {:?}", s.name(), Local.timestamp_opt(s.creation_date() as i64, 0).unwrap().to_string());
             }
         },
         Command::Add(add_cmd) => {
@@ -226,8 +225,13 @@ fn main() {
         let current_uid = users::get_current_uid();
 
         if uid != current_uid {
-            eprintln!("Configuration is not relevant to the user invoking the command.\nAborting.");
-            std::process::exit(-1);
+            if !args.ignore_user.unwrap_or_default() {
+                eprintln!("Configuration is not relevant to the user invoking the command.\nAborting.");
+                std::process::exit(-1);
+            } else {
+                println!("Configuration is not relevant to the user invoking the command, but will proceed anyway.");
+            }
+            
         }
 
         save_user_auth_data(user_cfg, &storage_source).expect("Error saving the updated configuration.\nAborting.");

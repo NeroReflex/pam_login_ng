@@ -267,9 +267,13 @@ impl UserAuthData {
         // this makes the check about correctness of the intermediate key
         let _ = self.main(intermediate)?;
 
-        let secondary_auth_method = SecondaryPassword::new(intermediate, secondary_password)?;
-
-        self.auth.push(SecondaryAuth::Password(secondary_auth_method));
+        self.auth.push(
+            SecondaryAuth::new_password(
+                "test",
+                None,
+                SecondaryPassword::new(intermediate, secondary_password)?
+            )
+        );
 
         Ok(())
     }
@@ -369,7 +373,7 @@ impl UserAuthData {
         &self.main
     }
 
-    pub(crate) fn secondary(&self) -> std::slice::Iter::<SecondaryAuth> {
+    pub fn secondary(&self) -> std::slice::Iter::<SecondaryAuth> {
         self.auth.iter()
     }
 

@@ -1,6 +1,6 @@
 use std::{ffi::OsString, path::{Path, PathBuf}};
 
-use crate::{auth::{SecondaryAuth, SecondaryPassword}, user::{MainPassword, UserAuthData}};
+use crate::{auth::{SecondaryAuth, SecondaryAuthMethod, SecondaryPassword}, user::{MainPassword, UserAuthData}};
 
 use errors::ByteVecError;
 use thiserror::Error;
@@ -40,15 +40,65 @@ use bytevec::*;
 
 bytevec_decl! {
     #[derive(PartialEq, Eq, Debug, Copy, Clone)]
-    struct AuthDatamanifest {
+    struct AuthDataManifest {
         version: u32
     }
 }
 
-impl AuthDatamanifest {
+impl AuthDataManifest {
     fn new() -> Self {
         Self {
             version: 0
+        }
+    }
+}
+
+bytevec_decl! {
+    #[derive(PartialEq, Eq, Debug, Clone)]
+    struct AuthDataSerialized {
+        name: String,
+        creation_date: u64,
+        auth_type: u32,
+        auth_data: Vec<u8>
+    }
+}
+
+impl TryFrom<&SecondaryAuth> for AuthDataSerialized {
+    type Error = StorageError;
+
+    fn try_from(value: &SecondaryAuth) -> Result<Self, Self::Error> {
+        let name = String::from(value.name());
+        let creation_date = value.creation_date();
+        
+        let (auth_type, auth_data) = match value.data() {
+            SecondaryAuthMethod::Password(secondary_password) => 
+                (0, secondary_password.encode::<u16>().map_err(|err| Self::Error::SerializationError(err))?),
+        };
+
+        Ok(
+            Self {
+                name,
+                creation_date,
+                auth_data,
+                auth_type
+            }
+        )
+    }
+}
+
+impl TryInto<SecondaryAuth> for AuthDataSerialized {
+    type Error = StorageError;
+
+    fn try_into(self) -> Result<SecondaryAuth, Self::Error> {
+        match self.auth_type {
+            0 => Ok(
+                SecondaryAuth::new_password(
+                    self.name.as_str(),
+                    Some(self.creation_date),
+                    SecondaryPassword::decode::<u16>(self.auth_data.as_slice()).map_err(|err| StorageError::SerializationError(err))?
+                )
+            ),
+            _ => Err(StorageError::DeserializationError)
         }
     }
 }
@@ -101,34 +151,12 @@ pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData
         match attr.to_str() {
             Some(s) => {
                 if s.starts_with(format!("{}.auth.", crate::DEFAULT_XATTR_NAME).as_str()) {
-                    let parts: Vec<&str> = s.split('.').collect();
-                    if parts.len() >= 2 {
-                        let index_and_type = parts[parts.len() - 1];
-                        let index_parts: Vec<&str> = index_and_type.split('_').collect();
-                        let t = index_parts[1].to_string();
-                        if index_parts.len() == 2 {
-                            match index_parts[0].parse::<usize>() {
-                                Ok(idx) => {
-                                    match xattr::get_deref(home_dir_path.as_os_str(), s).map_err(|err| StorageError::XAttrError(err))? {
-                                        Some(raw_data) => {
-                                            if t == "password" {
-                                                auth_data.push_secondary(
-                                                    SecondaryAuth::Password(
-                                                        SecondaryPassword::decode::<u16>(&raw_data)
-                                                            .map_err(|err| StorageError::SerializationError(err))?
-                                                    )
-                                                );
-                                            } else {
+                    let raw_data = xattr::get_deref(home_dir_path.as_os_str(), s).map_err(|err| StorageError::XAttrError(err))?.unwrap();
+                    let serialized_data = AuthDataSerialized::decode::<u32>(raw_data.as_slice())?;
 
-                                            }
-                                        },
-                                        None => {}
-                                    }
-                                },
-                                Err(_) => {}
-                            };
-                        }
-                    }
+                    let secondary_auth: SecondaryAuth = serialized_data.try_into()?;
+
+                    auth_data.push_secondary(secondary_auth);
                 }
             },
             None => {}
@@ -161,8 +189,8 @@ pub fn save_user_auth_data(auth_data: UserAuthData, source: &StorageSource) -> R
     };
 
     // this is used in case a future format will be required
-    let manifest = AuthDatamanifest::new();
-    let manifest_serialization = manifest.encode::<u8>().map_err(|err| StorageError::SerializationError(err))?;
+    let manifest = AuthDataManifest::new();
+    let manifest_serialization = manifest.encode::<u16>().map_err(|err| StorageError::SerializationError(err))?;
     
     let maybe_main_password_serialization = match auth_data.main_password() {
         Some(m) => Some(m.encode::<u16>().map_err(|err| StorageError::SerializationError(err))?),
@@ -185,25 +213,13 @@ pub fn save_user_auth_data(auth_data: UserAuthData, source: &StorageSource) -> R
                     home_dir_path.as_os_str(), format!("{}.main", crate::DEFAULT_XATTR_NAME), data.as_slice()
                 ).map_err(|err| StorageError::XAttrError(err))?;
 
-                let staged_attrs = auth_data.secondary().map(|val| {
-                    match val {
-                        SecondaryAuth::Password(pw) => {
-                            (format!("password"), pw.encode::<u16>().map_err(|err| StorageError::SerializationError(err)))
-                        }
-                    }
-                }).collect::<Vec<(String, Result<Vec<u8>, StorageError>)>>();
+                for (index, val) in auth_data.secondary().enumerate() {
+                    let serialized_data: AuthDataSerialized = val.try_into()?;
+                    let raw_data = serialized_data.encode::<u32>().map_err(|err| StorageError::SerializationError(err))?;
 
-                let mut index: usize = 0;
-                for attr in staged_attrs {
-                    let (t, b) = attr;
-                    match b {
-                        Ok(d) => xattr::set(
-                            home_dir_path.as_os_str(), format!("{}.auth.{}_{}", crate::DEFAULT_XATTR_NAME, index, t), d.as_slice()
-                        ).map_err(|err| StorageError::XAttrError(err))?,
-                        Err(err) => return Err(err)
-                    };
-
-                    index += 1;
+                    xattr::set(
+                        home_dir_path.as_os_str(), format!("{}.auth.{}", crate::DEFAULT_XATTR_NAME, index), raw_data.as_slice()
+                    ).map_err(|err| StorageError::XAttrError(err))?
                 }
             },
             None => {}

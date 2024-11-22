@@ -1,7 +1,3 @@
-use std::path::PathBuf;
-
-use crate::storage::{load_user_auth_data, save_user_auth_data, StorageSource};
-
 #[test]
 fn test_main_password_serialization() {
     let first_main = format!("main password <3");
@@ -11,7 +7,7 @@ fn test_main_password_serialization() {
 
     let dir_name = "test1";
 
-    let source = StorageSource::Path(PathBuf::from(dir_name));
+    let source = crate::storage::StorageSource::Path(std::path::PathBuf::from(dir_name));
 
     {
         let mut user_cfg = crate::user::UserAuthData::new();
@@ -22,10 +18,10 @@ fn test_main_password_serialization() {
         assert_eq!(user_cfg.main_by_auth(&provided_password).unwrap(), first_main);
 
         std::fs::create_dir(dir_name).unwrap();
-        save_user_auth_data(user_cfg, &source).unwrap();
+        crate::storage::save_user_auth_data(user_cfg, &source).unwrap();
     }
 
-    match load_user_auth_data(&source) {
+    match crate::storage::load_user_auth_data(&source) {
         Ok(reloaded) => {
             std::fs::remove_dir(dir_name).unwrap();
             assert_eq!(reloaded.as_ref().unwrap().main_by_auth(&provided_password).unwrap(), first_main)
@@ -49,7 +45,7 @@ fn test_secondary_password_serialization() {
     ];
 
     let dir_name = "test2";
-    let source = StorageSource::Path(PathBuf::from(dir_name));
+    let source = crate::storage::StorageSource::Path(std::path::PathBuf::from(dir_name));
 
     {
         let mut user_cfg = crate::user::UserAuthData::new();
@@ -61,11 +57,11 @@ fn test_secondary_password_serialization() {
         }
 
         std::fs::create_dir(dir_name).unwrap();
-        save_user_auth_data(user_cfg, &source).unwrap();
+        crate::storage::save_user_auth_data(user_cfg, &source).unwrap();
     }
 
     let mut tested: usize = 0;
-    match load_user_auth_data(&source) {
+    match crate::storage::load_user_auth_data(&source) {
         Ok(reloaded) => {
             std::fs::remove_dir(dir_name).unwrap();
             

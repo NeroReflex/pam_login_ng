@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use bytevec::*;
 
 use aes_gcm::{
@@ -84,18 +86,57 @@ impl SecondaryPassword {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum SecondaryAuth {
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub struct SecondaryAuth {
+    name: String,
+    creation_date: u64,
+    method: SecondaryAuthMethod,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum SecondaryAuthMethod {
     Password(SecondaryPassword)
 }
 
 impl SecondaryAuth {
+    pub fn new_password(name: &str, creation_date: Option<u64>, password: SecondaryPassword) -> Self {
+        Self {
+            name: String::from(name),
+            creation_date: match creation_date {
+                Some(date) => date,
+                None => match SystemTime::now().duration_since(UNIX_EPOCH) {
+                    Ok(from_epoch) => from_epoch.as_secs(),
+                    Err(_err) => 0u64
+                }
+            },
+            method: SecondaryAuthMethod::Password(password)
+        }
+    }
+
+    pub(crate) fn data(&self) -> &SecondaryAuthMethod {
+        &self.method
+    }
+
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    pub fn creation_date(&self) -> u64 {
+        self.creation_date
+    }
+
+    pub fn type_name(&self) -> String {
+        match self.method {
+            SecondaryAuthMethod::Password(_) => String::from("password"),
+        }
+    }
+
     pub fn intermediate(
         &self,
         secondary_password: &Option<String>
     ) -> Result<String, UserOperationError> {
-        match self {
-            SecondaryAuth::Password(pwd) => {
+        match &self.method {
+            SecondaryAuthMethod::Password(pwd) => {
                 match &secondary_password {
                     Some(provided_secondary) => pwd.intermediate(provided_secondary),
                     None => Err(UserOperationError::User(UserAuthDataError::MatchingAuthNotProvided))

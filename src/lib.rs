@@ -10,6 +10,7 @@ pub mod pam;
 #[cfg(feature = "greetd")]
 pub mod greetd;
 
+#[cfg(test)]
 pub(crate) mod tests;
 
 extern crate bytevec;
