@@ -13,7 +13,7 @@ pub mod greetd;
 #[cfg(test)]
 pub(crate) mod tests;
 
-extern crate bytevec;
+extern crate bytevec2;
 
 pub const DEFAULT_CMD: &str = "/bin/sh";
 

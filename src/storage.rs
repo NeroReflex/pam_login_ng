@@ -2,6 +2,7 @@ use std::{ffi::OsString, path::{Path, PathBuf}};
 
 use crate::{auth::{SecondaryAuth, SecondaryAuthMethod, SecondaryPassword}, user::{MainPassword, UserAuthData}};
 
+use bytevec2::errors;
 use errors::ByteVecError;
 use thiserror::Error;
 use users::{get_user_by_name, os::unix::UserExt};
@@ -36,7 +37,7 @@ pub enum StorageSource {
     Path(PathBuf)
 }
 
-use bytevec::*;
+use bytevec2::*;
 
 bytevec_decl! {
     #[derive(PartialEq, Eq, Debug, Copy, Clone)]

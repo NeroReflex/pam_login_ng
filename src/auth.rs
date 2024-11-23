@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use bytevec::*;
+use bytevec2::*;
 
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},

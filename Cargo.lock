@@ -178,10 +178,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
-name = "bytevec"
-version = "0.2.0"
+name = "bytevec2"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d1ee6ad2d80504e769c077bd18fc6b11409518c3f20e4918a5c286d693c2b43"
+checksum = "aca792ac9754434d4a26403ac4c0c472d0e8611c27ffc54bffd72d70ec8cc477"
 
 [[package]]
 name = "cc"
@@ -468,7 +468,7 @@ dependencies = [
  "aes-gcm",
  "argh",
  "bcrypt",
- "bytevec",
+ "bytevec2",
  "chrono",
  "greetd_ipc",
  "hkdf",

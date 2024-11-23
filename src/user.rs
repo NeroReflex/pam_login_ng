@@ -1,4 +1,4 @@
-use bytevec::*;
+use bytevec2::*;
 
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
