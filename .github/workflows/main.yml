@@ -10,14 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          override: true
-          toolchain: nightly
-      - name: Run tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-features --no-fail-fast
+      - run: cargo test --all-features
 
   # Check formatting with rustfmt
   formatting:
