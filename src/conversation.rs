@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 #[derive(Debug, Clone)]
 pub enum ConversationInteraction {
     EchoOn { prompt: String, response: String },
-    EchoOff { prompt: String, response: String }
+    EchoOff { prompt: String, response: String },
 }
 
 pub trait ConversationRecorder {
@@ -17,7 +17,7 @@ pub trait ConversationRecorder {
 
     fn record_echo_off(&mut self, prompt: String, response: String);
 
-    fn recorded_username(&self, user_prompt: &Option<&str>,) -> Option<String>;
+    fn recorded_username(&self, user_prompt: &Option<&str>) -> Option<String>;
 
     fn recorded_password(&self) -> Option<String>;
 }
@@ -28,28 +28,40 @@ pub struct SimpleConversationRecorder {
 
 impl SimpleConversationRecorder {
     #[must_use]
-	pub fn new() -> Self {
-		Self {
-            recording: vec![]
-        }
-	}
+    pub fn new() -> Self {
+        Self { recording: vec![] }
+    }
 }
 
 impl ConversationRecorder for SimpleConversationRecorder {
     fn record_echo_on(&mut self, prompt: String, response: String) {
-        self.recording.push(ConversationInteraction::EchoOn { prompt: prompt, response: response } );
+        self.recording.push(ConversationInteraction::EchoOn {
+            prompt: prompt,
+            response: response,
+        });
     }
 
     fn record_echo_off(&mut self, prompt: String, response: String) {
-        self.recording.push(ConversationInteraction::EchoOff { prompt: prompt, response: response } );
+        self.recording.push(ConversationInteraction::EchoOff {
+            prompt: prompt,
+            response: response,
+        });
     }
 
-    fn recorded_username(&self, user_prompt: &Option<&str>,) -> Option<String> {
+    fn recorded_username(&self, user_prompt: &Option<&str>) -> Option<String> {
         for r in self.recording.iter().rev() {
             if let ConversationInteraction::EchoOn { prompt, response } = r {
                 match user_prompt {
-                    Some(expected_prompt) => if expected_prompt == prompt { return Some(response.clone()) },
-                    None => if prompt.contains("login:") { return Some(response.clone()) },
+                    Some(expected_prompt) => {
+                        if expected_prompt == prompt {
+                            return Some(response.clone());
+                        }
+                    }
+                    None => {
+                        if prompt.contains("login:") {
+                            return Some(response.clone());
+                        }
+                    }
                 }
             }
         }
@@ -59,8 +71,12 @@ impl ConversationRecorder for SimpleConversationRecorder {
 
     fn recorded_password(&self) -> Option<String> {
         for r in self.recording.iter().rev() {
-            if let ConversationInteraction::EchoOff { prompt: _, response } = r {
-                return Some(response.clone())
+            if let ConversationInteraction::EchoOff {
+                prompt: _,
+                response,
+            } = r
+            {
+                return Some(response.clone());
             }
         }
 
@@ -69,7 +85,6 @@ impl ConversationRecorder for SimpleConversationRecorder {
 }
 
 pub trait ConversationPrompter {
-    
     fn echo_on_prompt(&mut self, prompt: &String) -> Option<String>;
 
     fn echo_off_prompt(&mut self, prompt: &String) -> Option<String>;
@@ -77,60 +92,61 @@ pub trait ConversationPrompter {
     fn display_info(&mut self, prompt: &String);
 
     fn display_error(&mut self, prompt: &String);
-
 }
 
 #[derive(Clone)]
 pub struct ProxyLoginUserInteractionHandlerConversation {
-
     inner: Arc<Mutex<dyn LoginUserInteractionHandler>>,
-
 }
 
 impl ProxyLoginUserInteractionHandlerConversation {
     pub fn new(inner: Arc<Mutex<dyn LoginUserInteractionHandler>>) -> Self {
-        Self {
-            inner
-        }
+        Self { inner }
     }
 }
 
 impl ConversationHandler for ProxyLoginUserInteractionHandlerConversation {
-	fn prompt_echo_on(&mut self, msg: &CStr) -> Result<CString, ErrorCode> {
+    fn prompt_echo_on(&mut self, msg: &CStr) -> Result<CString, ErrorCode> {
         let msg = format!("{}", msg.to_string_lossy());
 
         let mut guard = self.inner.lock().map_err(|_| ErrorCode::CONV_ERR)?;
         match guard.prompt_plain(&msg) {
             Some(response) => Ok(CString::new(response).map_err(|_err| ErrorCode::CONV_ERR)?),
-            None => Err(ErrorCode::CONV_ERR)
+            None => Err(ErrorCode::CONV_ERR),
         }
-	}
+    }
 
-	fn prompt_echo_off(&mut self, msg: &CStr) -> Result<CString, ErrorCode> {
-		let msg = format!("{}", msg.to_string_lossy());
+    fn prompt_echo_off(&mut self, msg: &CStr) -> Result<CString, ErrorCode> {
+        let msg = format!("{}", msg.to_string_lossy());
 
         let mut guard = self.inner.lock().map_err(|_| ErrorCode::CONV_ERR)?;
         match guard.prompt_secret(&msg) {
             Some(response) => Ok(CString::new(response).map_err(|_err| ErrorCode::CONV_ERR)?),
-            None => Err(ErrorCode::CONV_ERR)
+            None => Err(ErrorCode::CONV_ERR),
         }
-	}
+    }
 
-	fn text_info(&mut self, msg: &CStr) {
+    fn text_info(&mut self, msg: &CStr) {
         let msg = format!("{}", msg.to_string_lossy());
 
         match self.inner.lock().map_err(|_| ErrorCode::CONV_ERR) {
             Ok(mut guard) => guard.print_info(&msg),
-            Err(err) => eprintln!("had to info about '{}', but an error occurred: {:?}", msg, err)
+            Err(err) => eprintln!(
+                "had to info about '{}', but an error occurred: {:?}",
+                msg, err
+            ),
         }
     }
 
-	fn error_msg(&mut self, msg: &CStr) {
+    fn error_msg(&mut self, msg: &CStr) {
         let msg = format!("{}", msg.to_string_lossy());
 
         match self.inner.lock().map_err(|_| ErrorCode::CONV_ERR) {
             Ok(mut guard) => guard.print_error(&msg),
-            Err(err) => eprintln!("had to info about '{}', but an error occurred: {:?}", msg, err)
+            Err(err) => eprintln!(
+                "had to info about '{}', but an error occurred: {:?}",
+                msg, err
+            ),
         }
     }
 }

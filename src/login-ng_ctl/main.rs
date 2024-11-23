@@ -5,15 +5,11 @@ use std::sync::Mutex;
 use chrono::Local;
 use chrono::TimeZone;
 use login_ng::cli::TrivialCommandLineConversationPrompter;
-use login_ng::conversation::*;
-use login_ng::storage::{
-    load_user_auth_data,
-    remove_user_auth_data,
-    save_user_auth_data
-};
-use login_ng::storage::StorageSource;
 use login_ng::cli::*;
+use login_ng::conversation::*;
 use login_ng::prompt_password;
+use login_ng::storage::StorageSource;
+use login_ng::storage::{load_user_auth_data, remove_user_auth_data, save_user_auth_data};
 
 use login_ng::user::UserAuthData;
 use pam_client2::{Context, Flag};
@@ -55,16 +51,12 @@ enum Command {
 #[derive(FromArgs, PartialEq, Debug)]
 /// Reset additional authentication data also destroying the intermediate key
 #[argh(subcommand, name = "reset")]
-struct ResetCommand {
-    
-}
+struct ResetCommand {}
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Inspects user login settings
 #[argh(subcommand, name = "inspect")]
-struct InspectCommand {
-    
-}
+struct InspectCommand {}
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Add a new authentication method
@@ -86,7 +78,7 @@ struct AddAuthCommand {
 #[argh(subcommand)]
 /// Subcommands for adding an authentication method
 enum AddAuthMethod {
-    Password(AddAuthPasswordCommand)
+    Password(AddAuthPasswordCommand),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -103,47 +95,51 @@ fn main() {
 
     let user_prompt = Some("username: ");
 
-    let answerer = Arc::new(
-        Mutex::new(
-            TrivialCommandLineConversationPrompter::new(
-                args.user.clone(),
-                args.password.clone(),
-            )
-        )
-    );
+    let answerer = Arc::new(Mutex::new(TrivialCommandLineConversationPrompter::new(
+        args.user.clone(),
+        args.password.clone(),
+    )));
 
-    let interaction_recorder = Arc::new(
-        Mutex::new(
-            SimpleConversationRecorder::new()
-        )
-    );
+    let interaction_recorder = Arc::new(Mutex::new(SimpleConversationRecorder::new()));
 
     let mut context = Context::new(
         "system-login",
         args.user.as_deref(),
-        CommandLineConversation::new(Some(answerer), Some(interaction_recorder.clone()))
-    ).expect("Failed to initialize PAM context");
+        CommandLineConversation::new(Some(answerer), Some(interaction_recorder.clone())),
+    )
+    .expect("Failed to initialize PAM context");
 
     context.set_user_prompt(user_prompt).unwrap();
 
     // Authenticate the user (ask for password, 2nd-factor token, fingerprint, etc.)
-    context.authenticate(Flag::NONE).expect("Authentication failed");
+    context
+        .authenticate(Flag::NONE)
+        .expect("Authentication failed");
 
     // Validate the account (is not locked, expired, etc.)
-    context.acct_mgmt(Flag::NONE).expect("Account validation failed");
+    context
+        .acct_mgmt(Flag::NONE)
+        .expect("Account validation failed");
 
     let username = args.user.clone().unwrap_or_else(|| {
-        interaction_recorder.lock().unwrap().recorded_username(&user_prompt).unwrap()
+        interaction_recorder
+            .lock()
+            .unwrap()
+            .recorded_username(&user_prompt)
+            .unwrap()
     });
 
     let storage_source = StorageSource::Username(username.clone());
     let mut user_cfg = match load_user_auth_data(&storage_source) {
         Ok(load_res) => match load_res {
             Some(auth_data) => auth_data,
-            None => UserAuthData::new()
+            None => UserAuthData::new(),
         },
         Err(err) => {
-            eprintln!("There is a problem loading your configuration file: {}.\nAborting.", err);
+            eprintln!(
+                "There is a problem loading your configuration file: {}.\nAborting.",
+                err
+            );
             std::process::exit(-1)
         }
     };
@@ -152,16 +148,19 @@ fn main() {
     match args.command {
         Command::Reset(_) => {
             match remove_user_auth_data(&storage_source) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(err) => {
-                    eprintln!("Error in resetting user additional athentication methods: {}", err);
+                    eprintln!(
+                        "Error in resetting user additional athentication methods: {}",
+                        err
+                    );
                     std::process::exit(-1)
                 }
             }
-            
+
             // Do NOT rewrite the User structure that was created while authenticating the user
             write_file = Some(false)
-        },
+        }
         Command::Inspect(_) => {
             let methods_count = user_cfg.secondary().len();
             match methods_count {
@@ -171,20 +170,29 @@ fn main() {
                 1 => {
                     println!("There is 1 authentication method: ");
                     println!("-----------------------------------------------------------");
-                },
+                }
                 _ => {
-                    println!("There are {} authentication methods: ", user_cfg.secondary().len());
+                    println!(
+                        "There are {} authentication methods: ",
+                        user_cfg.secondary().len()
+                    );
                     println!("-----------------------------------------------------------");
                 }
             }
-            
+
             for s in user_cfg.secondary() {
                 println!("name: {}", s.name());
-                println!("    created at: {:?}", Local.timestamp_opt(s.creation_date() as i64, 0).unwrap().to_string());
+                println!(
+                    "    created at: {:?}",
+                    Local
+                        .timestamp_opt(s.creation_date() as i64, 0)
+                        .unwrap()
+                        .to_string()
+                );
                 println!("    type: {}", s.type_name());
                 println!("-----------------------------------------------------------");
             }
-        },
+        }
         Command::Add(add_cmd) => {
             let intermediate_password = add_cmd.intermediate.clone().unwrap_or_else(|| {
                 prompt_password("Intermediate key:").expect("Failed to read intermediate key")
@@ -192,29 +200,36 @@ fn main() {
 
             if user_cfg.has_main() {
                 if let Err(err) = user_cfg.main_by_auth(&Some(intermediate_password.clone())) {
-                    eprintln!("Could not verify the correctness of the intermediate key: {}", err);
+                    eprintln!(
+                        "Could not verify the correctness of the intermediate key: {}",
+                        err
+                    );
                     std::process::exit(-1)
                 }
             }
 
             // if the main password is accepted update the stored one
             if let Some(main_password) = interaction_recorder.lock().unwrap().recorded_password() {
-                user_cfg.set_main(&main_password, &intermediate_password).expect("Error handling main password");
+                user_cfg
+                    .set_main(&main_password, &intermediate_password)
+                    .expect("Error handling main password");
             }
 
             match add_cmd.method {
-                AddAuthMethod::Password(add_auth_password_command) =>  {
+                AddAuthMethod::Password(add_auth_password_command) => {
                     let secondary_password = match add_auth_password_command.secondary_pw {
                         Some(secondary_password) => secondary_password,
                         None => {
-                            let secondary_password = prompt_password("Secondary password:").expect("Failed to read secondary password");
-    
-                            let repeat = prompt_password("Secondary password (repeat):").expect("Failed to read secondary password (repeat)");
+                            let secondary_password = prompt_password("Secondary password:")
+                                .expect("Failed to read secondary password");
+
+                            let repeat = prompt_password("Secondary password (repeat):")
+                                .expect("Failed to read secondary password (repeat)");
                             if secondary_password != repeat {
                                 eprintln!("Passwords do not match.\nAborting.");
                                 std::process::exit(-1)
                             }
-    
+
                             secondary_password
                         }
                     };
@@ -223,23 +238,28 @@ fn main() {
                         eprintln!("Cannot add a secondary password for an account with no main password.\nAborting.");
                         std::process::exit(-1);
                     }
-    
-                    match user_cfg.add_secondary_password(&add_cmd.name, &intermediate_password, &secondary_password) {
+
+                    match user_cfg.add_secondary_password(
+                        &add_cmd.name,
+                        &intermediate_password,
+                        &secondary_password,
+                    ) {
                         Ok(_) => {
                             write_file = Some(true);
                             println!("Secondary password added.");
-                        },
+                        }
                         Err(err) => {
                             eprintln!("Error adding a secondary password: {}.\nAborting.", err);
                             std::process::exit(-1);
                         }
                     }
-                },
+                }
             }
         }
     }
 
-    let selected_user = users::get_user_by_name(&username).expect("Could not identify the specified user by its username.\nAborting.");
+    let selected_user = users::get_user_by_name(&username)
+        .expect("Could not identify the specified user by its username.\nAborting.");
 
     let uid = selected_user.uid();
 
@@ -248,14 +268,16 @@ fn main() {
 
         if uid != current_uid {
             if !args.ignore_user.unwrap_or_default() {
-                eprintln!("Configuration is not relevant to the user invoking the command.\nAborting.");
+                eprintln!(
+                    "Configuration is not relevant to the user invoking the command.\nAborting."
+                );
                 std::process::exit(-1);
             } else {
                 println!("Configuration is not relevant to the user invoking the command, but will proceed anyway.");
             }
-            
         }
 
-        save_user_auth_data(user_cfg, &storage_source).expect("Error saving the updated configuration.\nAborting.");
+        save_user_auth_data(user_cfg, &storage_source)
+            .expect("Error saving the updated configuration.\nAborting.");
     }
 }

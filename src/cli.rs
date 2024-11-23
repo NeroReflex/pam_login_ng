@@ -1,24 +1,27 @@
-use std::{ffi::{CStr, CString}, sync::{Arc, Mutex}};
+use std::{
+    ffi::{CStr, CString},
+    sync::{Arc, Mutex},
+};
 
 use pam_client2::{ConversationHandler, ErrorCode};
 use rpassword::prompt_password;
 
-use crate::{conversation::*, login::LoginUserInteractionHandler, prompt_stderr, storage::{load_user_auth_data, StorageSource}, user::UserAuthData};
+use crate::{
+    conversation::*,
+    login::LoginUserInteractionHandler,
+    prompt_stderr,
+    storage::{load_user_auth_data, StorageSource},
+    user::UserAuthData,
+};
 
 pub struct TrivialCommandLineConversationPrompter {
     plain: Option<String>,
-    hidden: Option<String>
+    hidden: Option<String>,
 }
 
 impl TrivialCommandLineConversationPrompter {
-    pub fn new(
-        plain: Option<String>,
-        hidden: Option<String>
-    ) -> Self {
-        Self {
-            plain,
-            hidden
-        }
+    pub fn new(plain: Option<String>, hidden: Option<String>) -> Self {
+        Self { plain, hidden }
     }
 }
 
@@ -30,11 +33,11 @@ impl ConversationPrompter for TrivialCommandLineConversationPrompter {
     fn echo_off_prompt(&mut self, _prompt: &String) -> Option<String> {
         self.hidden.clone()
     }
-    
+
     fn display_info(&mut self, prompt: &String) {
         println!("{}", prompt)
     }
-    
+
     fn display_error(&mut self, prompt: &String) {
         eprintln!("{}", prompt)
     }
@@ -47,16 +50,13 @@ pub struct CommandLineConversation {
 
 impl CommandLineConversation {
     /// Creates a new null conversation handler
-	#[must_use]
-	pub fn new(
+    #[must_use]
+    pub fn new(
         answerer: Option<Arc<Mutex<dyn ConversationPrompter>>>,
-        recorder: Option<Arc<Mutex<dyn ConversationRecorder>>>
+        recorder: Option<Arc<Mutex<dyn ConversationRecorder>>>,
     ) -> Self {
-		Self {
-            answerer,
-            recorder
-        }
-	}
+        Self { answerer, recorder }
+    }
 
     pub fn attach_recorder(&mut self, recorder: Arc<Mutex<dyn ConversationRecorder>>) {
         self.recorder = Some(recorder)
@@ -64,24 +64,24 @@ impl CommandLineConversation {
 }
 
 impl Default for CommandLineConversation {
-	fn default() -> Self {
-		Self::new(None, None)
-	}
+    fn default() -> Self {
+        Self::new(None, None)
+    }
 }
 
 impl ConversationHandler for CommandLineConversation {
-	fn prompt_echo_on(&mut self, msg: &CStr) -> Result<CString, ErrorCode> {
+    fn prompt_echo_on(&mut self, msg: &CStr) -> Result<CString, ErrorCode> {
         let prompt = format!("{}", msg.to_string_lossy());
 
-		let response: String = match self.answerer {
+        let response: String = match self.answerer {
             Some(ref ans) => match ans.lock() {
                 Ok(mut guard) => match guard.echo_on_prompt(&prompt) {
                     Some(answer) => answer,
-                    None => prompt_stderr(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?
+                    None => prompt_stderr(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?,
                 },
-                Err(_) => prompt_stderr(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?
+                Err(_) => prompt_stderr(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?,
             },
-            None => prompt_stderr(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?
+            None => prompt_stderr(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?,
         };
 
         if let Some(recorder) = &self.recorder {
@@ -91,20 +91,20 @@ impl ConversationHandler for CommandLineConversation {
         }
 
         Ok(CString::new(response).map_err(|_err| ErrorCode::CONV_ERR)?)
-	}
+    }
 
-	fn prompt_echo_off(&mut self, msg: &CStr) -> Result<CString, ErrorCode> {
-		let prompt = format!("{}", msg.to_string_lossy());
+    fn prompt_echo_off(&mut self, msg: &CStr) -> Result<CString, ErrorCode> {
+        let prompt = format!("{}", msg.to_string_lossy());
 
         let response: String = match self.answerer {
             Some(ref ans) => match ans.lock() {
                 Ok(mut guard) => match guard.echo_off_prompt(&prompt) {
                     Some(answer) => answer,
-                    None => prompt_password(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?
+                    None => prompt_password(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?,
                 },
-                Err(_) => prompt_password(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?
+                Err(_) => prompt_password(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?,
             },
-            None => prompt_password(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?
+            None => prompt_password(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?,
         };
 
         if let Some(recorder) = &self.recorder {
@@ -114,9 +114,9 @@ impl ConversationHandler for CommandLineConversation {
         }
 
         Ok(CString::new(response).map_err(|_err| ErrorCode::CONV_ERR)?)
-	}
+    }
 
-	fn text_info(&mut self, msg: &CStr) {
+    fn text_info(&mut self, msg: &CStr) {
         let string = format!("{}", msg.to_string_lossy());
 
         match self.answerer {
@@ -128,7 +128,7 @@ impl ConversationHandler for CommandLineConversation {
         };
     }
 
-	fn error_msg(&mut self, msg: &CStr) {
+    fn error_msg(&mut self, msg: &CStr) {
         let string = format!("{}", msg.to_string_lossy());
 
         match self.answerer {
@@ -142,7 +142,6 @@ impl ConversationHandler for CommandLineConversation {
 }
 
 pub struct CommandLineLoginUserInteractionHandler {
-
     attempt_autologin: bool,
 
     maybe_user: Option<UserAuthData>,
@@ -153,17 +152,16 @@ pub struct CommandLineLoginUserInteractionHandler {
 }
 
 impl CommandLineLoginUserInteractionHandler {
-
     pub fn new(
         attempt_autologin: bool,
         maybe_username: Option<String>,
-        maybe_password: Option<String>
+        maybe_password: Option<String>,
     ) -> Self {
         let maybe_user = match &maybe_username {
-            Some(username) => load_user_auth_data(
-                &StorageSource::Username(username.clone())
-            ).map_or(None, |a| a),
-            None => None
+            Some(username) => {
+                load_user_auth_data(&StorageSource::Username(username.clone())).map_or(None, |a| a)
+            }
+            None => None,
         };
 
         Self {
@@ -173,7 +171,6 @@ impl CommandLineLoginUserInteractionHandler {
             maybe_password,
         }
     }
-
 }
 
 impl Default for CommandLineLoginUserInteractionHandler {
@@ -188,18 +185,16 @@ impl Default for CommandLineLoginUserInteractionHandler {
 }
 
 impl LoginUserInteractionHandler for CommandLineLoginUserInteractionHandler {
-
     fn provide_username(&mut self, username: &String) {
-        self.maybe_user = load_user_auth_data(
-            &StorageSource::Username(username.clone())
-        ).map_or(None, |a| a)
+        self.maybe_user =
+            load_user_auth_data(&StorageSource::Username(username.clone())).map_or(None, |a| a)
     }
 
     fn prompt_secret(&mut self, msg: &String) -> Option<String> {
         if self.attempt_autologin {
             if let Some(user_cfg) = &self.maybe_user {
                 if let Ok(main_password) = user_cfg.main_by_auth(&Some(String::new())) {
-                    return Some(main_password)
+                    return Some(main_password);
                 }
             }
         }
@@ -208,20 +203,20 @@ impl LoginUserInteractionHandler for CommandLineLoginUserInteractionHandler {
             Some(password) => match &self.maybe_user {
                 Some(user_cfg) => match user_cfg.main_by_auth(&Some(password.clone())) {
                     Ok(main_password) => Some(main_password),
-                    Err(_) => Some(password.clone())
+                    Err(_) => Some(password.clone()),
                 },
-                None => Some(password.clone())
+                None => Some(password.clone()),
             },
             None => match prompt_password(msg.as_str()) {
                 Ok(provided_secret) => match &self.maybe_user {
                     Some(user_cfg) => match user_cfg.main_by_auth(&Some(provided_secret.clone())) {
                         Ok(main_password) => Some(main_password),
-                        Err(_) => Some(provided_secret)
+                        Err(_) => Some(provided_secret),
                     },
-                    None => Some(provided_secret)
+                    None => Some(provided_secret),
                 },
-                Err(_) => None
-            }
+                Err(_) => None,
+            },
         }
     }
 
@@ -230,7 +225,7 @@ impl LoginUserInteractionHandler for CommandLineLoginUserInteractionHandler {
             Some(username) => Some(username.clone()),
             None => match prompt_stderr(msg.as_str()) {
                 Ok(response) => Some(response),
-                Err(_) => None
+                Err(_) => None,
             },
         }
     }

@@ -1,11 +1,11 @@
-pub mod login;
-pub mod user;
 pub mod auth;
-pub mod error;
-pub mod storage;
-pub mod conversation;
 pub mod cli;
+pub mod conversation;
+pub mod error;
+pub mod login;
 pub mod pam;
+pub mod storage;
+pub mod user;
 
 #[cfg(feature = "greetd")]
 pub mod greetd;

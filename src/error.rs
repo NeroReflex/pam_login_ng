@@ -1,5 +1,5 @@
-use std::io::Error as IoError;
 use aes_gcm::Error as AesError;
+use std::io::Error as IoError;
 
 use thiserror::Error;
 

@@ -1,6 +1,12 @@
-use std::{ffi::OsString, path::{Path, PathBuf}};
+use std::{
+    ffi::OsString,
+    path::{Path, PathBuf},
+};
 
-use crate::{auth::{SecondaryAuth, SecondaryAuthMethod, SecondaryPassword}, user::{MainPassword, UserAuthData}};
+use crate::{
+    auth::{SecondaryAuth, SecondaryAuthMethod, SecondaryPassword},
+    user::{MainPassword, UserAuthData},
+};
 
 use bytevec2::errors;
 use errors::ByteVecError;
@@ -34,7 +40,7 @@ pub enum StorageSource {
     Username(String),
 
     /// Load/Store operations will be performed on the given path
-    Path(PathBuf)
+    Path(PathBuf),
 }
 
 use bytevec2::*;
@@ -48,9 +54,7 @@ bytevec_decl! {
 
 impl AuthDataManifest {
     fn new() -> Self {
-        Self {
-            version: 0
-        }
+        Self { version: 0 }
     }
 }
 
@@ -70,20 +74,22 @@ impl TryFrom<&SecondaryAuth> for AuthDataSerialized {
     fn try_from(value: &SecondaryAuth) -> Result<Self, Self::Error> {
         let name = String::from(value.name());
         let creation_date = value.creation_date();
-        
+
         let (auth_type, auth_data) = match value.data() {
-            SecondaryAuthMethod::Password(secondary_password) => 
-                (0, secondary_password.encode::<u16>().map_err(|err| Self::Error::SerializationError(err))?),
+            SecondaryAuthMethod::Password(secondary_password) => (
+                0,
+                secondary_password
+                    .encode::<u16>()
+                    .map_err(|err| Self::Error::SerializationError(err))?,
+            ),
         };
 
-        Ok(
-            Self {
-                name,
-                creation_date,
-                auth_data,
-                auth_type
-            }
-        )
+        Ok(Self {
+            name,
+            creation_date,
+            auth_data,
+            auth_type,
+        })
     }
 }
 
@@ -92,14 +98,13 @@ impl TryInto<SecondaryAuth> for AuthDataSerialized {
 
     fn try_into(self) -> Result<SecondaryAuth, Self::Error> {
         match self.auth_type {
-            0 => Ok(
-                SecondaryAuth::new_password(
-                    self.name.as_str(),
-                    Some(self.creation_date),
-                    SecondaryPassword::decode::<u16>(self.auth_data.as_slice()).map_err(|err| StorageError::SerializationError(err))?
-                )
-            ),
-            _ => Err(StorageError::DeserializationError)
+            0 => Ok(SecondaryAuth::new_password(
+                self.name.as_str(),
+                Some(self.creation_date),
+                SecondaryPassword::decode::<u16>(self.auth_data.as_slice())
+                    .map_err(|err| StorageError::SerializationError(err))?,
+            )),
+            _ => Err(StorageError::DeserializationError),
         }
     }
 }
@@ -112,54 +117,66 @@ fn homedir_by_username(username: &String) -> Result<OsString, StorageError> {
 
     let home_dir_path = match systemd_homed_path.exists() {
         true => systemd_homed_str,
-        false => user.home_dir().as_os_str().into()
+        false => user.home_dir().as_os_str().into(),
     };
 
     match Path::new(home_dir_path.as_os_str()).exists() {
         true => Ok(home_dir_path),
-        false => Err(StorageError::HomeDirNotFound(home_dir_path))
+        false => Err(StorageError::HomeDirNotFound(home_dir_path)),
     }
 }
 
 pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData>, StorageError> {
     let home_dir_path = match source {
         StorageSource::Username(username) => homedir_by_username(&username)?,
-        StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string()
+        StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
     };
 
-    let manifest = xattr::get_deref(home_dir_path.as_os_str(), format!("{}.manifest", crate::DEFAULT_XATTR_NAME)).map_err(|err| StorageError::XAttrError(err))?;
+    let manifest = xattr::get_deref(
+        home_dir_path.as_os_str(),
+        format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
+    )
+    .map_err(|err| StorageError::XAttrError(err))?;
     if let None = manifest {
-        return Ok(None)
+        return Ok(None);
     }
 
-    let main = xattr::get_deref(home_dir_path.as_os_str(), format!("{}.main", crate::DEFAULT_XATTR_NAME)).map_err(|err| StorageError::XAttrError(err))?;
+    let main = xattr::get_deref(
+        home_dir_path.as_os_str(),
+        format!("{}.main", crate::DEFAULT_XATTR_NAME),
+    )
+    .map_err(|err| StorageError::XAttrError(err))?;
     if let None = main {
-        return Ok(None)
+        return Ok(None);
     }
 
     let mut auth_data = UserAuthData::new();
 
     match main {
         Some(a) => {
-            let main = MainPassword::decode::<u16>(a.as_slice()).map_err(|err| StorageError::SerializationError(err))?;
+            let main = MainPassword::decode::<u16>(a.as_slice())
+                .map_err(|err| StorageError::SerializationError(err))?;
             auth_data.push_main(main);
-        },
-        None => return Ok(None)
+        }
+        None => return Ok(None),
     };
 
-    let xattrs = xattr::list_deref(home_dir_path.as_os_str()).map_err(|err| StorageError::XAttrError(err))?;
+    let xattrs = xattr::list_deref(home_dir_path.as_os_str())
+        .map_err(|err| StorageError::XAttrError(err))?;
     for attr in xattrs.into_iter() {
         match attr.to_str() {
             Some(s) => {
                 if s.starts_with(format!("{}.auth.", crate::DEFAULT_XATTR_NAME).as_str()) {
-                    let raw_data = xattr::get_deref(home_dir_path.as_os_str(), s).map_err(|err| StorageError::XAttrError(err))?.unwrap();
+                    let raw_data = xattr::get_deref(home_dir_path.as_os_str(), s)
+                        .map_err(|err| StorageError::XAttrError(err))?
+                        .unwrap();
                     let serialized_data = AuthDataSerialized::decode::<u32>(raw_data.as_slice())?;
 
                     let secondary_auth: SecondaryAuth = serialized_data.try_into()?;
 
                     auth_data.push_secondary(secondary_auth);
                 }
-            },
+            }
             None => {}
         }
     }
@@ -170,32 +187,45 @@ pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData
 pub fn remove_user_auth_data(source: &StorageSource) -> Result<(), StorageError> {
     let home_dir_path = match source {
         StorageSource::Username(username) => homedir_by_username(&username)?,
-        StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string()
+        StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
     };
 
-    let xattrs = xattr::list_deref(home_dir_path.as_os_str()).map_err(|err| StorageError::XAttrError(err))?;
+    let xattrs = xattr::list_deref(home_dir_path.as_os_str())
+        .map_err(|err| StorageError::XAttrError(err))?;
     for attr in xattrs.into_iter() {
-        if attr.to_string_lossy().starts_with(crate::DEFAULT_XATTR_NAME) {
-            xattr::remove_deref(home_dir_path.as_os_str(), crate::DEFAULT_XATTR_NAME).map_err(|err| StorageError::XAttrError(err))?
+        if attr
+            .to_string_lossy()
+            .starts_with(crate::DEFAULT_XATTR_NAME)
+        {
+            xattr::remove_deref(home_dir_path.as_os_str(), crate::DEFAULT_XATTR_NAME)
+                .map_err(|err| StorageError::XAttrError(err))?
         }
     }
 
     Ok(())
 }
 
-pub fn save_user_auth_data(auth_data: UserAuthData, source: &StorageSource) -> Result<(), StorageError> {
+pub fn save_user_auth_data(
+    auth_data: UserAuthData,
+    source: &StorageSource,
+) -> Result<(), StorageError> {
     let home_dir_path = match source {
         StorageSource::Username(username) => homedir_by_username(&username)?,
-        StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string()
+        StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
     };
 
     // this is used in case a future format will be required
     let manifest = AuthDataManifest::new();
-    let manifest_serialization = manifest.encode::<u16>().map_err(|err| StorageError::SerializationError(err))?;
-    
+    let manifest_serialization = manifest
+        .encode::<u16>()
+        .map_err(|err| StorageError::SerializationError(err))?;
+
     let maybe_main_password_serialization = match auth_data.main_password() {
-        Some(m) => Some(m.encode::<u16>().map_err(|err| StorageError::SerializationError(err))?),
-        None => None
+        Some(m) => Some(
+            m.encode::<u16>()
+                .map_err(|err| StorageError::SerializationError(err))?,
+        ),
+        None => None,
     };
 
     // remove everything that was already present
@@ -203,27 +233,36 @@ pub fn save_user_auth_data(auth_data: UserAuthData, source: &StorageSource) -> R
 
     // once everything is serialized perform the writing
     xattr::set(
-        home_dir_path.as_os_str(), format!("{}.manifest", crate::DEFAULT_XATTR_NAME), manifest_serialization.as_slice()
-    ).map_err(|err| StorageError::XAttrError(err))?;
-
-    Ok(
-        match &maybe_main_password_serialization {
-            Some(data) => {
-                // save the main password first so that if something bad happens after one or more secondary auth may be usable
-                xattr::set(
-                    home_dir_path.as_os_str(), format!("{}.main", crate::DEFAULT_XATTR_NAME), data.as_slice()
-                ).map_err(|err| StorageError::XAttrError(err))?;
-
-                for (index, val) in auth_data.secondary().enumerate() {
-                    let serialized_data: AuthDataSerialized = val.try_into()?;
-                    let raw_data = serialized_data.encode::<u32>().map_err(|err| StorageError::SerializationError(err))?;
-
-                    xattr::set(
-                        home_dir_path.as_os_str(), format!("{}.auth.{}", crate::DEFAULT_XATTR_NAME, index), raw_data.as_slice()
-                    ).map_err(|err| StorageError::XAttrError(err))?
-                }
-            },
-            None => {}
-        }
+        home_dir_path.as_os_str(),
+        format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
+        manifest_serialization.as_slice(),
     )
+    .map_err(|err| StorageError::XAttrError(err))?;
+
+    Ok(match &maybe_main_password_serialization {
+        Some(data) => {
+            // save the main password first so that if something bad happens after one or more secondary auth may be usable
+            xattr::set(
+                home_dir_path.as_os_str(),
+                format!("{}.main", crate::DEFAULT_XATTR_NAME),
+                data.as_slice(),
+            )
+            .map_err(|err| StorageError::XAttrError(err))?;
+
+            for (index, val) in auth_data.secondary().enumerate() {
+                let serialized_data: AuthDataSerialized = val.try_into()?;
+                let raw_data = serialized_data
+                    .encode::<u32>()
+                    .map_err(|err| StorageError::SerializationError(err))?;
+
+                xattr::set(
+                    home_dir_path.as_os_str(),
+                    format!("{}.auth.{}", crate::DEFAULT_XATTR_NAME, index),
+                    raw_data.as_slice(),
+                )
+                .map_err(|err| StorageError::XAttrError(err))?
+            }
+        }
+        None => {}
+    })
 }

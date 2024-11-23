@@ -38,7 +38,7 @@ fn login_greetd(
     greetd_sock: String,
     prompter: Arc<Mutex<dyn LoginUserInteractionHandler>>,
     maybe_username: &Option<String>,
-    cmd: &Option<String>
+    cmd: &Option<String>,
 ) -> Result<LoginResult, LoginError> {
     use login_ng::greetd::GreetdLoginExecutor;
 
@@ -50,7 +50,7 @@ fn login_greetd(
 fn login_pam(
     prompter: Arc<Mutex<dyn LoginUserInteractionHandler>>,
     maybe_username: &Option<String>,
-    cmd: &Option<String>
+    cmd: &Option<String>,
 ) -> Result<LoginResult, LoginError> {
     let conversation = ProxyLoginUserInteractionHandlerConversation::new(prompter);
 
@@ -66,23 +66,20 @@ fn main() {
 
     let max_failures = args.failures.unwrap_or(5);
 
-    let prompter = Arc::new(
-        Mutex::new(
-            CommandLineLoginUserInteractionHandler::new(
-                allow_autologin,
-                args.user.clone(),
-                args.password.clone()
-            )
-        )
-    );
+    let prompter = Arc::new(Mutex::new(CommandLineLoginUserInteractionHandler::new(
+        allow_autologin,
+        args.user.clone(),
+        args.password.clone(),
+    )));
 
     'login_attempt: for attempt in 0..max_failures {
-
         let login_result = {
             #[cfg(not(feature = "greetd"))]
             {
                 if let Ok(_) = env::var("GREETD_SOCK") {
-                    println!("Running over greetd, but greetd support has been compile-time disabled.")
+                    println!(
+                        "Running over greetd, but greetd support has been compile-time disabled."
+                    )
                 }
 
                 login_pam(prompter.clone(), &args.user, &args.cmd)
@@ -91,8 +88,10 @@ fn main() {
             #[cfg(feature = "greetd")]
             {
                 match env::var("GREETD_SOCK") {
-                    Ok(greetd_sock) => login_greetd(greetd_sock, prompter.clone(), &args.user, &args.cmd),
-                    Err(_) => login_pam(prompter.clone(), &args.user, &args.cmd)
+                    Ok(greetd_sock) => {
+                        login_greetd(greetd_sock, prompter.clone(), &args.user, &args.cmd)
+                    }
+                    Err(_) => login_pam(prompter.clone(), &args.user, &args.cmd),
                 }
             }
         };
@@ -100,9 +99,9 @@ fn main() {
         match login_result {
             Ok(succeeded) => match succeeded {
                 LoginResult::Success => break 'login_attempt,
-                LoginResult::Failure => eprintln!("Login attempt {attempt}/{max_failures} failed.")
+                LoginResult::Failure => eprintln!("Login attempt {attempt}/{max_failures} failed."),
             },
-            Err(err) => eprintln!("Login attempt {attempt}/{max_failures} errored: {}", err)
+            Err(err) => eprintln!("Login attempt {attempt}/{max_failures} errored: {}", err),
         };
     }
 }
