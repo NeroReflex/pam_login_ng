@@ -2,6 +2,8 @@
 name = "login_ng"
 version = "0.1.0"
 edition = "2021"
+license = "GPL-2.0-or-later"
+license-file = "LICENSE.md"
 
 [[bin]]
 name = "login-ng_cli"
