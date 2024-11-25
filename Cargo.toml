@@ -1,6 +1,6 @@
 [package]
 name = "login_ng"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "GPL-2.0-or-later"
 
@@ -17,7 +17,7 @@ rpassword = "^7.3"
 thiserror = "^1.0"
 aes-gcm = "^0.10"
 bcrypt = "^0.15"
-hkdf = { version = "^0.12", features = ["std"] }
+hkdf = { version = "^0.12", features = [] }
 sha2 = "0.10.8"
 pam-client2 = { version = "0.5.2", features = [] }
 argh = "0.1.12"

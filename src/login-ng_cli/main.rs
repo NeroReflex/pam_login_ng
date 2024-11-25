@@ -67,13 +67,14 @@ fn login_greetd(
 }
 
 fn login_pam(
+    allow_autologin: bool,
     prompter: Arc<Mutex<dyn LoginUserInteractionHandler>>,
     maybe_username: &Option<String>,
     cmd: &Option<String>,
 ) -> Result<LoginResult, LoginError> {
     let conversation = ProxyLoginUserInteractionHandlerConversation::new(prompter);
 
-    let mut login_executer = PamLoginExecutor::new(conversation);
+    let mut login_executer = PamLoginExecutor::new(conversation, allow_autologin);
 
     login_executer.execute(maybe_username, cmd)
 }
@@ -107,7 +108,7 @@ fn main() {
                     )
                 }
 
-                login_pam(prompter.clone(), &args.user, &args.cmd)
+                login_pam(allow_autologin, prompter.clone(), &args.user, &args.cmd)
             }
 
             #[cfg(feature = "greetd")]
@@ -116,7 +117,7 @@ fn main() {
                     Ok(greetd_sock) => {
                         login_greetd(greetd_sock, prompter.clone(), &args.user, &args.cmd)
                     }
-                    Err(_) => login_pam(prompter.clone(), &args.user, &args.cmd),
+                    Err(_) => login_pam(allow_autologin, prompter.clone(), &args.user, &args.cmd),
                 }
             }
         };

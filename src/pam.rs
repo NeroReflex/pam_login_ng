@@ -57,11 +57,18 @@ pub enum PamLoginError {
 
 pub struct PamLoginExecutor {
     conversation: ProxyLoginUserInteractionHandlerConversation,
+    allow_autologin: bool
 }
 
 impl PamLoginExecutor {
-    pub fn new(conversation: ProxyLoginUserInteractionHandlerConversation) -> Self {
-        Self { conversation }
+    pub fn new(
+        conversation: ProxyLoginUserInteractionHandlerConversation,
+        allow_autologin: bool
+    ) -> Self {
+        Self {
+            conversation,
+            allow_autologin
+        }
     }
 }
 
@@ -79,7 +86,10 @@ impl LoginExecutor for PamLoginExecutor {
         let user_prompt = Some("username: ");
 
         let mut context = Context::new(
-            "system-login",
+            match self.allow_autologin {
+                true => "login_ng-autologin",
+                false => "login_ng",
+            },
             maybe_username.as_ref().map(|a| a.as_str()),
             self.conversation.clone(),
         )
