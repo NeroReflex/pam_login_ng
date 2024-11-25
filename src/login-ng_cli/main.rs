@@ -124,9 +124,9 @@ fn main() {
         match login_result {
             Ok(succeeded) => match succeeded {
                 LoginResult::Success => break 'login_attempt,
-                LoginResult::Failure => eprintln!("Login attempt {attempt}/{max_failures} failed."),
+                LoginResult::Failure => eprintln!("Login attempt {}/{max_failures} failed.", attempt+1),
             },
-            Err(err) => eprintln!("Login attempt {attempt}/{max_failures} errored: {}", err),
+            Err(err) => eprintln!("Login attempt {}/{max_failures} errored: {}", attempt+1, err),
         };
     }
 }
