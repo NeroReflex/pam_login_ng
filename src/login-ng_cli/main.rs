@@ -80,7 +80,7 @@ fn login_pam(
 }
 
 fn main() {
-    println!("login-ng version 0.1.0, Copyright (C) 2024 Denis Benato");
+    println!("login-ng version {}, Copyright (C) 2024 Denis Benato", env!("CARGO_PKG_VERSION"));
     println!("login-ng comes with ABSOLUTELY NO WARRANTY;");
     println!("This is free software, and you are welcome to redistribute it");
     println!("under certain conditions.");
