@@ -16,8 +16,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Install Dependencies
+    - name: Install clang-sys Dependencies
       run: sudo apt-get install -y clang llvm lld libclang-dev
+    - name: Install pam-sys Dependencies
+      run: sudo apt-get install -y libpam0g-dev
     - name: Build
       run: cargo build --verbose
     - name: Run tests
