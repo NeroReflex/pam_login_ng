@@ -46,3 +46,8 @@ changing the main password won't suffice!
 
 The good part is that knowing the main password will __NOT__ disclose the intermediate key nor any secondary authentication method,
 and knowing the intermediate key will __NOT__ disclose secondary authentication methods.
+
+## Additional notes
+
+Here is some notes of general interest:
+    - on Archlinux if you install the *kwallet-pam* package and your wallet password is the same as your account the wallet will be automatically unlocked: this chains with autologin
