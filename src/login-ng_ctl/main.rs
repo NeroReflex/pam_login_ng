@@ -110,7 +110,10 @@ struct AddAuthPasswordCommand {
 }
 
 fn main() {
-    println!("login-ng version 0.1.0, Copyright (C) 2024 Denis Benato");
+    println!(
+        "login-ng version {}, Copyright (C) 2024 Denis Benato",
+        env!("CARGO_PKG_VERSION")
+    );
     println!("login-ng comes with ABSOLUTELY NO WARRANTY;");
     println!("This is free software, and you are welcome to redistribute it");
     println!("under certain conditions.");
@@ -127,9 +130,23 @@ fn main() {
 
     let interaction_recorder = Arc::new(Mutex::new(SimpleConversationRecorder::new()));
 
+    let username = match args.user {
+        Some(username) => Some(username),
+        None => match users::get_current_username() {
+            Some(username) => match username.to_str() {
+                Some(u) => match u {
+                    "root" => None,
+                    username => Some(String::from(username)),
+                },
+                None => None,
+            },
+            None => None,
+        },
+    };
+
     let mut context = Context::new(
         "system-login",
-        args.user.as_deref(),
+        username.as_deref(),
         CommandLineConversation::new(Some(answerer), Some(interaction_recorder.clone())),
     )
     .expect("Failed to initialize PAM context");
@@ -146,7 +163,7 @@ fn main() {
         .acct_mgmt(Flag::NONE)
         .expect("Account validation failed");
 
-    let username = args.user.clone().unwrap_or_else(|| {
+    let username = username.clone().unwrap_or_else(|| {
         interaction_recorder
             .lock()
             .unwrap()
@@ -221,9 +238,12 @@ fn main() {
         Command::Add(add_cmd) => {
             let intermediate_password = match user_cfg.has_main() {
                 false => add_cmd.intermediate.clone().unwrap_or_else(|| {
-                    let intermediate_password = prompt_password("Intermediate key:").expect("Failed to read intermediate key");
+                    let intermediate_password = prompt_password("Intermediate key:")
+                        .expect("Failed to read intermediate key");
 
-                    let intermediate_password_repeat = prompt_password("Intermediate key (repeat):").expect("Failed to read intermediate key (repeat)");
+                    let intermediate_password_repeat =
+                        prompt_password("Intermediate key (repeat):")
+                            .expect("Failed to read intermediate key (repeat)");
 
                     if intermediate_password != intermediate_password_repeat {
                         eprintln!("Intermediate key and and Intermediate (repeat) do not match!");
@@ -235,7 +255,7 @@ fn main() {
                 }),
                 true => add_cmd.intermediate.clone().unwrap_or_else(|| {
                     prompt_password("Intermediate key:").expect("Failed to read intermediate key")
-                })
+                }),
             };
 
             if user_cfg.has_main() {

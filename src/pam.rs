@@ -57,17 +57,17 @@ pub enum PamLoginError {
 
 pub struct PamLoginExecutor {
     conversation: ProxyLoginUserInteractionHandlerConversation,
-    allow_autologin: bool
+    allow_autologin: bool,
 }
 
 impl PamLoginExecutor {
     pub fn new(
         conversation: ProxyLoginUserInteractionHandlerConversation,
-        allow_autologin: bool
+        allow_autologin: bool,
     ) -> Self {
         Self {
             conversation,
-            allow_autologin
+            allow_autologin,
         }
     }
 }
@@ -137,7 +137,16 @@ impl LoginExecutor for PamLoginExecutor {
             .envs(session.envlist().iter_tuples())
             .uid(logged_user.uid())
             .gid(logged_user.primary_group_id())
-            .groups(logged_user.groups().unwrap_or(vec![]).iter().filter(|g| g.gid() != logged_user.primary_group_id()).map(|g| g.gid()).collect::<Vec<u32>>().as_slice())
+            .groups(
+                logged_user
+                    .groups()
+                    .unwrap_or(vec![])
+                    .iter()
+                    .filter(|g| g.gid() != logged_user.primary_group_id())
+                    .map(|g| g.gid())
+                    .collect::<Vec<u32>>()
+                    .as_slice(),
+            )
             .current_dir(match logged_user.home_dir().exists() {
                 true => logged_user.home_dir(),
                 false => Path::new("/"),

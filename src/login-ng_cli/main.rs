@@ -80,7 +80,10 @@ fn login_pam(
 }
 
 fn main() {
-    println!("login-ng version {}, Copyright (C) 2024 Denis Benato", env!("CARGO_PKG_VERSION"));
+    println!(
+        "login-ng version {}, Copyright (C) 2024 Denis Benato",
+        env!("CARGO_PKG_VERSION")
+    );
     println!("login-ng comes with ABSOLUTELY NO WARRANTY;");
     println!("This is free software, and you are welcome to redistribute it");
     println!("under certain conditions.");
@@ -125,9 +128,15 @@ fn main() {
         match login_result {
             Ok(succeeded) => match succeeded {
                 LoginResult::Success => break 'login_attempt,
-                LoginResult::Failure => eprintln!("Login attempt {}/{max_failures} failed.", attempt+1),
+                LoginResult::Failure => {
+                    eprintln!("Login attempt {}/{max_failures} failed.", attempt + 1)
+                }
             },
-            Err(err) => eprintln!("Login attempt {}/{max_failures} errored: {}", attempt+1, err),
+            Err(err) => eprintln!(
+                "Login attempt {}/{max_failures} errored: {}",
+                attempt + 1,
+                err
+            ),
         };
     }
 }
