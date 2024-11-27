@@ -39,7 +39,7 @@ use argh::FromArgs;
 /// Command line tool for managing login-ng authentication methods
 struct Args {
     #[argh(option, short = 'u')]
-    /// username
+    /// username to be used, if unspecified it will be autodetected: if that fails it will be prompted for
     user: Option<String>,
 
     #[argh(option, short = 'p')]
@@ -145,7 +145,7 @@ fn main() {
     };
 
     let mut context = Context::new(
-        "system-login",
+        "login_ng",
         username.as_deref(),
         CommandLineConversation::new(Some(answerer), Some(interaction_recorder.clone())),
     )
