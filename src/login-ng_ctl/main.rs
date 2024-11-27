@@ -28,7 +28,7 @@ use login_ng::cli::*;
 use login_ng::conversation::*;
 use login_ng::prompt_password;
 use login_ng::storage::StorageSource;
-use login_ng::storage::{load_user_auth_data, remove_user_auth_data, save_user_auth_data};
+use login_ng::storage::{load_user_auth_data, remove_user_data, save_user_auth_data};
 
 use login_ng::user::UserAuthData;
 use pam_client2::{Context, Flag};
@@ -189,7 +189,7 @@ fn main() {
     let mut write_file = args.update_as_needed;
     match args.command {
         Command::Reset(_) => {
-            match remove_user_auth_data(&storage_source) {
+            match remove_user_data(&storage_source) {
                 Ok(_) => {}
                 Err(err) => {
                     eprintln!(

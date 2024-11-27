@@ -203,7 +203,7 @@ pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData
     Ok(Some(auth_data))
 }
 
-pub fn remove_user_auth_data(source: &StorageSource) -> Result<(), StorageError> {
+pub fn remove_user_data(source: &StorageSource) -> Result<(), StorageError> {
     let home_dir_path = match source {
         StorageSource::Username(username) => homedir_by_username(&username)?,
         StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
@@ -248,7 +248,18 @@ pub fn save_user_auth_data(
     };
 
     // remove everything that was already present
-    remove_user_auth_data(source)?;
+    let xattrs = xattr::list_deref(home_dir_path.as_os_str())
+        .map_err(|err| StorageError::XAttrError(err))?;
+    for attr in xattrs.into_iter() {
+        let current_xattr = attr.to_string_lossy();
+
+        if current_xattr.starts_with(format!("{}.auth", crate::DEFAULT_XATTR_NAME).as_str())
+            || current_xattr.starts_with(format!("{}.main", crate::DEFAULT_XATTR_NAME).as_str())
+        {
+            xattr::remove_deref(home_dir_path.as_os_str(), attr.as_os_str())
+                .map_err(|err| StorageError::XAttrError(err))?
+        }
+    }
 
     // once everything is serialized perform the writing
     xattr::set(
