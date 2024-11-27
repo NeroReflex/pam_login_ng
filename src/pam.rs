@@ -137,7 +137,7 @@ impl LoginExecutor for PamLoginExecutor {
             .envs(session.envlist().iter_tuples())
             .uid(logged_user.uid())
             .gid(logged_user.primary_group_id())
-            //.groups(logged_user.groups().unwrap_or(vec![]).iter().map(|g| g.gid()).collect::<Vec<u32>>().as_slice())
+            .groups(logged_user.groups().unwrap_or(vec![]).iter().filter(|g| g.gid() != logged_user.primary_group_id()).map(|g| g.gid()).collect::<Vec<u32>>().as_slice())
             .current_dir(match logged_user.home_dir().exists() {
                 true => logged_user.home_dir(),
                 false => Path::new("/"),
