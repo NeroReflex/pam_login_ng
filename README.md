@@ -50,4 +50,4 @@ and knowing the intermediate key will __NOT__ disclose secondary authentication 
 ## Additional notes
 
 Here is some notes of general interest:
-    - on Archlinux if you install the *kwallet-pam* package and your wallet password is the same as your account the wallet will be automatically unlocked: this chains with autologin
+    - on Archlinux if you install the *kwallet-pam* package and your wallet password is the same as your account the wallet can be automatically unlocked: this will chains with autologin: [Archlinux Wiki](https://wiki.archlinux.org/title/KDE_Wallet).
