@@ -22,6 +22,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use login_ng::cli::CommandLineLoginUserInteractionHandler;
+use login_ng::command::SessionCommand;
 use login_ng::conversation::ProxyLoginUserInteractionHandlerConversation;
 use login_ng::login::*;
 
@@ -57,26 +58,26 @@ fn login_greetd(
     greetd_sock: String,
     prompter: Arc<Mutex<dyn LoginUserInteractionHandler>>,
     maybe_username: &Option<String>,
-    cmd: &Option<String>,
+    retrival_strategy: &SessionCommandRetrival,
 ) -> Result<LoginResult, LoginError> {
     use login_ng::greetd::GreetdLoginExecutor;
 
     let mut login_executor = GreetdLoginExecutor::new(greetd_sock, prompter);
 
-    login_executor.execute(maybe_username, cmd)
+    login_executor.execute(maybe_username, retrival_strategy)
 }
 
 fn login_pam(
     allow_autologin: bool,
     prompter: Arc<Mutex<dyn LoginUserInteractionHandler>>,
     maybe_username: &Option<String>,
-    cmd: &Option<String>,
+    retrival_strategy: &SessionCommandRetrival,
 ) -> Result<LoginResult, LoginError> {
     let conversation = ProxyLoginUserInteractionHandlerConversation::new(prompter);
 
     let mut login_executer = PamLoginExecutor::new(conversation, allow_autologin);
 
-    login_executer.execute(maybe_username, cmd)
+    login_executer.execute(maybe_username, retrival_strategy)
 }
 
 fn main() {
@@ -101,6 +102,11 @@ fn main() {
         args.password.clone(),
     )));
 
+    let command_retrieval = match args.cmd {
+        Some(command) => SessionCommandRetrival::Defined(SessionCommand::new(command, vec![])),
+        _ => SessionCommandRetrival::AutodetectFromUserHome,
+    };
+
     'login_attempt: for attempt in 0..max_failures {
         let login_result = {
             #[cfg(not(feature = "greetd"))]
@@ -111,16 +117,29 @@ fn main() {
                     )
                 }
 
-                login_pam(allow_autologin, prompter.clone(), &args.user, &args.cmd)
+                login_pam(
+                    allow_autologin,
+                    prompter.clone(),
+                    &args.user,
+                    &command_retrieval,
+                )
             }
 
             #[cfg(feature = "greetd")]
             {
                 match env::var("GREETD_SOCK") {
-                    Ok(greetd_sock) => {
-                        login_greetd(greetd_sock, prompter.clone(), &args.user, &args.cmd)
-                    }
-                    Err(_) => login_pam(allow_autologin, prompter.clone(), &args.user, &args.cmd),
+                    Ok(greetd_sock) => login_greetd(
+                        greetd_sock,
+                        prompter.clone(),
+                        &args.user,
+                        &command_retrieval,
+                    ),
+                    Err(_) => login_pam(
+                        allow_autologin,
+                        prompter.clone(),
+                        &args.user,
+                        &command_retrieval,
+                    ),
                 }
             }
         };

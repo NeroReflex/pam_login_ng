@@ -27,7 +27,6 @@ use std::{
 use greetd_ipc::{codec::SyncCodec, AuthMessageType, ErrorType, Request, Response};
 
 use thiserror::Error;
-use users::{get_user_by_name, os::unix::UserExt};
 
 #[derive(Debug, Error)]
 pub enum GreetdLoginError {
@@ -66,19 +65,15 @@ impl GreetdLoginExecutor {
 }
 
 impl LoginExecutor for GreetdLoginExecutor {
-    fn prompt(&self) -> Arc<Mutex<dyn crate::login::LoginUserInteractionHandler>> {
-        self.prompter.clone()
-    }
-
     fn execute(
         &mut self,
         maybe_username: &Option<String>,
-        cmd: &Option<String>,
+        retrival_strategy: &SessionCommandRetrival,
     ) -> Result<LoginResult, LoginError> {
         let mut stream = UnixStream::connect(&self.greetd_sock)
             .map_err(|err| LoginError::GreetdError(GreetdLoginError::GreetdConnectionError(err)))?;
 
-        let mutexed_prompter = self.prompt();
+        let mutexed_prompter = self.prompter.clone();
 
         let mut prompter = mutexed_prompter
             .lock()
@@ -131,24 +126,13 @@ impl LoginExecutor for GreetdLoginExecutor {
                     } else {
                         starting = true;
 
-                        let logged_user =
-                            get_user_by_name(&username).ok_or(LoginError::UserDiscoveryError)?;
-
-                        let command = match &cmd {
-                            Some(cmd) => cmd.clone(),
-                            None => format!(
-                                "{}",
-                                logged_user
-                                    .shell()
-                                    .to_str()
-                                    .map_or(String::from(crate::DEFAULT_CMD), |shell| shell
-                                        .to_string())
-                            ),
-                        };
+                        // The retrival of default session MUST be done after the account has been unlocked
+                        let command =
+                            retrieve_session_command_for_user(&username, retrival_strategy);
 
                         next_request = Request::StartSession {
                             env: vec![],
-                            cmd: vec![command],
+                            cmd: vec![command.command()], // TODO: arguments?
                         }
                     }
                 }

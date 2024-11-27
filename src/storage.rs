@@ -24,6 +24,7 @@ use std::{
 
 use crate::{
     auth::{SecondaryAuth, SecondaryAuthMethod, SecondaryPassword},
+    command::SessionCommand,
     user::{MainPassword, UserAuthData},
 };
 
@@ -74,6 +75,29 @@ bytevec_decl! {
 impl AuthDataManifest {
     fn new() -> Self {
         Self { version: 0 }
+    }
+}
+
+bytevec_decl! {
+    #[derive(PartialEq, Eq, Debug, Clone)]
+    struct SessionCommandSerialized {
+        command: String,
+        args: Vec<String>
+    }
+}
+
+impl From<&SessionCommand> for SessionCommandSerialized {
+    fn from(value: &SessionCommand) -> Self {
+        let command = String::from(value.command());
+        let args = value.args();
+
+        Self { command, args }
+    }
+}
+
+impl Into<SessionCommand> for SessionCommandSerialized {
+    fn into(self) -> SessionCommand {
+        SessionCommand::new(self.command.clone(), self.args.clone())
     }
 }
 
@@ -142,6 +166,38 @@ fn homedir_by_username(username: &String) -> Result<OsString, StorageError> {
     match Path::new(home_dir_path.as_os_str()).exists() {
         true => Ok(home_dir_path),
         false => Err(StorageError::HomeDirNotFound(home_dir_path)),
+    }
+}
+
+pub fn load_user_session_command(
+    source: &StorageSource,
+) -> Result<Option<SessionCommand>, StorageError> {
+    let home_dir_path = match source {
+        StorageSource::Username(username) => homedir_by_username(&username)?,
+        StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
+    };
+
+    let manifest = xattr::get_deref(
+        home_dir_path.as_os_str(),
+        format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
+    )
+    .map_err(|err| StorageError::XAttrError(err))?;
+    if manifest.is_none() {
+        return Ok(None);
+    }
+
+    match xattr::get_deref(
+        home_dir_path.as_os_str(),
+        format!("{}.session", crate::DEFAULT_XATTR_NAME),
+    )
+    .map_err(|err| StorageError::XAttrError(err))?
+    {
+        Some(bytes) => Ok(Some(
+            SessionCommandSerialized::decode::<u32>(bytes.as_slice())
+                .map_err(|_| StorageError::DeserializationError)?
+                .into(),
+        )),
+        None => Ok(None),
     }
 }
 

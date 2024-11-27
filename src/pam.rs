@@ -17,12 +17,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{
-    os::unix::process::CommandExt,
-    path::Path,
-    process::Command,
-    sync::{Arc, Mutex},
-};
+use std::{os::unix::process::CommandExt, path::Path, process::Command};
 
 use pam_client2::{Context, Flag};
 use thiserror::Error;
@@ -73,15 +68,10 @@ impl PamLoginExecutor {
 }
 
 impl LoginExecutor for PamLoginExecutor {
-    fn prompt(&self) -> Arc<Mutex<dyn crate::login::LoginUserInteractionHandler>> {
-        //Arc::new(Mutex::new(self.conversation.clone()))
-        todo!()
-    }
-
     fn execute(
         &mut self,
         maybe_username: &Option<String>,
-        cmd: &Option<String>,
+        retrival_strategy: &SessionCommandRetrival,
     ) -> Result<LoginResult, LoginError> {
         let user_prompt = Some("username: ");
 
@@ -120,19 +110,12 @@ impl LoginExecutor for PamLoginExecutor {
             .open_session(Flag::NONE)
             .map_err(|err| LoginError::PamError(PamLoginError::Open(err.to_string())))?;
 
-        let command = match &cmd {
-            Some(cmd) => cmd.clone(),
-            None => format!(
-                "{}",
-                logged_user
-                    .shell()
-                    .to_str()
-                    .map_or(String::from(crate::DEFAULT_CMD), |shell| shell.to_string())
-            ),
-        };
+        // The retrival of default session MUST be done after the account has been unlocked
+        let command = retrieve_session_command_for_user(&username, &retrival_strategy);
 
         // Run a process in the PAM environment
-        let _result = Command::new(command)
+        let _result = Command::new(command.command())
+            .args(command.args())
             .env_clear()
             .envs(session.envlist().iter_tuples())
             .uid(logged_user.uid())
