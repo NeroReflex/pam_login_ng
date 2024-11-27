@@ -219,9 +219,24 @@ fn main() {
             }
         }
         Command::Add(add_cmd) => {
-            let intermediate_password = add_cmd.intermediate.clone().unwrap_or_else(|| {
-                prompt_password("Intermediate key:").expect("Failed to read intermediate key")
-            });
+            let intermediate_password = match user_cfg.has_main() {
+                false => add_cmd.intermediate.clone().unwrap_or_else(|| {
+                    let intermediate_password = prompt_password("Intermediate key:").expect("Failed to read intermediate key");
+
+                    let intermediate_password_repeat = prompt_password("Intermediate key (repeat):").expect("Failed to read intermediate key (repeat)");
+
+                    if intermediate_password != intermediate_password_repeat {
+                        eprintln!("Intermediate key and and Intermediate (repeat) do not match!");
+
+                        std::process::exit(-1)
+                    }
+
+                    intermediate_password
+                }),
+                true => add_cmd.intermediate.clone().unwrap_or_else(|| {
+                    prompt_password("Intermediate key:").expect("Failed to read intermediate key")
+                })
+            };
 
             if user_cfg.has_main() {
                 if let Err(err) = user_cfg.main_by_auth(&Some(intermediate_password.clone())) {
