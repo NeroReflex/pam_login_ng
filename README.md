@@ -1,4 +1,5 @@
 # login-ng
+
 A greeter with the additional (and totally optional) feature of shielding the real password
 behind another password that can be unlocked by various means while logging in:
     - __autologin__: provide autologin functionality that has been long lost in systemd-homed
@@ -14,6 +15,7 @@ Using *login-ng_ctl* utility you can set more authentication options or even con
 account with an encrypted home directory.
 
 ## Additional authentication
+
 Additional authentication methods is a feature introduced to support more secondary authentication methods regardless
 of pam configuration and usage of systemd-homed.
 
@@ -22,6 +24,7 @@ what systemd-homed does to store certain things, but this also means that such f
 in filesystems that do not support extended attributes, such as cercain network filesystems, ntfs (oh god, please don't.) and others.
 
 ## Security considerations
+
 When *additional authentication methods* feature is not in use the security of this greeter shold not be different than any other greeter,
 however when such feature is used there are additional considerations: __read below__.
 
