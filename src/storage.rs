@@ -216,7 +216,7 @@ pub fn remove_user_auth_data(source: &StorageSource) -> Result<(), StorageError>
             .to_string_lossy()
             .starts_with(crate::DEFAULT_XATTR_NAME)
         {
-            xattr::remove_deref(home_dir_path.as_os_str(), crate::DEFAULT_XATTR_NAME)
+            xattr::remove_deref(home_dir_path.as_os_str(), attr.as_os_str())
                 .map_err(|err| StorageError::XAttrError(err))?
         }
     }
