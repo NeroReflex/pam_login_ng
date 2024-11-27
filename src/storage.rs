@@ -156,7 +156,7 @@ pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData
         format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
     )
     .map_err(|err| StorageError::XAttrError(err))?;
-    if let None = manifest {
+    if manifest.is_none() {
         return Ok(None);
     }
 
