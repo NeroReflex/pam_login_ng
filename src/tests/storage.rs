@@ -40,7 +40,7 @@ fn test_main_password_serialization() {
         );
 
         std::fs::create_dir(dir_name).unwrap();
-        crate::storage::save_user_auth_data(user_cfg, &source).unwrap();
+        crate::storage::store_user_auth_data(user_cfg, &source).unwrap();
     }
 
     match crate::storage::load_user_auth_data(&source) {
@@ -85,7 +85,7 @@ fn test_secondary_password_serialization() {
         }
 
         std::fs::create_dir(dir_name).unwrap();
-        crate::storage::save_user_auth_data(user_cfg, &source).unwrap();
+        crate::storage::store_user_auth_data(user_cfg, &source).unwrap();
     }
 
     let mut tested: usize = 0;

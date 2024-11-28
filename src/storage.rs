@@ -201,6 +201,45 @@ pub fn load_user_session_command(
     }
 }
 
+pub fn store_user_session_command(
+    settings: &SessionCommand,
+    source: &StorageSource,
+) -> Result<(), StorageError> {
+    let home_dir_path = match source {
+        StorageSource::Username(username) => homedir_by_username(&username)?,
+        StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
+    };
+
+    // this is used in case a future format will be required
+    let manifest = AuthDataManifest::new();
+    let manifest_serialization = manifest
+        .encode::<u16>()
+        .map_err(|err| StorageError::SerializationError(err))?;
+
+    // once everything is serialized perform the writing
+    xattr::set(
+        home_dir_path.as_os_str(),
+        format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
+        manifest_serialization.as_slice(),
+    )
+    .map_err(|err| StorageError::XAttrError(err))?;
+
+    let session_data = SessionCommandSerialized::from(settings);
+    let session_serialization = session_data
+        .encode::<u32>()
+        .map_err(|err| StorageError::SerializationError(err))?;
+
+    // once everything is serialized perform the writing
+    xattr::set(
+        home_dir_path.as_os_str(),
+        format!("{}.session", crate::DEFAULT_XATTR_NAME),
+        session_serialization.as_slice(),
+    )
+    .map_err(|err| StorageError::XAttrError(err))?;
+
+    Ok(())
+}
+
 pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData>, StorageError> {
     let home_dir_path = match source {
         StorageSource::Username(username) => homedir_by_username(&username)?,
@@ -280,7 +319,7 @@ pub fn remove_user_data(source: &StorageSource) -> Result<(), StorageError> {
     Ok(())
 }
 
-pub fn save_user_auth_data(
+pub fn store_user_auth_data(
     auth_data: UserAuthData,
     source: &StorageSource,
 ) -> Result<(), StorageError> {

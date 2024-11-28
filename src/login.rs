@@ -81,10 +81,13 @@ pub(crate) fn load_session_from_conf(content: String) -> SessionCommand {
     let mut config = Ini::new();
     match config.read(content) {
         Ok(_) => match config.get("Session", "command") {
-            Some(value) => SessionCommand::new(value.clone(), match config.get("Session", "arguments") {
-                Some(args) => args.split(" ").map(|arg| String::from(arg)).collect(),
-                None => vec![]
-            }),
+            Some(value) => SessionCommand::new(
+                value.clone(),
+                match config.get("Session", "arguments") {
+                    Some(args) => args.split(" ").map(|arg| String::from(arg)).collect(),
+                    None => vec![],
+                },
+            ),
             None => system_defined_with_crate_fallback(),
         },
         Err(_) => system_defined_with_crate_fallback(),

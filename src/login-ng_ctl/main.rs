@@ -25,10 +25,13 @@ use chrono::Local;
 use chrono::TimeZone;
 use login_ng::cli::TrivialCommandLineConversationPrompter;
 use login_ng::cli::*;
+use login_ng::command::SessionCommand;
 use login_ng::conversation::*;
 use login_ng::prompt_password;
+use login_ng::storage::load_user_session_command;
+use login_ng::storage::store_user_session_command;
 use login_ng::storage::StorageSource;
-use login_ng::storage::{load_user_auth_data, remove_user_data, save_user_auth_data};
+use login_ng::storage::{load_user_auth_data, remove_user_data, store_user_auth_data};
 
 use login_ng::user::UserAuthData;
 use pam_client2::{Context, Flag};
@@ -65,6 +68,20 @@ enum Command {
     Reset(ResetCommand),
     Inspect(InspectCommand),
     Add(AddAuthCommand),
+    SetSession(SetSessionCommand),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Set the default session command to be executed when a user login if nothing else is being specified
+#[argh(subcommand, name = "set-session")]
+struct SetSessionCommand {
+    #[argh(option)]
+    /// command to execute
+    cmd: String,
+
+    #[argh(option)]
+    /// additional arguments for the command
+    args: Vec<String>,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -145,7 +162,7 @@ fn main() {
     };
 
     let mut context = Context::new(
-        "login_ng",
+        "system-login", // this cannot be changed as setting the main password won't be possible (or it will be unverified)
         username.as_deref(),
         CommandLineConversation::new(Some(answerer), Some(interaction_recorder.clone())),
     )
@@ -188,6 +205,17 @@ fn main() {
 
     let mut write_file = args.update_as_needed;
     match args.command {
+        Command::SetSession(session_data) => {
+            let command = SessionCommand::new(session_data.cmd, session_data.args);
+
+            match store_user_session_command(&command, &storage_source) {
+                Ok(_) => {}
+                Err(err) => {
+                    eprintln!("Error in changing the user default session: {}", err);
+                    std::process::exit(-1)
+                }
+            }
+        }
         Command::Reset(_) => {
             match remove_user_data(&storage_source) {
                 Ok(_) => {}
@@ -204,6 +232,28 @@ fn main() {
             write_file = Some(false)
         }
         Command::Inspect(_) => {
+            println!("-----------------------------------------------------------");
+
+            println!("User: {}", username);
+
+            println!("-----------------------------------------------------------");
+
+            match load_user_session_command(&storage_source) {
+                Ok(maybe_data) => match maybe_data {
+                    Some(data) => println!("Default session command: {} {}", data.command(), data.args().join(" ")),
+                    None => println!("No default session set."),
+                },
+                Err(err) => {
+                    eprintln!(
+                        "Error in reading the user default session: {}",
+                        err
+                    );
+                    std::process::exit(-1)
+                },
+            };
+
+            println!("-----------------------------------------------------------");
+
             let methods_count = user_cfg.secondary().len();
             match methods_count {
                 0 => {
@@ -337,7 +387,7 @@ fn main() {
             }
         }
 
-        save_user_auth_data(user_cfg, &storage_source)
+        store_user_auth_data(user_cfg, &storage_source)
             .expect("Error saving the updated configuration.\nAborting.");
     }
 }
