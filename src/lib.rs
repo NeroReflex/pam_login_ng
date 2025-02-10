@@ -17,8 +17,6 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-#![feature(setgroups)]
-
 pub mod auth;
 pub mod cli;
 pub mod command;

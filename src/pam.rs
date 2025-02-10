@@ -120,6 +120,8 @@ impl LoginExecutor for PamLoginExecutor {
             .envs(session.envlist().iter_tuples())
             .uid(logged_user.uid())
             .gid(logged_user.primary_group_id())
+            /*
+            // unstable feature
             .groups(
                 logged_user
                     .groups()
@@ -130,6 +132,7 @@ impl LoginExecutor for PamLoginExecutor {
                     .collect::<Vec<u32>>()
                     .as_slice(),
             )
+            */
             .current_dir(match logged_user.home_dir().exists() {
                 true => logged_user.home_dir(),
                 false => Path::new("/"),
