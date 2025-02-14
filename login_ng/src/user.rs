@@ -268,6 +268,13 @@ impl MainPassword {
 
         Ok(decrypted_main)
     }
+
+    pub fn check(&self, main_password: &String) -> Result<bool, UserOperationError> {
+        let main_password_hash = hash(main_password, DEFAULT_COST)
+            .map_err(|err| UserOperationError::HashingError(err))?;
+
+        Ok(self.main_hash == main_password_hash)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -310,6 +317,20 @@ impl UserAuthData {
         return self.main.is_some();
     }
 
+    /// Check if the given main passowrd is the same as the stored one
+    /// NOTE: this is NOT the same as a PAM authentication
+    pub fn check_main(&self, main_password: &String) -> Result<bool, UserOperationError> {
+        let Some(stored_main) = &self.main else {
+            return Err(UserOperationError::User(
+                UserAuthDataError::MainPasswordNotSet,
+            ));
+        };
+
+        stored_main.check(&main_password)
+    }
+
+    /// Function to get the main password from a secondary password.
+    /// NOTE: the main password always returns the main password
     pub fn main_by_auth(
         &self,
         secondary_password: &Option<String>,

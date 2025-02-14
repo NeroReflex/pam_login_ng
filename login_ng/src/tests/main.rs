@@ -17,7 +17,22 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-pub mod secondary;
-pub mod storage;
-pub mod user;
-pub mod main;
+#[test]
+fn test_main_password_auth() {
+    let first_main = format!("main password <3");
+    let intermediate = format!("intermediate_key");
+
+    let mut user_cfg = crate::user::UserAuthData::new();
+
+    // set the main password
+    user_cfg.set_main(&first_main, &intermediate).unwrap();
+
+    assert_eq!(
+        user_cfg.main_by_auth(&Some(first_main.clone())).unwrap(),
+        first_main
+    );
+
+    let login_attempt = user_cfg.main_by_auth(&Some(String::from("this is a wrong password")));
+
+    assert!(login_attempt.is_err());
+}
