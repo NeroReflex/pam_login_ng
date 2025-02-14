@@ -161,7 +161,7 @@ fn main() {
             };
 
             let mut context = Context::new(
-                "system-login", // this cannot be changed as setting the main password won't be possible (or it will be unverified)
+                "login_ng-ctl", // this cannot be changed as setting the main password won't be possible (or it will be unverified)
                 username.as_deref(),
                 CommandLineConversation::new(Some(answerer), Some(interaction_recorder.clone())),
             )
