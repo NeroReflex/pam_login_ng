@@ -1,18 +1,36 @@
 extern crate pam;
 
 use login_ng::storage::{load_user_auth_data, StorageSource};
+use login_ng::user::UserAuthData;
 use pam::constants::{PamFlag, PamResultCode, *};
 use pam::conv::Conv;
 use pam::module::{PamHandle, PamHooks};
-//use pam::pam_try;
-use login_ng::users;
+use pam::pam_try;
 use std::ffi::CStr;
 
 struct PamQuickEmbedded;
 pam::pam_hooks!(PamQuickEmbedded);
 
 impl PamQuickEmbedded {
-    
+    pub(crate) fn load_user_auth_data_from_username(
+        username: &String,
+    ) -> Result<UserAuthData, PamResultCode> {
+        match username.as_str() {
+            "" => Err(PamResultCode::PAM_USER_UNKNOWN),
+            "root" => Err(PamResultCode::PAM_USER_UNKNOWN),
+            // load login-ng data and skip the user if it's not set
+            _ => match load_user_auth_data(&StorageSource::Username(username.clone())) {
+                Ok(load_res) => match load_res {
+                    Some(auth_data) => match auth_data.has_main() {
+                        true => Ok(auth_data),
+                        false => Err(PamResultCode::PAM_USER_UNKNOWN),
+                    },
+                    None => Err(PamResultCode::PAM_USER_UNKNOWN),
+                },
+                Err(_err) => Err(PamResultCode::PAM_USER_UNKNOWN),
+            },
+        }
+    }
 }
 
 impl PamHooks for PamQuickEmbedded {
@@ -58,27 +76,10 @@ impl PamHooks for PamQuickEmbedded {
             }
         };
 
-        match username.as_str() {
-            "" => return PamResultCode::PAM_USER_UNKNOWN,
-            "root" => return PamResultCode::PAM_USER_UNKNOWN,
-            _ => {}
-        }
-
-        let storage_source = match users::get_user_by_name(&username) {
-            Some(user) => StorageSource::Username(user.name().to_string_lossy().to_string()),
-            None => return PamResultCode::PAM_USER_UNKNOWN,
-        };
-
-        // load login-ng data and skip the user if it's not set
-        let user_cfg = match load_user_auth_data(&storage_source) {
-            Ok(load_res) => match load_res {
-                Some(auth_data) => match auth_data.has_main() {
-                    true => auth_data,
-                    false => return PamResultCode::PAM_USER_UNKNOWN,
-                },
-                None => return PamResultCode::PAM_USER_UNKNOWN,
-            },
-            Err(_err) => return PamResultCode::PAM_USER_UNKNOWN,
+        // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
+        let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username) {
+            Ok(user_cfg) => user_cfg,
+            Err(pam_err_code) => return pam_err_code,
         };
 
         // first of all check if the empty password is valid
@@ -106,7 +107,7 @@ impl PamHooks for PamQuickEmbedded {
 
         // NOTE: if main_by_auth returns a main passowrd the authentication was successful:
         // there is no need to check if the returned main password is the same as the stored one.
-        match pam::pam_try!(conv.send(PAM_PROMPT_ECHO_OFF, "Password: "))
+        match pam_try!(conv.send(PAM_PROMPT_ECHO_OFF, "Password: "))
             .map(|cstr| cstr.to_str().map(|s| s.to_string()))
         {
             Some(Ok(password)) => user_cfg
