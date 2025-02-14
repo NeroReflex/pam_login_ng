@@ -18,6 +18,7 @@
 */
 
 use std::fmt::Debug;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -43,7 +44,11 @@ use argh::FromArgs;
 struct Args {
     #[argh(option, short = 'u')]
     /// username to be used, if unspecified it will be autodetected: if that fails it will be prompted for
-    user: Option<String>,
+    username: Option<String>,
+
+    #[argh(option, short = 'd')]
+    /// force the use of a specific home directory
+    directory: Option<PathBuf>,
 
     #[argh(option, short = 'p')]
     /// main password for authentication (the one accepted by PAM)
@@ -52,10 +57,6 @@ struct Args {
     #[argh(switch)]
     /// force update of the user configuration if required
     update_as_needed: Option<bool>,
-
-    #[argh(switch)]
-    /// ignore the failure about the user running this software and the target user not being the same
-    ignore_user: Option<bool>,
 
     #[argh(subcommand)]
     command: Command,
@@ -138,57 +139,70 @@ fn main() {
 
     let args: Args = argh::from_env();
 
-    let user_prompt = Some("username: ");
+    let (storage_source, maybe_main_password) = match (args.username, args.directory) {
+        (args_username, None) => {
+            let user_prompt = Some("username: ");
 
-    let answerer = Arc::new(Mutex::new(TrivialCommandLineConversationPrompter::new(
-        args.user.clone(),
-        args.password.clone(),
-    )));
+            let answerer = Arc::new(Mutex::new(TrivialCommandLineConversationPrompter::new(
+                args_username.clone(),
+                args.password.clone(),
+            )));
 
-    let interaction_recorder = Arc::new(Mutex::new(SimpleConversationRecorder::new()));
+            let interaction_recorder = Arc::new(Mutex::new(SimpleConversationRecorder::new()));
 
-    let username = match args.user {
-        Some(username) => Some(username),
-        None => match users::get_current_username() {
-            Some(username) => match username.to_str() {
-                Some(u) => match u {
-                    "root" => None,
-                    username => Some(String::from(username)),
+            let username = match args_username {
+                Some(username) => Some(username),
+                None => match users::get_current_username() {
+                    Some(username) => match username.to_str() {
+                        Some(u) => match u {
+                            "root" => None,
+                            username => Some(String::from(username)),
+                        },
+                        None => None,
+                    },
+                    None => None,
                 },
-                None => None,
-            },
-            None => None,
+            };
+
+            let mut context = Context::new(
+                "system-login", // this cannot be changed as setting the main password won't be possible (or it will be unverified)
+                username.as_deref(),
+                CommandLineConversation::new(Some(answerer), Some(interaction_recorder.clone())),
+            )
+            .expect("Failed to initialize PAM context");
+
+            context.set_user_prompt(user_prompt).unwrap();
+
+            // Authenticate the user (ask for password, 2nd-factor token, fingerprint, etc.)
+            context
+                .authenticate(Flag::NONE)
+                .expect("Authentication failed");
+
+            // Validate the account (is not locked, expired, etc.)
+            context
+                .acct_mgmt(Flag::NONE)
+                .expect("Account validation failed");
+
+            let username = username.clone().unwrap_or_else(|| {
+                interaction_recorder
+                    .lock()
+                    .unwrap()
+                    .recorded_username(&user_prompt)
+                    .unwrap()
+            });
+
+            let main_password = match interaction_recorder.lock().unwrap().recorded_password() {
+                Some(main_password) => Some(main_password),
+                None => args.password
+            };
+
+            (StorageSource::Username(username.clone()), main_password)
         },
+        (_, Some(path)) => {
+            (StorageSource::Path(path), args.password)
+        }
     };
 
-    let mut context = Context::new(
-        "system-login", // this cannot be changed as setting the main password won't be possible (or it will be unverified)
-        username.as_deref(),
-        CommandLineConversation::new(Some(answerer), Some(interaction_recorder.clone())),
-    )
-    .expect("Failed to initialize PAM context");
-
-    context.set_user_prompt(user_prompt).unwrap();
-
-    // Authenticate the user (ask for password, 2nd-factor token, fingerprint, etc.)
-    context
-        .authenticate(Flag::NONE)
-        .expect("Authentication failed");
-
-    // Validate the account (is not locked, expired, etc.)
-    context
-        .acct_mgmt(Flag::NONE)
-        .expect("Account validation failed");
-
-    let username = username.clone().unwrap_or_else(|| {
-        interaction_recorder
-            .lock()
-            .unwrap()
-            .recorded_username(&user_prompt)
-            .unwrap()
-    });
-
-    let storage_source = StorageSource::Username(username.clone());
     let mut user_cfg = match load_user_auth_data(&storage_source) {
         Ok(load_res) => match load_res {
             Some(auth_data) => auth_data,
@@ -232,11 +246,18 @@ fn main() {
             write_file = Some(false)
         }
         Command::Inspect(_) => {
-            println!("-----------------------------------------------------------");
-
-            println!("User: {}", username);
-
-            println!("-----------------------------------------------------------");
+            match &storage_source {
+                StorageSource::Username(username) => {
+                    println!("-----------------------------------------------------------");
+                    println!("User: {}", username);
+                    println!("-----------------------------------------------------------");
+                },
+                StorageSource::Path(path) => {
+                    println!("-----------------------------------------------------------");
+                    println!("Path: {}", path.to_string_lossy());
+                    println!("-----------------------------------------------------------");
+                }
+            }
 
             match load_user_session_command(&storage_source) {
                 Ok(maybe_data) => match maybe_data {
@@ -319,7 +340,7 @@ fn main() {
             }
 
             // if the main password is accepted update the stored one
-            if let Some(main_password) = interaction_recorder.lock().unwrap().recorded_password() {
+            if let Some(main_password) = maybe_main_password {
                 user_cfg
                     .set_main(&main_password, &intermediate_password)
                     .expect("Error handling main password");
@@ -368,25 +389,7 @@ fn main() {
         }
     }
 
-    let selected_user = users::get_user_by_name(&username)
-        .expect("Could not identify the specified user by its username.\nAborting.");
-
-    let uid = selected_user.uid();
-
     if write_file.unwrap_or_default() {
-        let current_uid = users::get_current_uid();
-
-        if uid != current_uid {
-            if !args.ignore_user.unwrap_or_default() {
-                eprintln!(
-                    "Configuration is not relevant to the user invoking the command.\nAborting."
-                );
-                std::process::exit(-1);
-            } else {
-                println!("Configuration is not relevant to the user invoking the command, but will proceed anyway.");
-            }
-        }
-
         store_user_auth_data(user_cfg, &storage_source)
             .expect("Error saving the updated configuration.\nAborting.");
     }
