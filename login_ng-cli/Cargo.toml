@@ -7,11 +7,9 @@ license = "GPL-2.0-or-later"
 [dependencies]
 argh = "0.1.12"
 login_ng = { path = "../login_ng"}
-login_ng_user_interactions = { path = "../login_ng_user_interactions", features = ["greetd"]}
+login_ng_user_interactions = { path = "../login_ng_user_interactions", features = []}
 
 # Conditional dependencies
 [features]
 default = ["greetd"]  # Enable greetd feature by default
-
-
 greetd = ["login_ng_user_interactions/greetd"]

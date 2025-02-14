@@ -16,7 +16,7 @@ login_ng = { path = "../login_ng"}
 
 # Conditional dependencies
 [features]
-default = ["greetd"]  # Enable greetd feature by default
+default = []
 greetd = ["greetd_ipc", "nix"]
 
 # Optional dependencies
