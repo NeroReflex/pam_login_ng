@@ -1,0 +1,30 @@
+[package]
+name = "login_ng_user_interactions"
+edition = "2021"
+authors = ["Denis Benato <benato.denis96@gmail.com>"]
+license = "GPL-2.0-or-later"
+
+[lib]
+name = "login_ng_user_interactions"
+
+[dependencies]
+configparser = "3.1.0"
+rpassword = "^7.3"
+thiserror = "^1.0"
+pam-client2 = { version = "0.5.2", features = [] }
+login_ng = { path = "../login_ng"}
+
+# Conditional dependencies
+[features]
+default = ["greetd"]  # Enable greetd feature by default
+greetd = ["greetd_ipc", "nix"]
+
+# Optional dependencies
+[dependencies.greetd_ipc]
+version = "0.10.3"
+features = ["sync-codec"]
+optional = true
+
+[dependencies.nix]
+version = "^0.29"
+optional = true

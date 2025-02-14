@@ -186,9 +186,9 @@ checksum = "aca792ac9754434d4a26403ac4c0c472d0e8611c27ffc54bffd72d70ec8cc477"
 
 [[package]]
 name = "cc"
-version = "1.2.13"
+version = "1.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7777341816418c02e033934a09f20dc0ccaf65a5201ef8a450ae0105a573fda"
+checksum = "0c3d1b2e905a3a7b00a6141adb0e4c0bb941d11caf55349d863942a1cc44e3c9"
 dependencies = [
  "shlex",
 ]
@@ -474,20 +474,46 @@ name = "login_ng"
 version = "0.1.7"
 dependencies = [
  "aes-gcm",
- "argh",
  "bcrypt",
  "bytevec2",
- "chrono",
- "configparser",
- "greetd_ipc",
  "hkdf",
- "nix",
- "pam-client2",
  "rpassword",
  "sha2",
  "thiserror",
  "users",
  "xattr",
+]
+
+[[package]]
+name = "login_ng-cli"
+version = "0.0.0"
+dependencies = [
+ "argh",
+ "login_ng",
+ "login_ng_user_interactions",
+]
+
+[[package]]
+name = "login_ng-ctl"
+version = "0.0.0"
+dependencies = [
+ "argh",
+ "chrono",
+ "login_ng",
+ "login_ng_user_interactions",
+]
+
+[[package]]
+name = "login_ng_user_interactions"
+version = "0.0.0"
+dependencies = [
+ "configparser",
+ "greetd_ipc",
+ "login_ng",
+ "nix",
+ "pam-client2",
+ "rpassword",
+ "thiserror",
 ]
 
 [[package]]
@@ -546,6 +572,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
+name = "pam-bindings"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95c337e922acb6ab9c3ddd1016fed13957a5bf14f51b6caa293ddc8dd47660ca"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "pam-client2"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -566,6 +601,14 @@ checksum = "ce9484729b3e52c0bacdc5191cb6a6a5f31ef4c09c5e4ab1209d3340ad9e997b"
 dependencies = [
  "bindgen",
  "libc",
+]
+
+[[package]]
+name = "pam_login_ng"
+version = "0.1.0"
+dependencies = [
+ "login_ng",
+ "pam-bindings",
 ]
 
 [[package]]

@@ -1,0 +1,13 @@
+[package]
+name = "pam_login_ng"
+version = "0.1.0"
+edition = "2021"
+authors = ["Denis Benato <benato.denis96@gmail.com>"]
+
+[lib]
+name = "pam_login_ng"
+crate-type = ["cdylib"]
+
+[dependencies]
+pam-bindings = "^0.1.1"
+login_ng = { path = "../login_ng"}

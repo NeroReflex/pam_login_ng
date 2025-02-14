@@ -21,10 +21,10 @@ use std::path::{Path, PathBuf};
 
 use configparser::ini::Ini;
 
+use login_ng::users::os::unix::UserExt;
 use thiserror::Error;
-use users::os::unix::UserExt;
 
-use crate::{
+use login_ng::{
     command::SessionCommand,
     storage::{load_user_session_command, StorageSource},
 };
@@ -102,7 +102,7 @@ pub(crate) fn system_defined_with_crate_fallback() -> SessionCommand {
 }
 
 pub(crate) fn user_default_command_with_system_fallback(username: &String) -> SessionCommand {
-    match users::get_user_by_name(username) {
+    match login_ng::users::get_user_by_name(username) {
         Some(logged_user) => match logged_user.shell().to_str() {
             Some(path_str) => SessionCommand::new(String::from(path_str), vec![]),
             None => match logged_user.name().to_str() {

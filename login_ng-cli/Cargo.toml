@@ -1,0 +1,17 @@
+[package]
+name = "login_ng-cli"
+authors = ["Denis Benato <benato.denis96@gmail.com>"]
+edition = "2021"
+license = "GPL-2.0-or-later"
+
+[dependencies]
+argh = "0.1.12"
+login_ng = { path = "../login_ng"}
+login_ng_user_interactions = { path = "../login_ng_user_interactions", features = ["greetd"]}
+
+# Conditional dependencies
+[features]
+default = ["greetd"]  # Enable greetd feature by default
+
+
+greetd = ["login_ng_user_interactions/greetd"]

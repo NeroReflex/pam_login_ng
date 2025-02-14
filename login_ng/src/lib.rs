@@ -18,24 +18,17 @@
 */
 
 pub mod auth;
-pub mod cli;
 pub mod command;
-pub mod conversation;
 pub mod error;
-pub mod login;
-pub mod pam;
 pub mod storage;
 pub mod user;
 
-#[cfg(feature = "greetd")]
-pub mod greetd;
+pub extern crate users;
 
 #[cfg(test)]
 pub(crate) mod tests;
 
 extern crate bytevec2;
-
-pub const DEFAULT_CMD: &str = "/bin/sh";
 
 pub const DEFAULT_XATTR_NAME: &str = "user.login-ng";
 
@@ -43,6 +36,8 @@ use std::io::BufRead;
 
 use hkdf::*;
 use sha2::Sha256;
+
+pub const LIBRARY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub use rpassword::prompt_password;
 

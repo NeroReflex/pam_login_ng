@@ -21,13 +21,14 @@ use std::env;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use login_ng::cli::CommandLineLoginUserInteractionHandler;
 use login_ng::command::SessionCommand;
-use login_ng::conversation::ProxyLoginUserInteractionHandlerConversation;
-use login_ng::login::*;
+
+use login_ng_user_interactions::cli::CommandLineLoginUserInteractionHandler;
+use login_ng_user_interactions::conversation::ProxyLoginUserInteractionHandlerConversation;
+use login_ng_user_interactions::login::*;
+use login_ng_user_interactions::pam::PamLoginExecutor;
 
 use argh::FromArgs;
-use login_ng::pam::PamLoginExecutor;
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Command line tool for managing login-ng authentication methods
@@ -60,7 +61,7 @@ fn login_greetd(
     maybe_username: &Option<String>,
     retrival_strategy: &SessionCommandRetrival,
 ) -> Result<LoginResult, LoginError> {
-    use login_ng::greetd::GreetdLoginExecutor;
+    use login_ng_user_interactions::greetd::GreetdLoginExecutor;
 
     let mut login_executor = GreetdLoginExecutor::new(greetd_sock, prompter);
 
@@ -81,10 +82,8 @@ fn login_pam(
 }
 
 fn main() {
-    println!(
-        "login-ng version {}, Copyright (C) 2024 Denis Benato",
-        env!("CARGO_PKG_VERSION")
-    );
+    let version = login_ng::LIBRARY_VERSION;
+    println!("login-ng version {version}, Copyright (C) 2024 Denis Benato");
     println!("login-ng comes with ABSOLUTELY NO WARRANTY;");
     println!("This is free software, and you are welcome to redistribute it");
     println!("under certain conditions.");

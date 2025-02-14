@@ -24,7 +24,7 @@ use thiserror::Error;
 
 use crate::{conversation::ProxyLoginUserInteractionHandlerConversation, login::*};
 
-use users::{get_user_by_name, os::unix::UserExt};
+use login_ng::users::{get_user_by_name, os::unix::UserExt};
 
 #[derive(Debug, Error)]
 pub enum PamLoginError {

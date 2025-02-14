@@ -24,18 +24,16 @@ use std::sync::Mutex;
 
 use chrono::Local;
 use chrono::TimeZone;
-use login_ng::cli::TrivialCommandLineConversationPrompter;
-use login_ng::cli::*;
 use login_ng::command::SessionCommand;
-use login_ng::conversation::*;
 use login_ng::prompt_password;
 use login_ng::storage::load_user_session_command;
 use login_ng::storage::store_user_session_command;
 use login_ng::storage::StorageSource;
 use login_ng::storage::{load_user_auth_data, remove_user_data, store_user_auth_data};
-
 use login_ng::user::UserAuthData;
-use pam_client2::{Context, Flag};
+use login_ng_user_interactions::cli::*;
+use login_ng_user_interactions::conversation::*;
+use login_ng_user_interactions::pam_client2::{Context, Flag};
 
 use argh::FromArgs;
 
@@ -128,10 +126,8 @@ struct AddAuthPasswordCommand {
 }
 
 fn main() {
-    println!(
-        "login-ng version {}, Copyright (C) 2024 Denis Benato",
-        env!("CARGO_PKG_VERSION")
-    );
+    let version = login_ng::LIBRARY_VERSION;
+    println!("login-ng version {version}, Copyright (C) 2024 Denis Benato");
     println!("login-ng comes with ABSOLUTELY NO WARRANTY;");
     println!("This is free software, and you are welcome to redistribute it");
     println!("under certain conditions.");
@@ -152,7 +148,7 @@ fn main() {
 
             let username = match args_username {
                 Some(username) => Some(username),
-                None => match users::get_current_username() {
+                None => match login_ng::users::get_current_username() {
                     Some(username) => match username.to_str() {
                         Some(u) => match u {
                             "root" => None,
@@ -193,14 +189,12 @@ fn main() {
 
             let main_password = match interaction_recorder.lock().unwrap().recorded_password() {
                 Some(main_password) => Some(main_password),
-                None => args.password
+                None => args.password,
             };
 
             (StorageSource::Username(username.clone()), main_password)
-        },
-        (_, Some(path)) => {
-            (StorageSource::Path(path), args.password)
         }
+        (_, Some(path)) => (StorageSource::Path(path), args.password),
     };
 
     let mut user_cfg = match load_user_auth_data(&storage_source) {
@@ -251,7 +245,7 @@ fn main() {
                     println!("-----------------------------------------------------------");
                     println!("User: {}", username);
                     println!("-----------------------------------------------------------");
-                },
+                }
                 StorageSource::Path(path) => {
                     println!("-----------------------------------------------------------");
                     println!("Path: {}", path.to_string_lossy());
@@ -261,16 +255,17 @@ fn main() {
 
             match load_user_session_command(&storage_source) {
                 Ok(maybe_data) => match maybe_data {
-                    Some(data) => println!("Default session command: {} {}", data.command(), data.args().join(" ")),
+                    Some(data) => println!(
+                        "Default session command: {} {}",
+                        data.command(),
+                        data.args().join(" ")
+                    ),
                     None => println!("No default session set."),
                 },
                 Err(err) => {
-                    eprintln!(
-                        "Error in reading the user default session: {}",
-                        err
-                    );
+                    eprintln!("Error in reading the user default session: {}", err);
                     std::process::exit(-1)
-                },
+                }
             };
 
             println!("-----------------------------------------------------------");
