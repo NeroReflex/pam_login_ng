@@ -131,7 +131,7 @@ fn main() {
     println!("login-ng comes with ABSOLUTELY NO WARRANTY;");
     println!("This is free software, and you are welcome to redistribute it");
     println!("under certain conditions.");
-    println!("");
+    println!("\n");
 
     let args: Args = argh::from_env();
 
