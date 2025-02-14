@@ -11,6 +11,10 @@ use std::ffi::CStr;
 struct PamQuickEmbedded;
 pam::pam_hooks!(PamQuickEmbedded);
 
+impl PamQuickEmbedded {
+    
+}
+
 impl PamHooks for PamQuickEmbedded {
     fn sm_close_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
         match pamh.get_item::<pam::items::User>() {
@@ -100,15 +104,14 @@ impl PamHooks for PamQuickEmbedded {
             }
         };
 
+        // NOTE: if main_by_auth returns a main passowrd the authentication was successful:
+        // there is no need to check if the returned main password is the same as the stored one.
         match pam::pam_try!(conv.send(PAM_PROMPT_ECHO_OFF, "Password: "))
             .map(|cstr| cstr.to_str().map(|s| s.to_string()))
         {
             Some(Ok(password)) => user_cfg
-                .check_main(&password)
-                .map(|password_matches| match password_matches {
-                    true => PamResultCode::PAM_SUCCESS,
-                    false => PamResultCode::PAM_AUTH_ERR,
-                })
+                .main_by_auth(&Some(password))
+                .map(|_| PamResultCode::PAM_SUCCESS)
                 .unwrap_or(PamResultCode::PAM_AUTH_ERR),
             Some(Err(_err)) => PamResultCode::PAM_CRED_INSUFFICIENT,
             None => PamResultCode::PAM_CRED_INSUFFICIENT,
