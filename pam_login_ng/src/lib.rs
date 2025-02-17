@@ -1,5 +1,7 @@
 extern crate pam;
 
+pub extern crate zbus;
+
 use login_ng::storage::{load_user_auth_data, StorageSource};
 use login_ng::user::UserAuthData;
 use pam::constants::{PamFlag, PamResultCode, *};
@@ -7,6 +9,38 @@ use pam::conv::Conv;
 use pam::module::{PamHandle, PamHooks};
 use pam::pam_try;
 use std::ffi::CStr;
+use std::sync::Once;
+use tokio::runtime::Runtime;
+use zbus::{proxy, Connection, Result as ZResult};
+
+static INIT: Once = Once::new();
+static mut RUNTIME: Option<Runtime> = None;
+
+#[repr(C)]
+enum ServiceOperationResult {
+    Ok = 0,
+    Unknown,
+}
+
+impl From<u32> for ServiceOperationResult {
+    fn from(value: u32) -> Self {
+        match value {
+            0 => ServiceOperationResult::Ok,
+            _ => ServiceOperationResult::Unknown
+        }
+    }
+}
+
+#[proxy(
+    interface = "org.zbus.login_ng",
+    default_service = "org.zbus.login_ng",
+    default_path = "/org/zbus/login_ng"
+)]
+trait Service {
+    async fn open_user_session(&self, user: &str) -> ZResult<u32>;
+
+    async fn close_user_session(&self, user: &str) -> ZResult<u32>;
+}
 
 struct PamQuickEmbedded;
 pam::pam_hooks!(PamQuickEmbedded);
@@ -31,23 +65,91 @@ impl PamQuickEmbedded {
             },
         }
     }
+
+    pub(crate) async fn open_session_for_user(user: &String) -> ZResult<u32> {
+        let connection = Connection::session().await?;
+
+        let proxy = ServiceProxy::new(&connection).await?;
+        let reply = proxy.open_user_session(user.as_str()).await?;
+
+        Ok(reply)
+    }
+
+    pub(crate) async fn close_session_for_user(user: &String) -> ZResult<u32> {
+        let connection = Connection::session().await?;
+
+        let proxy = ServiceProxy::new(&connection).await?;
+        let reply = proxy.close_user_session(user.as_str()).await?;
+
+        Ok(reply)
+    }
 }
 
 impl PamHooks for PamQuickEmbedded {
     fn sm_close_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
-        match pamh.get_item::<pam::items::User>() {
-            Ok(Some(username)) => println!("{}", String::from(username.to_string_lossy())),
-            Ok(None) => println!("B"),
-            Err(err) => println!("E {:?}", err),
-        };
+        INIT.call_once(|| {
+            // Initialize the Tokio runtime
+            unsafe {
+                RUNTIME = Some(Runtime::new().unwrap());
+            }
+        });
 
-        PamResultCode::PAM_IGNORE
+        unsafe {
+            match &RUNTIME {
+                Some(runtime) => runtime.block_on(async {
+                    match pamh.get_item::<pam::items::User>() {
+                        Ok(Some(username)) => match PamQuickEmbedded::close_session_for_user(
+                            &String::from(username.to_string_lossy()),
+                        )
+                        .await
+                        {
+                            Ok(result) => match ServiceOperationResult::from(result) {
+                                ServiceOperationResult::Ok => PamResultCode::PAM_SUCCESS,
+                                _ => PamResultCode::PAM_SERVICE_ERR,
+                            },
+                            Err(_) => PamResultCode::PAM_SERVICE_ERR,
+                        },
+                        Ok(None) => PamResultCode::PAM_SERVICE_ERR,
+                        Err(_) => PamResultCode::PAM_SERVICE_ERR,
+                    }
+                }),
+                None => return PamResultCode::PAM_SERVICE_ERR,
+            }
+        }
     }
 
-    fn sm_open_session(_pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
-        PamResultCode::PAM_IGNORE
-    }
+    fn sm_open_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
+        INIT.call_once(|| {
+            // Initialize the Tokio runtime
+            unsafe {
+                RUNTIME = Some(Runtime::new().unwrap());
+            }
+        });
 
+        unsafe {
+            match &RUNTIME {
+                Some(runtime) => runtime.block_on(async {
+                    match pamh.get_item::<pam::items::User>() {
+                        Ok(Some(username)) => match PamQuickEmbedded::open_session_for_user(
+                            &String::from(username.to_string_lossy()),
+                        )
+                        .await
+                        {
+                            Ok(result) => match ServiceOperationResult::from(result) {
+                                ServiceOperationResult::Ok => PamResultCode::PAM_SUCCESS,
+                                _ => PamResultCode::PAM_SERVICE_ERR,
+                            },
+                            Err(_) => PamResultCode::PAM_SERVICE_ERR,
+                        },
+                        Ok(None) => PamResultCode::PAM_SERVICE_ERR,
+                        Err(_) => PamResultCode::PAM_SERVICE_ERR,
+                    }
+                }),
+                None => return PamResultCode::PAM_SERVICE_ERR,
+            }
+        }
+    }
+/*
     fn sm_setcred(_pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
         println!("set credentials");
         PamResultCode::PAM_SUCCESS
@@ -57,7 +159,7 @@ impl PamHooks for PamQuickEmbedded {
         println!("account management");
         PamResultCode::PAM_SUCCESS
     }
-
+*/
     fn sm_authenticate(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
         let username = match pamh.get_user(None) {
             Ok(res) => res,

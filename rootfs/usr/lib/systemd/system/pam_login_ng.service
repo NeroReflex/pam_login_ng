@@ -1,0 +1,8 @@
+[Unit]
+Description=pam service for login_ng
+Before=greetd.service
+
+[Service]
+ExecStart=/usr/bin/pam_login_ng-service
+Restart=always
+IgnoreSIGPIPE=no

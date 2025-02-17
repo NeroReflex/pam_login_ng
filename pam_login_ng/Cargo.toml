@@ -8,6 +8,13 @@ authors = ["Denis Benato <benato.denis96@gmail.com>"]
 name = "pam_login_ng"
 crate-type = ["cdylib"]
 
+[[bin]]
+name = "pam_login_ng-service"
+path = "src/pam_login_ng-service/main.rs"
+
 [dependencies]
 pam-bindings = "^0.1.1"
 login_ng = { path = "../login_ng"}
+zbus = "5.5.0"
+tokio = { version = "^1.43", features = ["macros", "rt-multi-thread"] }
+thiserror = "2.0.11"
