@@ -32,11 +32,10 @@ pub extern crate pam_client2;
 pub const DEFAULT_CMD: &str = "/bin/sh";
 
 /// Reads a password from the TTY
-fn read_plain() -> std::io::Result<String> {
+fn read_plain(stream: std::fs::File) -> std::io::Result<String> {
     use std::io::BufRead;
 
-    let tty = std::fs::File::open("/dev/tty")?;
-    let mut reader = std::io::BufReader::new(tty);
+    let mut reader = std::io::BufReader::new(stream);
 
     let mut answer = String::new();
     reader.read_line(&mut answer)?;
@@ -72,16 +71,16 @@ fn fix_line_issues(mut line: String) -> std::io::Result<String> {
     Ok(line)
 }
 
-pub fn prompt_stderr(prompt: &str) -> Result<String, Box<dyn std::error::Error>> {
+pub fn prompt_plain(prompt: &str) -> Result<String, Box<dyn std::error::Error>> {
     use std::io::Write;
 
-    let mut stream = std::fs::OpenOptions::new().write(true).open("/dev/tty")?;
+    let mut stream = std::fs::OpenOptions::new().write(true).read(true).open("/dev/tty")?;
 
     Ok(
         stream
             .write_all(prompt.to_string().as_str().as_bytes())
             .and_then(|_| stream.flush())
-            .and_then(|_| read_plain())
+            .and_then(|_| read_plain(stream))
             .map_err(|err| Box::new(err))?
     )
 }

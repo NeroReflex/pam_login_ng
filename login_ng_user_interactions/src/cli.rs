@@ -23,7 +23,7 @@ use std::{
 };
 
 use pam_client2::{ConversationHandler, ErrorCode};
-use crate::{prompt_password, prompt_stderr};
+use crate::{prompt_password, prompt_plain};
 
 use crate::{conversation::*, login::LoginUserInteractionHandler};
 
@@ -95,11 +95,11 @@ impl ConversationHandler for CommandLineConversation {
             Some(ref ans) => match ans.lock() {
                 Ok(mut guard) => match guard.echo_on_prompt(&prompt) {
                     Some(answer) => answer,
-                    None => prompt_stderr(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?,
+                    None => prompt_plain(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?,
                 },
-                Err(_) => prompt_stderr(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?,
+                Err(_) => prompt_plain(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?,
             },
-            None => prompt_stderr(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?,
+            None => prompt_plain(prompt.as_str()).map_err(|_err| ErrorCode::CONV_ERR)?,
         };
 
         if let Some(recorder) = &self.recorder {
@@ -241,7 +241,7 @@ impl LoginUserInteractionHandler for CommandLineLoginUserInteractionHandler {
     fn prompt_plain(&mut self, msg: &String) -> Option<String> {
         match &self.maybe_username {
             Some(username) => Some(username.clone()),
-            None => match prompt_stderr(msg.as_str()) {
+            None => match prompt_plain(msg.as_str()) {
                 Ok(response) => Some(response),
                 Err(_) => None,
             },
