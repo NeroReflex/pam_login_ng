@@ -23,12 +23,11 @@ use std::{
 };
 
 use pam_client2::{ConversationHandler, ErrorCode};
-use rpassword::prompt_password;
+use crate::{prompt_password, prompt_stderr};
 
 use crate::{conversation::*, login::LoginUserInteractionHandler};
 
 use login_ng::{
-    prompt_stderr,
     storage::{load_user_auth_data, StorageSource},
     user::UserAuthData,
 };

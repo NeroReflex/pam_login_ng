@@ -25,7 +25,6 @@ use std::sync::Mutex;
 use chrono::Local;
 use chrono::TimeZone;
 use login_ng::command::SessionCommand;
-use login_ng::prompt_password;
 use login_ng::storage::load_user_session_command;
 use login_ng::storage::store_user_session_command;
 use login_ng::storage::StorageSource;
@@ -34,6 +33,7 @@ use login_ng::user::UserAuthData;
 use login_ng_user_interactions::cli::*;
 use login_ng_user_interactions::conversation::*;
 use login_ng_user_interactions::pam_client2::{Context, Flag};
+use login_ng_user_interactions::prompt_password;
 
 use argh::FromArgs;
 

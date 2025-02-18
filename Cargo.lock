@@ -815,7 +815,6 @@ dependencies = [
  "bcrypt",
  "bytevec2",
  "hkdf",
- "rpassword",
  "sha2",
  "thiserror 1.0.69",
  "users",
