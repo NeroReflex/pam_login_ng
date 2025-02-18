@@ -8,7 +8,7 @@ install: build
 	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service $(PREFIX)/usr/bin/pam_login_ng-service
 	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so $(PREFIX)/usr/lib/security/pam_login_ng.so
 	install -D -m 644 rootfs/usr/lib/systemd/system/pam_login_ng.service $(PREFIX)/usr/lib/systemd/system/pam_login_ng.service
-	install -D -m 644 rootfs/usr/lib/systemd/system/login_ng.service $(PREFIX)/usr/lib/systemd/system/login_ng.service
+	install -D -m 644 rootfs/usr/lib/systemd/system/login_ng@.service $(PREFIX)/usr/lib/systemd/system/login_ng@.service
 	install -D -m 644 rootfs/usr/lib/sysusers.d/login_ng.conf $(PREFIX)/usr/lib/sysusers.d/login_ng.conf
 	install -D -m 644 rootfs/etc/pam.d/login_ng $(PREFIX)/etc/pam.d/login_ng
 	install -D -m 644 rootfs/etc/pam.d/login_ng-autologin $(PREFIX)/etc/pam.d/login_ng-autologin
