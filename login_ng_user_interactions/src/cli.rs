@@ -22,8 +22,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use pam_client2::{ConversationHandler, ErrorCode};
 use crate::{prompt_password, prompt_plain};
+#[cfg(feature = "pam")]
+use pam_client2::{ConversationHandler, ErrorCode};
 
 use crate::{conversation::*, login::LoginUserInteractionHandler};
 
@@ -61,11 +62,13 @@ impl ConversationPrompter for TrivialCommandLineConversationPrompter {
     }
 }
 
+#[cfg(feature = "pam")]
 pub struct CommandLineConversation {
     answerer: Option<Arc<Mutex<dyn ConversationPrompter>>>,
     recorder: Option<Arc<Mutex<dyn ConversationRecorder>>>,
 }
 
+#[cfg(feature = "pam")]
 impl CommandLineConversation {
     /// Creates a new null conversation handler
     #[must_use]
@@ -81,12 +84,14 @@ impl CommandLineConversation {
     }
 }
 
+#[cfg(feature = "pam")]
 impl Default for CommandLineConversation {
     fn default() -> Self {
         Self::new(None, None)
     }
 }
 
+#[cfg(feature = "pam")]
 impl ConversationHandler for CommandLineConversation {
     fn prompt_echo_on(&mut self, msg: &CStr) -> Result<CString, ErrorCode> {
         let prompt = format!("{}", msg.to_string_lossy());

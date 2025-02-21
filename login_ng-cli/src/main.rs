@@ -26,6 +26,8 @@ use login_ng::command::SessionCommand;
 use login_ng_user_interactions::cli::CommandLineLoginUserInteractionHandler;
 use login_ng_user_interactions::conversation::ProxyLoginUserInteractionHandlerConversation;
 use login_ng_user_interactions::login::*;
+
+#[cfg(feature = "pam")]
 use login_ng_user_interactions::pam::PamLoginExecutor;
 
 use argh::FromArgs;
@@ -68,6 +70,7 @@ fn login_greetd(
     login_executor.execute(maybe_username, retrival_strategy)
 }
 
+#[cfg(feature = "pam")]
 fn login_pam(
     allow_autologin: bool,
     prompter: Arc<Mutex<dyn LoginUserInteractionHandler>>,
@@ -107,38 +110,38 @@ fn main() {
     };
 
     'login_attempt: for attempt in 0..max_failures {
-        let login_result = {
-            #[cfg(not(feature = "greetd"))]
-            {
-                if let Ok(_) = env::var("GREETD_SOCK") {
-                    println!(
-                        "Running over greetd, but greetd support has been compile-time disabled."
-                    )
-                }
-
-                login_pam(
-                    allow_autologin,
-                    prompter.clone(),
-                    &args.user,
-                    &command_retrieval,
-                )
-            }
-
-            #[cfg(feature = "greetd")]
-            {
-                match env::var("GREETD_SOCK") {
-                    Ok(greetd_sock) => login_greetd(
+        let login_result: Result<LoginResult, LoginError> = match env::var("GREETD_SOCK") {
+            Ok(greetd_sock) => {
+                #[cfg(feature = "greetd")]
+                {
+                    login_greetd(
                         greetd_sock,
                         prompter.clone(),
                         &args.user,
                         &command_retrieval,
-                    ),
-                    Err(_) => login_pam(
+                    )
+                }
+
+                #[cfg(not(feature = "greetd"))]
+                {
+                    eprintln!("greetd support has been removed.");
+                    Err(LoginError::NoLoginSupport)
+                }
+            }
+            _ => {
+                #[cfg(feature = "pam")]
+                {
+                    login_pam(
                         allow_autologin,
                         prompter.clone(),
                         &args.user,
                         &command_retrieval,
-                    ),
+                    )
+                }
+                #[cfg(not(feature = "pam"))]
+                {
+                    eprintln!("greetd support has either been removed or the service is unavailable, while pam support is compile-time disabled.");
+                    Err(LoginError::NoLoginSupport)
                 }
             }
         };

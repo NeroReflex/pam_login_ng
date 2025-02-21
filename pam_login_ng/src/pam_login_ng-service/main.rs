@@ -44,12 +44,10 @@ impl Service {
 #[interface(name = "org.zbus.pam_login_ng")]
 impl Service {
     fn open_user_session(&mut self, user: &str) -> u32 {
-        
         0u32
     }
 
     fn close_user_session(&mut self, user: &str) -> u32 {
-        
         0u32
     }
 }

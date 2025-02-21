@@ -13,3 +13,4 @@ login_ng_user_interactions = { path = "../login_ng_user_interactions", features 
 [features]
 default = ["greetd"]  # Enable greetd feature by default
 greetd = ["login_ng_user_interactions/greetd"]
+pam = ["login_ng_user_interactions/pam"]

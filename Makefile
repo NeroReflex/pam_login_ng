@@ -18,16 +18,16 @@ install: build
 build: login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so
 
 login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli:
-	cd login_ng-cli && cargo build --frozen --offline --$(BUILD_TYPE) --target-dir target
+	cd login_ng-cli && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target
 
 login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl:
-	cd login_ng-ctl && cargo build --frozen --offline --$(BUILD_TYPE) --target-dir target
+	cd login_ng-ctl && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target
 
 pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service: pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so
-	cd pam_login_ng && cargo build --frozen --offline --$(BUILD_TYPE) --bin pam_login_ng-service --target-dir target
+	cd pam_login_ng && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --bin pam_login_ng-service --target-dir target
 
 pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so:
-	cd pam_login_ng && cargo build --frozen --offline --$(BUILD_TYPE) --lib --target-dir target
+	cd pam_login_ng && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --lib --target-dir target
 
 .PHONY: clean
 clean:

@@ -26,7 +26,7 @@ impl From<u32> for ServiceOperationResult {
     fn from(value: u32) -> Self {
         match value {
             0 => ServiceOperationResult::Ok,
-            _ => ServiceOperationResult::Unknown
+            _ => ServiceOperationResult::Unknown,
         }
     }
 }
@@ -149,17 +149,17 @@ impl PamHooks for PamQuickEmbedded {
             }
         }
     }
-/*
-    fn sm_setcred(_pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
-        println!("set credentials");
-        PamResultCode::PAM_SUCCESS
-    }
+    /*
+        fn sm_setcred(_pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
+            println!("set credentials");
+            PamResultCode::PAM_SUCCESS
+        }
 
-    fn acct_mgmt(_pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
-        println!("account management");
-        PamResultCode::PAM_SUCCESS
-    }
-*/
+        fn acct_mgmt(_pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
+            println!("account management");
+            PamResultCode::PAM_SUCCESS
+        }
+    */
     fn sm_authenticate(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
         let username = match pamh.get_user(None) {
             Ok(res) => res,

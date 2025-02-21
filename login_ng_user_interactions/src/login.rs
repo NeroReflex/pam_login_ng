@@ -41,11 +41,15 @@ pub enum LoginError {
     #[error("Error with greetd: {0}")]
     GreetdError(#[from] crate::greetd::GreetdLoginError),
 
+    #[cfg(feature = "pam")]
     #[error("Error with pam: {0}")]
     PamError(#[from] crate::pam::PamLoginError),
 
     #[error("Username not recognised")]
     UserDiscoveryError,
+
+    #[error("No login backend available")]
+    NoLoginSupport,
 }
 
 pub trait LoginUserInteractionHandler {

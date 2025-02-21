@@ -32,14 +32,17 @@ use login_ng::storage::{load_user_auth_data, remove_user_data, store_user_auth_d
 use login_ng::user::UserAuthData;
 use login_ng_user_interactions::cli::*;
 use login_ng_user_interactions::conversation::*;
-use login_ng_user_interactions::pam_client2::{Context, Flag};
 use login_ng_user_interactions::prompt_password;
+
+#[cfg(feature = "pam")]
+use login_ng_user_interactions::pam_client2::{Context, Flag};
 
 use argh::FromArgs;
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Command line tool for managing login-ng authentication methods
 struct Args {
+    #[cfg(feature = "pam")]
     #[argh(option, short = 'u')]
     /// username to be used, if unspecified it will be autodetected: if that fails it will be prompted for
     username: Option<String>,
@@ -135,6 +138,13 @@ fn main() {
 
     let args: Args = argh::from_env();
 
+    #[cfg(not(feature = "pam"))]
+    let (storage_source, maybe_main_password) = match args.directory {
+        Some(path) => (StorageSource::Path(path), args.password),
+        None => panic!("this software has been compiled without pam support: you must specify the home directory of the target user"),
+    };
+
+    #[cfg(feature = "pam")]
     let (storage_source, maybe_main_password) = match (args.username, args.directory) {
         (args_username, None) => {
             let user_prompt = Some("username: ");

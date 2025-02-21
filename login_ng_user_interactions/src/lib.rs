@@ -20,6 +20,8 @@
 pub mod cli;
 pub mod conversation;
 pub mod login;
+
+#[cfg(feature = "pam")]
 pub mod pam;
 
 #[cfg(feature = "greetd")]
@@ -27,6 +29,7 @@ pub mod greetd;
 
 pub use rpassword::prompt_password;
 
+#[cfg(feature = "pam")]
 pub extern crate pam_client2;
 
 pub const DEFAULT_CMD: &str = "/bin/sh";
@@ -74,13 +77,14 @@ fn fix_line_issues(mut line: String) -> std::io::Result<String> {
 pub fn prompt_plain(prompt: &str) -> Result<String, Box<dyn std::error::Error>> {
     use std::io::Write;
 
-    let mut stream = std::fs::OpenOptions::new().write(true).read(true).open("/dev/tty")?;
+    let mut stream = std::fs::OpenOptions::new()
+        .write(true)
+        .read(true)
+        .open("/dev/tty")?;
 
-    Ok(
-        stream
-            .write_all(prompt.to_string().as_str().as_bytes())
-            .and_then(|_| stream.flush())
-            .and_then(|_| read_plain(stream))
-            .map_err(|err| Box::new(err))?
-    )
+    Ok(stream
+        .write_all(prompt.to_string().as_str().as_bytes())
+        .and_then(|_| stream.flush())
+        .and_then(|_| read_plain(stream))
+        .map_err(|err| Box::new(err))?)
 }

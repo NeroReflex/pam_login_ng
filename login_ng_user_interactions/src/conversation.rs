@@ -21,6 +21,7 @@ use std::ffi::{CStr, CString};
 
 use crate::login::LoginUserInteractionHandler;
 
+#[cfg(feature = "pam")]
 use pam_client2::{ConversationHandler, ErrorCode};
 
 use std::sync::{Arc, Mutex};
@@ -124,6 +125,7 @@ impl ProxyLoginUserInteractionHandlerConversation {
     }
 }
 
+#[cfg(feature = "pam")]
 impl ConversationHandler for ProxyLoginUserInteractionHandlerConversation {
     fn prompt_echo_on(&mut self, msg: &CStr) -> Result<CString, ErrorCode> {
         let msg = format!("{}", msg.to_string_lossy());
