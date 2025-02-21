@@ -114,11 +114,13 @@ pub trait ConversationPrompter {
     fn display_error(&mut self, prompt: &String);
 }
 
+#[cfg(feature = "pam")]
 #[derive(Clone)]
 pub struct ProxyLoginUserInteractionHandlerConversation {
     inner: Arc<Mutex<dyn LoginUserInteractionHandler>>,
 }
 
+#[cfg(feature = "pam")]
 impl ProxyLoginUserInteractionHandlerConversation {
     pub fn new(inner: Arc<Mutex<dyn LoginUserInteractionHandler>>) -> Self {
         Self { inner }

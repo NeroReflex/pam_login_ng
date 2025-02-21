@@ -24,7 +24,6 @@ use std::sync::Mutex;
 use login_ng::command::SessionCommand;
 
 use login_ng_user_interactions::cli::CommandLineLoginUserInteractionHandler;
-use login_ng_user_interactions::conversation::ProxyLoginUserInteractionHandlerConversation;
 use login_ng_user_interactions::login::*;
 
 #[cfg(feature = "pam")]
@@ -77,7 +76,10 @@ fn login_pam(
     maybe_username: &Option<String>,
     retrival_strategy: &SessionCommandRetrival,
 ) -> Result<LoginResult, LoginError> {
-    let conversation = ProxyLoginUserInteractionHandlerConversation::new(prompter);
+    let conversation =
+        login_ng_user_interactions::conversation::ProxyLoginUserInteractionHandlerConversation::new(
+            prompter,
+        );
 
     let mut login_executer = PamLoginExecutor::new(conversation, allow_autologin);
 

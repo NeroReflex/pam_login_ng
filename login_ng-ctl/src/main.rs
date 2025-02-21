@@ -19,8 +19,6 @@
 
 use std::fmt::Debug;
 use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 use chrono::Local;
 use chrono::TimeZone;
@@ -30,8 +28,7 @@ use login_ng::storage::store_user_session_command;
 use login_ng::storage::StorageSource;
 use login_ng::storage::{load_user_auth_data, remove_user_data, store_user_auth_data};
 use login_ng::user::UserAuthData;
-use login_ng_user_interactions::cli::*;
-use login_ng_user_interactions::conversation::*;
+
 use login_ng_user_interactions::prompt_password;
 
 #[cfg(feature = "pam")]
@@ -147,6 +144,12 @@ fn main() {
     #[cfg(feature = "pam")]
     let (storage_source, maybe_main_password) = match (args.username, args.directory) {
         (args_username, None) => {
+            use std::sync::Arc;
+            use std::sync::Mutex;
+
+            use login_ng_user_interactions::cli::*;
+            use login_ng_user_interactions::conversation::*;
+
             let user_prompt = Some("username: ");
 
             let answerer = Arc::new(Mutex::new(TrivialCommandLineConversationPrompter::new(
