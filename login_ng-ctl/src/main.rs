@@ -64,10 +64,20 @@ struct Args {
 #[argh(subcommand)]
 /// Subcommands for managing authentication methods
 enum Command {
+    Setup(SetupCommand),
     Reset(ResetCommand),
     Inspect(InspectCommand),
     Add(AddAuthCommand),
     SetSession(SetSessionCommand),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Setup initial authentication data also creating a new intermediate key
+#[argh(subcommand, name = "setup")]
+struct SetupCommand {
+    #[argh(option, short = 'i')]
+    /// the intermediate key
+    intermediate: Option<String>,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -237,9 +247,50 @@ fn main() {
                 }
             }
         }
+        Command::Setup(s) => {
+            if user_cfg.has_main() {
+                eprintln!("User already has an intermediate key present: use reset if you want to delete the old one");
+                std::process::exit(-1)
+            }
+
+            let intermediate_key = match s.intermediate {
+                Some(ik) => ik.clone(),
+                None => {
+                    let ik = prompt_password("intermediate key:").unwrap();
+                    let ikc = prompt_password("intermediate key (confirm):").unwrap();
+
+                    if ik != ikc {
+                        eprintln!("Intermediate key and confirmation not matching");
+                        std::process::exit(-1)
+                    }
+
+                    ik
+                }
+            };
+
+            let password = match &maybe_main_password {
+                Some(password) => password.clone(),
+                None => prompt_password("main password:").unwrap(),
+            };
+
+            user_cfg = UserAuthData::new();
+            match user_cfg.set_main(&password, &intermediate_key) {
+                Ok(_) => {
+                    // Force the write of the populated User structure
+                    write_file = Some(false);
+                },
+                Err(err) => {
+                    eprintln!("Error in initializing the user authentication data: {}", err);
+                    std::process::exit(-1)
+                }
+            };
+        }
         Command::Reset(_) => {
             match remove_user_data(&storage_source) {
-                Ok(_) => {}
+                Ok(_) => {
+                    // Do NOT rewrite the User structure that was created while authenticating the user
+                    write_file = Some(false)
+                }
                 Err(err) => {
                     eprintln!(
                         "Error in resetting user additional athentication methods: {}",
@@ -248,9 +299,6 @@ fn main() {
                     std::process::exit(-1)
                 }
             }
-
-            // Do NOT rewrite the User structure that was created while authenticating the user
-            write_file = Some(false)
         }
         Command::Inspect(_) => {
             match &storage_source {
