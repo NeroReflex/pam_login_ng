@@ -1,5 +1,24 @@
-extern crate pam;
+/*
+    login-ng A greeter written in rust that also supports autologin with systemd-homed
+    Copyright (C) 2024  Denis Benato
 
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+*/
+
+extern crate pam;
+extern crate rand;
 pub extern crate zbus;
 
 use login_ng::storage::{load_user_auth_data, StorageSource};
@@ -8,10 +27,13 @@ use pam::constants::{PamFlag, PamResultCode, *};
 use pam::conv::Conv;
 use pam::module::{PamHandle, PamHooks};
 use pam::pam_try;
+use rsa::pkcs1::DecodeRsaPublicKey;
 use std::ffi::CStr;
 use std::sync::Once;
 use tokio::runtime::Runtime;
 use zbus::{proxy, Connection, Result as ZResult};
+
+use rsa::{Pkcs1v15Encrypt, RsaPublicKey};
 
 static INIT: Once = Once::new();
 static mut RUNTIME: Option<Runtime> = None;
@@ -19,6 +41,7 @@ static mut RUNTIME: Option<Runtime> = None;
 #[repr(C)]
 enum ServiceOperationResult {
     Ok = 0,
+    PubKeyError = 1,
     Unknown,
 }
 
@@ -26,6 +49,7 @@ impl From<u32> for ServiceOperationResult {
     fn from(value: u32) -> Self {
         match value {
             0 => ServiceOperationResult::Ok,
+            1 => ServiceOperationResult::PubKeyError,
             _ => ServiceOperationResult::Unknown,
         }
     }
@@ -37,7 +61,9 @@ impl From<u32> for ServiceOperationResult {
     default_path = "/org/zbus/login_ng"
 )]
 trait Service {
-    async fn open_user_session(&self, user: &str) -> ZResult<u32>;
+    async fn get_pubkey(&self) -> ZResult<String>;
+
+    async fn open_user_session(&self, user: &str, password: Vec<u8>) -> ZResult<u32>;
 
     async fn close_user_session(&self, user: &str) -> ZResult<u32>;
 }
@@ -70,9 +96,20 @@ impl PamQuickEmbedded {
         let connection = Connection::session().await?;
 
         let proxy = ServiceProxy::new(&connection).await?;
-        let reply = proxy.open_user_session(user.as_str()).await?;
 
-        Ok(reply)
+        let pk = proxy.get_pubkey().await?;
+
+        match RsaPublicKey::from_pkcs1_pem(pk.as_str()) {
+            Ok(pubkey) => {
+                let mut rng = rand::thread_rng();
+
+                let encrypted_password = pubkey.encrypt(&mut rng, Pkcs1v15Encrypt, "".as_bytes()).unwrap();
+
+                let reply = proxy.open_user_session(user.as_str(), encrypted_password).await?;
+                Ok(reply)
+            },
+            Err(_) => Ok(1u32)
+        }
     }
 
     pub(crate) async fn close_session_for_user(user: &String) -> ZResult<u32> {
@@ -130,16 +167,18 @@ impl PamHooks for PamQuickEmbedded {
             match &RUNTIME {
                 Some(runtime) => runtime.block_on(async {
                     match pamh.get_item::<pam::items::User>() {
-                        Ok(Some(username)) => match PamQuickEmbedded::open_session_for_user(
-                            &String::from(username.to_string_lossy()),
-                        )
-                        .await
-                        {
-                            Ok(result) => match ServiceOperationResult::from(result) {
-                                ServiceOperationResult::Ok => PamResultCode::PAM_SUCCESS,
-                                _ => PamResultCode::PAM_SERVICE_ERR,
-                            },
-                            Err(_) => PamResultCode::PAM_SERVICE_ERR,
+                        Ok(Some(username)) => {
+                            match PamQuickEmbedded::open_session_for_user(
+                                &String::from(username.to_string_lossy()),
+                            )
+                            .await
+                            {
+                                Ok(result) => match ServiceOperationResult::from(result) {
+                                    ServiceOperationResult::Ok => PamResultCode::PAM_SUCCESS,
+                                    _ => PamResultCode::PAM_SERVICE_ERR,
+                                },
+                                Err(_) => PamResultCode::PAM_SERVICE_ERR,
+                            }
                         },
                         Ok(None) => PamResultCode::PAM_SERVICE_ERR,
                         Err(_) => PamResultCode::PAM_SERVICE_ERR,
