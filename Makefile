@@ -15,7 +15,11 @@ install: build
 	install -D -m 644 rootfs/etc/pam.d/login_ng-ctl $(PREFIX)/etc/pam.d/login_ng-ctl
 
 .PHONY: build
-build: login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so
+build: fetch login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so
+
+.PHONY: fetch
+fetch: Cargo.lock
+	cargo fetch --locked
 
 login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli:
 	cd login_ng-cli && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target
