@@ -277,7 +277,7 @@ fn main() {
             match user_cfg.set_main(&password, &intermediate_key) {
                 Ok(_) => {
                     // Force the write of the populated User structure
-                    write_file = Some(false);
+                    write_file = Some(true);
                 },
                 Err(err) => {
                     eprintln!("Error in initializing the user authentication data: {}", err);
