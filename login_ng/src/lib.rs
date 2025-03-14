@@ -19,11 +19,15 @@
 
 pub mod auth;
 pub mod command;
+pub mod environment;
 pub mod error;
+pub mod mount;
 pub mod storage;
 pub mod user;
 
 pub extern crate users;
+
+pub extern crate rs_sha512;
 
 #[cfg(test)]
 pub(crate) mod tests;

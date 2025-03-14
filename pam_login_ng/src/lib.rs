@@ -42,6 +42,9 @@ static mut RUNTIME: Option<Runtime> = None;
 enum ServiceOperationResult {
     Ok = 0,
     PubKeyError = 1,
+    DataDecryptionFailed = 2,
+    CannotLoadUserMountError = 3,
+    MountError = 4,
     Unknown,
 }
 
@@ -50,6 +53,9 @@ impl From<u32> for ServiceOperationResult {
         match value {
             0 => ServiceOperationResult::Ok,
             1 => ServiceOperationResult::PubKeyError,
+            2 => ServiceOperationResult::DataDecryptionFailed,
+            3 => ServiceOperationResult::CannotLoadUserMountError,
+            4 => ServiceOperationResult::MountError,
             _ => ServiceOperationResult::Unknown,
         }
     }
@@ -92,7 +98,10 @@ impl PamQuickEmbedded {
         }
     }
 
-    pub(crate) async fn open_session_for_user(user: &String) -> ZResult<u32> {
+    pub(crate) async fn open_session_for_user(
+        user: &String,
+        plain_main_password: &String,
+    ) -> ZResult<u32> {
         let connection = Connection::session().await?;
 
         let proxy = ServiceProxy::new(&connection).await?;
@@ -103,12 +112,16 @@ impl PamQuickEmbedded {
             Ok(pubkey) => {
                 let mut rng = rand::thread_rng();
 
-                let encrypted_password = pubkey.encrypt(&mut rng, Pkcs1v15Encrypt, "".as_bytes()).unwrap();
+                let encrypted_password = pubkey
+                    .encrypt(&mut rng, Pkcs1v15Encrypt, plain_main_password.as_bytes())
+                    .unwrap();
 
-                let reply = proxy.open_user_session(user.as_str(), encrypted_password).await?;
+                let reply = proxy
+                    .open_user_session(user.as_str(), encrypted_password)
+                    .await?;
                 Ok(reply)
-            },
-            Err(_) => Ok(1u32)
+            }
+            Err(_) => Ok(1u32),
         }
     }
 
@@ -120,6 +133,8 @@ impl PamQuickEmbedded {
 
         Ok(reply)
     }
+
+    pub(crate) async fn handle_env(pamh: &mut PamHandle) {}
 }
 
 impl PamHooks for PamQuickEmbedded {
@@ -163,6 +178,31 @@ impl PamHooks for PamQuickEmbedded {
             }
         });
 
+        let username = match pamh.get_user(None) {
+            Ok(res) => res,
+            Err(err) => {
+                // If the error is PAM_SUCCESS, we should not return an error
+                if err != PamResultCode::PAM_SUCCESS {
+                    return err;
+                }
+
+                // Attempt to get the user item
+                match pamh.get_item::<pam::items::User>() {
+                    Ok(Some(username)) => String::from(username.to_string_lossy()),
+                    Ok(None) => return PamResultCode::PAM_AUTH_ERR,
+                    Err(err) => return err,
+                }
+            }
+        };
+
+        // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
+        let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username) {
+            Ok(user_cfg) => user_cfg,
+            Err(pam_err_code) => return pam_err_code,
+        };
+
+        // TODO: set environment variables
+
         unsafe {
             match &RUNTIME {
                 Some(runtime) => runtime.block_on(async {
@@ -170,6 +210,7 @@ impl PamHooks for PamQuickEmbedded {
                         Ok(Some(username)) => {
                             match PamQuickEmbedded::open_session_for_user(
                                 &String::from(username.to_string_lossy()),
+                                &String::from(""), // TODO: fetch the real passowrd
                             )
                             .await
                             {
@@ -179,7 +220,7 @@ impl PamHooks for PamQuickEmbedded {
                                 },
                                 Err(_) => PamResultCode::PAM_SERVICE_ERR,
                             }
-                        },
+                        }
                         Ok(None) => PamResultCode::PAM_SERVICE_ERR,
                         Err(_) => PamResultCode::PAM_SERVICE_ERR,
                     }
@@ -188,12 +229,37 @@ impl PamHooks for PamQuickEmbedded {
             }
         }
     }
-    /*
-        fn sm_setcred(_pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
-            println!("set credentials");
-            PamResultCode::PAM_SUCCESS
-        }
 
+    fn sm_setcred(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
+        let username = match pamh.get_user(None) {
+            Ok(res) => res,
+            Err(err) => {
+                // If the error is PAM_SUCCESS, we should not return an error
+                if err != PamResultCode::PAM_SUCCESS {
+                    return err;
+                }
+
+                // Attempt to get the user item
+                match pamh.get_item::<pam::items::User>() {
+                    Ok(Some(username)) => String::from(username.to_string_lossy()),
+                    Ok(None) => return PamResultCode::PAM_AUTH_ERR,
+                    Err(err) => return err,
+                }
+            }
+        };
+
+        // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
+        let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username) {
+            Ok(user_cfg) => user_cfg,
+            Err(pam_err_code) => return pam_err_code,
+        };
+
+        // TODO: set environment variables
+
+        PamResultCode::PAM_SUCCESS
+    }
+
+    /*
         fn acct_mgmt(_pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
             println!("account management");
             PamResultCode::PAM_SUCCESS

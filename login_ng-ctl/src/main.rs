@@ -23,6 +23,7 @@ use std::path::PathBuf;
 use chrono::Local;
 use chrono::TimeZone;
 use login_ng::command::SessionCommand;
+use login_ng::storage::load_user_mountpoints;
 use login_ng::storage::load_user_session_command;
 use login_ng::storage::store_user_session_command;
 use login_ng::storage::StorageSource;
@@ -278,9 +279,12 @@ fn main() {
                 Ok(_) => {
                     // Force the write of the populated User structure
                     write_file = Some(true);
-                },
+                }
                 Err(err) => {
-                    eprintln!("Error in initializing the user authentication data: {}", err);
+                    eprintln!(
+                        "Error in initializing the user authentication data: {}",
+                        err
+                    );
                     std::process::exit(-1)
                 }
             };
@@ -313,6 +317,38 @@ fn main() {
                     println!("-----------------------------------------------------------");
                 }
             }
+
+            match load_user_mountpoints(&storage_source) {
+                Ok(mounts) => match mounts {
+                    Some(mount_info) => {
+                        let hash = mount_info.hash();
+                        println!("hash: {hash:02X}");
+
+                        let primary_mount = mount_info.mount();
+                        print!("device: {}", primary_mount.device());
+                        if !primary_mount.fstype().is_empty() {
+                            print!("filesystem: {}", primary_mount.fstype());
+                        }
+                        
+                        print!("args: {}", primary_mount.flags().join(","));
+
+                        mount_info.foreach(|a, b| {
+                            println!("***********************************************************\n");
+                            println!("    directory: {}", a.clone());
+                            println!("    device: {}", b.device().clone());
+                            println!("    filesystem: {}", b.fstype().clone());
+                            println!("    args: {}", b.flags().join(","))
+                        });
+                    }
+                    None => println!("No user-defined mounts"),
+                },
+                Err(err) => {
+                    eprintln!("Error in reading user mounts: {}", err);
+                    std::process::exit(-1)
+                }
+            }
+
+            println!("-----------------------------------------------------------");
 
             match load_user_session_command(&storage_source) {
                 Ok(maybe_data) => match maybe_data {

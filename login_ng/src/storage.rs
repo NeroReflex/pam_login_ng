@@ -18,6 +18,7 @@
 */
 
 use std::{
+    collections::HashMap,
     ffi::OsString,
     path::{Path, PathBuf},
 };
@@ -25,6 +26,7 @@ use std::{
 use crate::{
     auth::{SecondaryAuth, SecondaryAuthMethod, SecondaryPassword},
     command::SessionCommand,
+    mount::{MountParams, MountPoints},
     user::{MainPassword, UserAuthData},
 };
 
@@ -75,6 +77,40 @@ bytevec_decl! {
 impl AuthDataManifest {
     fn new() -> Self {
         Self { version: 0 }
+    }
+}
+
+bytevec_decl! {
+    #[derive(PartialEq, Eq, Debug, Clone)]
+    struct MountPointSerialized {
+        fstype: String,
+        device: String,
+        directory: String,
+        args: Vec<String>
+    }
+}
+
+impl From<(&String, &MountParams)> for MountPointSerialized {
+    fn from(mount_param: (&String, &MountParams)) -> Self {
+        Self {
+            directory: mount_param.0.clone(),
+            fstype: mount_param.1.fstype().clone(),
+            device: mount_param.1.device().clone(),
+            args: mount_param.1.flags().clone(),
+        }
+    }
+}
+
+impl From<&MountPointSerialized> for (String, MountParams) {
+    fn from(serialized: &MountPointSerialized) -> Self {
+        (
+            serialized.directory.clone(),
+            MountParams::new(
+                serialized.device.clone(),
+                serialized.fstype.clone(),
+                serialized.args.clone(),
+            ),
+        )
     }
 }
 
@@ -390,4 +426,129 @@ pub fn store_user_auth_data(
         }
         None => {}
     })
+}
+
+pub fn load_user_mountpoints(source: &StorageSource) -> Result<Option<MountPoints>, StorageError> {
+    let home_dir_path = match source {
+        StorageSource::Username(username) => homedir_by_username(&username)?,
+        StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
+    };
+
+    let manifest = xattr::get_deref(
+        home_dir_path.as_os_str(),
+        format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
+    )
+    .map_err(|err| StorageError::XAttrError(err))?;
+    if manifest.is_none() {
+        return Ok(None);
+    }
+
+    let main = xattr::get_deref(
+        home_dir_path.as_os_str(),
+        format!("{}.mount", crate::DEFAULT_XATTR_NAME),
+    )
+    .map_err(|err| StorageError::XAttrError(err))?;
+    if let None = main {
+        return Ok(None);
+    }
+
+    let mount_data: (String, MountParams) = match main {
+        Some(a) => <(String, MountParams)>::from(
+            &MountPointSerialized::decode::<u16>(a.as_slice())
+                .map_err(|err| StorageError::SerializationError(err))?,
+        ),
+        None => return Ok(None),
+    };
+
+    let mut mounts = HashMap::new();
+
+    let xattrs = xattr::list_deref(home_dir_path.as_os_str())
+        .map_err(|err| StorageError::XAttrError(err))?;
+    for attr in xattrs.into_iter() {
+        match attr.to_str() {
+            Some(s) => {
+                if s.starts_with(format!("{}.mounts.", crate::DEFAULT_XATTR_NAME).as_str()) {
+                    let raw_data = xattr::get_deref(home_dir_path.as_os_str(), s)
+                        .map_err(|err| StorageError::XAttrError(err))?
+                        .unwrap();
+
+                    let secondary_auth = <(String, MountParams)>::from(
+                        &MountPointSerialized::decode::<u32>(raw_data.as_slice())?,
+                    );
+
+                    mounts.insert(secondary_auth.0, secondary_auth.1);
+                }
+            }
+            None => {}
+        }
+    }
+
+    Ok(Some(MountPoints::new(mount_data.1, mounts)))
+}
+
+pub fn store_user_mountpoints(
+    mountpoints: MountPoints,
+    source: &StorageSource,
+) -> Result<(), StorageError> {
+    let home_dir_path = match source {
+        StorageSource::Username(username) => homedir_by_username(&username)?,
+        StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
+    };
+
+    // this is used in case a future format will be required
+    let manifest = AuthDataManifest::new();
+    let manifest_serialization = manifest
+        .encode::<u16>()
+        .map_err(|err| StorageError::SerializationError(err))?;
+
+    let serialized_main_mount: MountPointSerialized = MountPointSerialized::from((&String::new(), &mountpoints.mount()));
+
+    let main_mount =  serialized_main_mount.encode::<u16>()
+        .map_err(|err| StorageError::SerializationError(err))?;
+
+    // remove everything that was already present
+    let xattrs = xattr::list_deref(home_dir_path.as_os_str())
+        .map_err(|err| StorageError::XAttrError(err))?;
+    for attr in xattrs.into_iter() {
+        let current_xattr = attr.to_string_lossy();
+
+        if current_xattr.starts_with(format!("{}.mount", crate::DEFAULT_XATTR_NAME).as_str())
+            || current_xattr.starts_with(format!("{}.mounts.", crate::DEFAULT_XATTR_NAME).as_str())
+        {
+            xattr::remove_deref(home_dir_path.as_os_str(), attr.as_os_str())
+                .map_err(|err| StorageError::XAttrError(err))?
+        }
+    }
+
+    // once everything is serialized perform the writing
+    xattr::set(
+        home_dir_path.as_os_str(),
+        format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
+        manifest_serialization.as_slice(),
+    )
+    .map_err(|err| StorageError::XAttrError(err))?;
+
+    for (index, val) in mountpoints.foreach(|a, b| (a.clone(), b.clone())).iter().enumerate() {
+        let serialized_data =  MountPointSerialized::from((&val.0, &val.1));
+        let raw_data = serialized_data
+            .encode::<u32>()
+            .map_err(|err| StorageError::SerializationError(err))?;
+
+        xattr::set(
+            home_dir_path.as_os_str(),
+            format!("{}.mounts.{}", crate::DEFAULT_XATTR_NAME, index),
+            raw_data.as_slice(),
+        )
+        .map_err(|err| StorageError::XAttrError(err))?
+    }
+
+    // save the home mount last so that if something bad happens an invalid mount won't be attempted
+    xattr::set(
+        home_dir_path.as_os_str(),
+        format!("{}.mount", crate::DEFAULT_XATTR_NAME),
+        main_mount.as_slice(),
+    )
+    .map_err(|err| StorageError::XAttrError(err))?;
+
+    Ok(())
 }
