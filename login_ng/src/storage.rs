@@ -501,9 +501,11 @@ pub fn store_user_mountpoints(
         .encode::<u16>()
         .map_err(|err| StorageError::SerializationError(err))?;
 
-    let serialized_main_mount: MountPointSerialized = MountPointSerialized::from((&String::new(), &mountpoints.mount()));
+    let serialized_main_mount: MountPointSerialized =
+        MountPointSerialized::from((&String::new(), &mountpoints.mount()));
 
-    let main_mount =  serialized_main_mount.encode::<u16>()
+    let main_mount = serialized_main_mount
+        .encode::<u16>()
         .map_err(|err| StorageError::SerializationError(err))?;
 
     // remove everything that was already present
@@ -528,8 +530,12 @@ pub fn store_user_mountpoints(
     )
     .map_err(|err| StorageError::XAttrError(err))?;
 
-    for (index, val) in mountpoints.foreach(|a, b| (a.clone(), b.clone())).iter().enumerate() {
-        let serialized_data =  MountPointSerialized::from((&val.0, &val.1));
+    for (index, val) in mountpoints
+        .foreach(|a, b| (a.clone(), b.clone()))
+        .iter()
+        .enumerate()
+    {
+        let serialized_data = MountPointSerialized::from((&val.0, &val.1));
         let raw_data = serialized_data
             .encode::<u32>()
             .map_err(|err| StorageError::SerializationError(err))?;

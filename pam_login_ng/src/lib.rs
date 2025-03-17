@@ -114,6 +114,11 @@ impl PamQuickEmbedded {
 
         let pk = proxy.get_pubkey().await?;
 
+        // return an unknown error if the service was unable to serialize the RSA public key
+        if pk.is_empty() {
+            return Ok(u32::MAX);
+        }
+
         match RsaPublicKey::from_pkcs1_pem(pk.as_str()) {
             Ok(pubkey) => {
                 let mut rng = rand::thread_rng();

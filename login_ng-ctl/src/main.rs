@@ -23,8 +23,10 @@ use std::path::PathBuf;
 use chrono::Local;
 use chrono::TimeZone;
 use login_ng::command::SessionCommand;
+use login_ng::mount::{MountParams, MountPoints};
 use login_ng::storage::load_user_mountpoints;
 use login_ng::storage::load_user_session_command;
+use login_ng::storage::store_user_mountpoints;
 use login_ng::storage::store_user_session_command;
 use login_ng::storage::StorageSource;
 use login_ng::storage::{load_user_auth_data, remove_user_data, store_user_auth_data};
@@ -70,6 +72,46 @@ enum Command {
     Inspect(InspectCommand),
     Add(AddAuthCommand),
     SetSession(SetSessionCommand),
+    ChangeMainMount(ChangeMainMountCommand),
+    ChangeSecondaryMount(ChangeSecondaryMountCommand),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Set the mount command that has to be used to mount the user home directory
+#[argh(subcommand, name = "set-pre-mount")]
+struct ChangeSecondaryMountCommand {
+    #[argh(option)]
+    /// directory to mount the device into
+    dir: String,
+
+    #[argh(option)]
+    /// device to mount
+    device: String,
+
+    #[argh(option)]
+    /// filesystem type (corresponds to -t flag in mount)
+    fstype: String,
+
+    #[argh(option)]
+    /// mount options relative to the filesystem type (corresponds to -o flag in mount)
+    flags: Vec<String>,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Set the mount command that has to be used to mount the user home directory
+#[argh(subcommand, name = "set-home-mount")]
+struct ChangeMainMountCommand {
+    #[argh(option)]
+    /// device to mount
+    device: String,
+
+    #[argh(option)]
+    /// filesystem type (corresponds to -t flag in mount)
+    fstype: String,
+
+    #[argh(option)]
+    /// mount options relative to the filesystem type (corresponds to -o flag in mount)
+    flags: Vec<String>,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -237,13 +279,64 @@ fn main() {
 
     let mut write_file = args.update_as_needed;
     match args.command {
+        Command::ChangeSecondaryMount(mount_data) => match load_user_mountpoints(&storage_source) {
+            Ok(existing_data) => {
+                let Some(mut new_data) = existing_data else {
+                    eprintln!("Error in changing user mounts: a main mount has not beed defined");
+                    std::process::exit(-1)
+                };
+
+                new_data.add_premount(
+                    &mount_data.dir,
+                    &MountParams::new(mount_data.device, mount_data.fstype, mount_data.flags),
+                );
+
+                match store_user_mountpoints(new_data, &storage_source) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        eprintln!("Error in changing user mounts: {err}");
+                        std::process::exit(-1)
+                    }
+                }
+            }
+            Err(err) => {
+                eprintln!("Error in loading the user mounts: {err}");
+                std::process::exit(-1)
+            }
+        },
+        Command::ChangeMainMount(mount_data) => match load_user_mountpoints(&storage_source) {
+            Ok(existing_data) => {
+                let mut new_data = match existing_data {
+                    Some(existing_data) => existing_data,
+                    None => MountPoints::default(),
+                };
+
+                new_data.set_mount(&MountParams::new(
+                    mount_data.device,
+                    mount_data.fstype,
+                    mount_data.flags,
+                ));
+
+                match store_user_mountpoints(new_data, &storage_source) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        eprintln!("Error in changing user mounts: {err}");
+                        std::process::exit(-1)
+                    }
+                }
+            }
+            Err(err) => {
+                eprintln!("Error in loading the user mounts: {err}");
+                std::process::exit(-1)
+            }
+        }
         Command::SetSession(session_data) => {
             let command = SessionCommand::new(session_data.cmd, session_data.args);
 
             match store_user_session_command(&command, &storage_source) {
                 Ok(_) => {}
                 Err(err) => {
-                    eprintln!("Error in changing the user default session: {}", err);
+                    eprintln!("Error in changing the user default session: {err}");
                     std::process::exit(-1)
                 }
             }
@@ -281,10 +374,7 @@ fn main() {
                     write_file = Some(true);
                 }
                 Err(err) => {
-                    eprintln!(
-                        "Error in initializing the user authentication data: {}",
-                        err
-                    );
+                    eprintln!("Error in initializing the user authentication data: {err}");
                     std::process::exit(-1)
                 }
             };
@@ -296,10 +386,7 @@ fn main() {
                     write_file = Some(false)
                 }
                 Err(err) => {
-                    eprintln!(
-                        "Error in resetting user additional athentication methods: {}",
-                        err
-                    );
+                    eprintln!("Error in resetting user additional athentication methods: {err}");
                     std::process::exit(-1)
                 }
             }
@@ -308,7 +395,7 @@ fn main() {
             match &storage_source {
                 StorageSource::Username(username) => {
                     println!("-----------------------------------------------------------");
-                    println!("User: {}", username);
+                    println!("User: {username}");
                     println!("-----------------------------------------------------------");
                 }
                 StorageSource::Path(path) => {
@@ -329,7 +416,7 @@ fn main() {
                         if !primary_mount.fstype().is_empty() {
                             print!("filesystem: {}", primary_mount.fstype());
                         }
-                        
+
                         print!("args: {}", primary_mount.flags().join(","));
 
                         mount_info.foreach(|a, b| {

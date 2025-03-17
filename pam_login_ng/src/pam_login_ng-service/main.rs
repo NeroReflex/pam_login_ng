@@ -32,8 +32,8 @@ use login_ng::{
 
 use thiserror::Error;
 
-use std::{collections::HashMap, ffi::OsString, io};
 use std::sync::Arc;
+use std::{collections::HashMap, ffi::OsString, io};
 use tokio::sync::Mutex;
 
 use std::future::pending;
@@ -53,13 +53,12 @@ pub enum ServiceError {
 }
 
 struct UserSession {
-    mounts: Vec<UnmountDrop<Mount>>
+    mounts: Vec<UnmountDrop<Mount>>,
 }
 
 struct Service {
     priv_key: RsaPrivateKey,
     pub_key: RsaPublicKey,
-    pub_key_string: String,
     sessions: Arc<Mutex<HashMap<OsString, UserSession>>>,
 }
 
@@ -68,14 +67,12 @@ impl Service {
         let mut rng = rand::thread_rng();
         let priv_key = RsaPrivateKey::new(&mut rng, 8192).expect("failed to generate a key");
         let pub_key = RsaPublicKey::from(&priv_key);
-        let pub_key_string = pub_key.to_pkcs1_pem(LineEnding::CRLF).unwrap();
 
         let sessions = Arc::new(Mutex::new(HashMap::new()));
 
         Self {
             priv_key,
             pub_key,
-            pub_key_string,
             sessions,
         }
     }
@@ -83,20 +80,24 @@ impl Service {
 
 fn mount(data: (String, String, String, String)) -> io::Result<Mount> {
     match data.0.is_empty() {
-        true => Mount::builder()
-            .mount(data.2.as_str(), data.3.as_str()),
+        true => Mount::builder().mount(data.2.as_str(), data.3.as_str()),
         false => Mount::builder()
             .fstype(data.0.as_str())
             .data(data.1.as_str())
-            .mount(data.2.as_str(), data.3.as_str()
-        )
+            .mount(data.2.as_str(), data.3.as_str()),
     }
 }
 
 #[interface(name = "org.zbus.pam_login_ng")]
 impl Service {
     async fn get_pubkey(&self) -> String {
-        self.pub_key_string.clone()
+        match self.pub_key.to_pkcs1_pem(LineEnding::CRLF) {
+            Ok(key) => key,
+            Err(err) => {
+                println!("failed to serialize the RSA key: {err}");
+                String::new()
+            }
+        }
     }
 
     async fn open_user_session(&mut self, user: &str, password: Vec<u8>) -> u32 {
@@ -136,9 +137,14 @@ impl Service {
 
         // mount every directory in order or throw an error
         if let Some(mounts) = user_mounts {
-            let staged_mounts = mounts.foreach(|a, b| 
-                (b.fstype().clone(), b.flags().join(",").clone(), b.device().clone(), a.clone())
-            );
+            let staged_mounts = mounts.foreach(|a, b| {
+                (
+                    b.fstype().clone(),
+                    b.flags().join(",").clone(),
+                    b.device().clone(),
+                    a.clone(),
+                )
+            });
 
             for m in staged_mounts.iter() {
                 match mount(m.clone()) {
@@ -147,13 +153,23 @@ impl Service {
                         mounted_devices.push(mount.into_unmount_drop(UnmountFlags::DETACH));
                     }
                     Err(err) => {
-                        eprintln!("failed to mount device {} into {}: {}", m.2.as_str(), m.3.as_str(), err);
+                        eprintln!(
+                            "failed to mount device {} into {}: {}",
+                            m.2.as_str(),
+                            m.3.as_str(),
+                            err
+                        );
                         return 4u32;
                     }
                 }
             }
 
-            match mount((mounts.mount().fstype().clone(), mounts.mount().flags().join(","), mounts.mount().device().clone(), user.home_dir().as_os_str().to_string_lossy().to_string())) {
+            match mount((
+                mounts.mount().fstype().clone(),
+                mounts.mount().flags().join(","),
+                mounts.mount().device().clone(),
+                user.home_dir().as_os_str().to_string_lossy().to_string(),
+            )) {
                 Ok(mount) => {
                     // Make the mount temporary, so that it will be unmounted on drop.
                     mounted_devices.push(mount.into_unmount_drop(UnmountFlags::DETACH));
@@ -166,9 +182,12 @@ impl Service {
         }
 
         let mut guard = self.sessions.lock().await;
-        guard.insert(user.name().to_os_string(), UserSession {
-            mounts: mounted_devices
-        });
+        guard.insert(
+            user.name().to_os_string(),
+            UserSession {
+                mounts: mounted_devices,
+            },
+        );
 
         0u32 // OK
     }

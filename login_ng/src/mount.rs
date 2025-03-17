@@ -18,7 +18,7 @@
 */
 
 use rs_sha512::*;
-use std::hash::{BuildHasher, Hash, Hasher};
+use std::hash::{BuildHasher, Hasher};
 
 use std::collections::HashMap;
 
@@ -119,7 +119,7 @@ impl MountPoints {
 
     pub fn hash(&self) -> u64 {
         let mut hasher = Sha512State::default().build_hasher();
-        
+
         hasher.write(self.home.device().as_bytes());
         hasher.write(self.home.fstype().as_bytes());
         hasher.write(self.home.flags.concat().as_bytes());
