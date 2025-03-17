@@ -67,6 +67,7 @@ struct Args {
 #[argh(subcommand)]
 /// Subcommands for managing authentication methods
 enum Command {
+    Info(InfoCommand),
     Setup(SetupCommand),
     Reset(ResetCommand),
     Inspect(InspectCommand),
@@ -74,6 +75,13 @@ enum Command {
     SetSession(SetSessionCommand),
     ChangeMainMount(ChangeMainMountCommand),
     ChangeSecondaryMount(ChangeSecondaryMountCommand),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Print information about the software
+#[argh(subcommand, name = "info")]
+struct InfoCommand {
+    
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -179,13 +187,6 @@ struct AddAuthPasswordCommand {
 }
 
 fn main() {
-    let version = login_ng::LIBRARY_VERSION;
-    println!("login-ng version {version}, Copyright (C) 2024 Denis Benato");
-    println!("login-ng comes with ABSOLUTELY NO WARRANTY;");
-    println!("This is free software, and you are welcome to redistribute it");
-    println!("under certain conditions.");
-    println!("\n");
-
     let args: Args = argh::from_env();
 
     #[cfg(not(feature = "pam"))]
@@ -279,6 +280,14 @@ fn main() {
 
     let mut write_file = args.update_as_needed;
     match args.command {
+        Command::Info(_) => {
+            let version = login_ng::LIBRARY_VERSION;
+            println!("login-ng version {version}, Copyright (C) 2024 Denis Benato");
+            println!("login-ng comes with ABSOLUTELY NO WARRANTY;");
+            println!("This is free software, and you are welcome to redistribute it");
+            println!("under certain conditions.");
+            println!("\n");
+        }
         Command::ChangeSecondaryMount(mount_data) => match load_user_mountpoints(&storage_source) {
             Ok(existing_data) => {
                 let Some(mut new_data) = existing_data else {
