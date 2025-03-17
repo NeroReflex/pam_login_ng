@@ -45,6 +45,9 @@ enum ServiceOperationResult {
     DataDecryptionFailed = 2,
     CannotLoadUserMountError = 3,
     MountError = 4,
+    SessionAlreadyOpened = 5,
+    SessionAlreadyClosed = 6,
+    CannotIdentifyUser = 7,
     Unknown,
 }
 
@@ -56,6 +59,9 @@ impl From<u32> for ServiceOperationResult {
             2 => ServiceOperationResult::DataDecryptionFailed,
             3 => ServiceOperationResult::CannotLoadUserMountError,
             4 => ServiceOperationResult::MountError,
+            5 => ServiceOperationResult::SessionAlreadyOpened,
+            6 => ServiceOperationResult::SessionAlreadyClosed,
+            7 => ServiceOperationResult::CannotIdentifyUser,
             _ => ServiceOperationResult::Unknown,
         }
     }

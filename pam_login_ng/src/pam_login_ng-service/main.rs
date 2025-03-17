@@ -23,7 +23,7 @@ extern crate tokio;
 
 use rand::rngs::OsRng;
 
-use sys_mount::{Mount, MountFlags, SupportedFilesystems, Unmount, UnmountFlags};
+use sys_mount::{Mount, MountFlags, SupportedFilesystems, Unmount, UnmountDrop, UnmountFlags};
 
 use login_ng::{
     storage::{load_user_auth_data, load_user_mountpoints},
@@ -32,7 +32,7 @@ use login_ng::{
 
 use thiserror::Error;
 
-use std::{collections::HashMap, io};
+use std::{collections::HashMap, ffi::OsString, io};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -52,13 +52,15 @@ pub enum ServiceError {
     ZbusError(#[from] ZError),
 }
 
-struct UserSession {}
+struct UserSession {
+    mounts: Vec<UnmountDrop<Mount>>
+}
 
 struct Service {
     priv_key: RsaPrivateKey,
     pub_key: RsaPublicKey,
     pub_key_string: String,
-    sessions: Arc<Mutex<HashMap<String, UserSession>>>,
+    sessions: Arc<Mutex<HashMap<OsString, UserSession>>>,
 }
 
 impl Service {
@@ -125,39 +127,67 @@ impl Service {
         // with every dmask, potentially compromising the
         // security and integrity of the whole system.
 
+        let Some(user) = get_user_by_name(user) else {
+            // cannot identify user
+            return 7u32;
+        };
+
         let mut mounted_devices = vec![];
 
         // mount every directory in order or throw an error
-        match get_user_by_name(user) {
-            Some(user) => {
-                if let Some(mounts) = user_mounts {
-                    let staged_mounts = mounts.foreach(|a, b| 
-                        (b.fstype().clone(), b.flags().join(",").clone(), b.device().clone(), a.clone())
-                    );
-        
-                    for m in staged_mounts {
-                        match mount(m) {
-                            Ok(mount) => {
-                                // Make the mount temporary, so that it will be unmounted on drop.
-                                mounted_devices.push(mount.into_unmount_drop(UnmountFlags::DETACH));
-                            }
-                            Err(err) => {
-                                eprintln!("failed to mount device {} into {}: {}", m.2.as_str(), m.3.as_str(), err);
-                                return 4u32;
-                            }
-                        }
+        if let Some(mounts) = user_mounts {
+            let staged_mounts = mounts.foreach(|a, b| 
+                (b.fstype().clone(), b.flags().join(",").clone(), b.device().clone(), a.clone())
+            );
+
+            for m in staged_mounts.iter() {
+                match mount(m.clone()) {
+                    Ok(mount) => {
+                        // Make the mount temporary, so that it will be unmounted on drop.
+                        mounted_devices.push(mount.into_unmount_drop(UnmountFlags::DETACH));
+                    }
+                    Err(err) => {
+                        eprintln!("failed to mount device {} into {}: {}", m.2.as_str(), m.3.as_str(), err);
+                        return 4u32;
                     }
                 }
-                user.home_dir();
             }
-            None => {},
+
+            match mount((mounts.mount().fstype().clone(), mounts.mount().flags().join(","), mounts.mount().device().clone(), user.home_dir().as_os_str().to_string_lossy().to_string())) {
+                Ok(mount) => {
+                    // Make the mount temporary, so that it will be unmounted on drop.
+                    mounted_devices.push(mount.into_unmount_drop(UnmountFlags::DETACH));
+                }
+                Err(err) => {
+                    eprintln!("failed to mount user directory: {err}");
+                    return 4u32;
+                }
+            }
         }
-        
+
+        let mut guard = self.sessions.lock().await;
+        guard.insert(user.name().to_os_string(), UserSession {
+            mounts: mounted_devices
+        });
 
         0u32 // OK
     }
 
     async fn close_user_session(&mut self, user: &str) -> u32 {
+        let Some(user) = get_user_by_name(user) else {
+            // cannot identify user
+            return 7u32;
+        };
+
+        let mut guard = self.sessions.lock().await;
+        if !guard.contains_key(user.name()) {
+            // session already closed
+            return 6u32;
+        }
+
+        let session = guard.remove(user.name());
+        drop(session);
+
         0u32
     }
 }
