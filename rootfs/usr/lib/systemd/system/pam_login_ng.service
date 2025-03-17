@@ -6,3 +6,6 @@ Before=greetd.service
 ExecStart=/usr/bin/pam_login_ng-service
 Restart=always
 IgnoreSIGPIPE=no
+
+[Install]
+WantedBy=multi-user.target
