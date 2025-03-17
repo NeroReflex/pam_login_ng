@@ -421,15 +421,15 @@ fn main() {
                         println!("hash: {hash:02X}");
 
                         let primary_mount = mount_info.mount();
-                        print!("device: {}", primary_mount.device());
+                        println!("device: {}", primary_mount.device());
                         if !primary_mount.fstype().is_empty() {
-                            print!("filesystem: {}", primary_mount.fstype());
+                            println!("filesystem: {}", primary_mount.fstype());
                         }
 
-                        print!("args: {}", primary_mount.flags().join(","));
+                        println!("args: {}", primary_mount.flags().join(","));
 
                         mount_info.foreach(|a, b| {
-                            println!("***********************************************************\n");
+                            println!("***********************************************************");
                             println!("    directory: {}", a.clone());
                             println!("    device: {}", b.device().clone());
                             println!("    filesystem: {}", b.fstype().clone());
