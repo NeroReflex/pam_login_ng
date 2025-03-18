@@ -166,22 +166,36 @@ impl PamHooks for PamQuickEmbedded {
             }
         });
 
+        let username = match pamh.get_user(None) {
+            Ok(res) => res,
+            Err(err) => {
+                // If the error is PAM_SUCCESS, we should not return an error
+                if err != PamResultCode::PAM_SUCCESS {
+                    eprintln!("login_ng: open_session: get_user failed");
+                    return err;
+                }
+
+                // Attempt to get the user item
+                match pamh.get_item::<pam::items::User>() {
+                    Ok(Some(username)) => String::from(username.to_string_lossy()),
+                    Ok(None) => return PamResultCode::PAM_AUTH_ERR,
+                    Err(err) => return err,
+                }
+            }
+        };
+
         unsafe {
             match &RUNTIME {
                 Some(runtime) => runtime.block_on(async {
-                    match pamh.get_item::<pam::items::User>() {
-                        Ok(Some(username)) => match PamQuickEmbedded::close_session_for_user(
-                            &String::from(username.to_string_lossy()),
-                        )
-                        .await
-                        {
-                            Ok(result) => match ServiceOperationResult::from(result) {
-                                ServiceOperationResult::Ok => PamResultCode::PAM_SUCCESS,
-                                _ => PamResultCode::PAM_SERVICE_ERR,
-                            },
-                            Err(_) => PamResultCode::PAM_SERVICE_ERR,
+                    match PamQuickEmbedded::close_session_for_user(
+                        &String::from(username),
+                    )
+                    .await
+                    {
+                        Ok(result) => match ServiceOperationResult::from(result) {
+                            ServiceOperationResult::Ok => PamResultCode::PAM_SUCCESS,
+                            _ => PamResultCode::PAM_SERVICE_ERR,
                         },
-                        Ok(None) => PamResultCode::PAM_SERVICE_ERR,
                         Err(_) => PamResultCode::PAM_SERVICE_ERR,
                     }
                 }),
@@ -232,32 +246,24 @@ impl PamHooks for PamQuickEmbedded {
         unsafe {
             match &RUNTIME {
                 Some(runtime) => runtime.block_on(async {
-                    match pamh.get_item::<pam::items::User>() {
-                        Ok(Some(username)) => {
-                            println!("login_ng: open_session: pam_login_ng-service->{}", username.to_string_lossy());
+                    match PamQuickEmbedded::open_session_for_user(
+                        &String::from(username),
+                        &String::from(""), // TODO: fetch the real passowrd
+                    )
+                    .await
+                    {
+                        Ok(result) => {
+                            println!("login_ng: open_session: pam_login_ng-service returned {result}");
 
-                            match PamQuickEmbedded::open_session_for_user(
-                                &String::from(username.to_string_lossy()),
-                                &String::from(""), // TODO: fetch the real passowrd
-                            )
-                            .await
-                            {
-                                Ok(result) => {
-                                    println!("login_ng: open_session: pam_login_ng-service returned {result}");
-
-                                    match ServiceOperationResult::from(result) {
-                                        ServiceOperationResult::Ok => PamResultCode::PAM_SUCCESS,
-                                        _ => PamResultCode::PAM_SERVICE_ERR,
-                                    }
-                                },
-                                Err(err) => {
-                                    eprintln!("login_ng: open_session: pam_login_ng-service errored: {err}");
-                                    PamResultCode::PAM_SERVICE_ERR
-                                },
+                            match ServiceOperationResult::from(result) {
+                                ServiceOperationResult::Ok => PamResultCode::PAM_SUCCESS,
+                                _ => PamResultCode::PAM_SERVICE_ERR,
                             }
-                        }
-                        Ok(None) => PamResultCode::PAM_SERVICE_ERR,
-                        Err(_) => PamResultCode::PAM_SERVICE_ERR,
+                        },
+                        Err(err) => {
+                            eprintln!("login_ng: open_session: pam_login_ng-service errored: {err}");
+                            PamResultCode::PAM_SERVICE_ERR
+                        },
                     }
                 }),
                 None => return PamResultCode::PAM_SERVICE_ERR,

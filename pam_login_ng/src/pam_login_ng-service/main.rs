@@ -88,7 +88,7 @@ fn mount(data: (String, String, String, String)) -> io::Result<Mount> {
     }
 }
 
-#[interface(name = "org.zbus.pam_login_ng")]
+#[interface(name = "org.zbus.login_ng")]
 impl Service {
     async fn get_pubkey(&self) -> String {
         match self.pub_key.to_pkcs1_pem(LineEnding::CRLF) {
@@ -256,9 +256,9 @@ async fn main() -> Result<(), ServiceError> {
 
     let _conn = connection::Builder::session()
         .map_err(|err| ServiceError::ZbusError(err))?
-        .name("org.zbus.pam_login_ng")
+        .name("org.zbus.login_ng")
         .map_err(|err| ServiceError::ZbusError(err))?
-        .serve_at("/org/zbus/pam_login_ng", service)
+        .serve_at("/org/zbus/login_ng", service)
         .map_err(|err| ServiceError::ZbusError(err))?
         .build()
         .await
