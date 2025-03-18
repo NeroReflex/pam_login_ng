@@ -3,6 +3,8 @@ Description=pam service for login_ng
 Before=greetd.service
 
 [Service]
+Type=dbus
+BusName=org.zbus.login_ng
 ExecStart=/usr/bin/pam_login_ng-service
 Restart=always
 IgnoreSIGPIPE=no
