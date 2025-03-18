@@ -116,6 +116,8 @@ impl PamQuickEmbedded {
 
         // return an unknown error if the service was unable to serialize the RSA public key
         if pk.is_empty() {
+            println!("login_ng: open_session: public key is empty");
+
             return Ok(u32::MAX);
         }
 
@@ -130,9 +132,16 @@ impl PamQuickEmbedded {
                 let reply = proxy
                     .open_user_session(user.as_str(), encrypted_password)
                     .await?;
+
+                println!("login_ng: open_session: DBus service returned {reply}");
+
                 Ok(reply)
             }
-            Err(_) => Ok(1u32),
+            Err(_) => {
+                println!("login_ng: open_session: cannot import public RSA key");
+
+                Ok(1u32)
+            },
         }
     }
 
