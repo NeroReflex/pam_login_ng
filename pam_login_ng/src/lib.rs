@@ -182,6 +182,8 @@ impl PamHooks for PamQuickEmbedded {
     }
 
     fn sm_open_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
+        println!("login_ng: open_session: enter");
+
         INIT.call_once(|| {
             // Initialize the Tokio runtime
             unsafe {
@@ -194,6 +196,7 @@ impl PamHooks for PamQuickEmbedded {
             Err(err) => {
                 // If the error is PAM_SUCCESS, we should not return an error
                 if err != PamResultCode::PAM_SUCCESS {
+                    eprintln!("login_ng: open_session: get_user failed");
                     return err;
                 }
 
@@ -206,12 +209,15 @@ impl PamHooks for PamQuickEmbedded {
             }
         };
 
+        println!("login_ng: open_session: user {username}");
+
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
         let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username) {
             Ok(user_cfg) => user_cfg,
             Err(pam_err_code) => return pam_err_code,
         };
 
+        println!("login_ng: open_session: loaded data");
         // TODO: set environment variables
 
         unsafe {

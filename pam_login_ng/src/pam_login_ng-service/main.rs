@@ -101,6 +101,8 @@ impl Service {
     }
 
     async fn open_user_session(&mut self, user: &str, password: Vec<u8>) -> u32 {
+        println!("Requested session for user '{user}' to be opened");
+
         let source = login_ng::storage::StorageSource::Username(String::from(user));
 
         let password = match self.priv_key.decrypt(Pkcs1v15Encrypt, &password) {
@@ -122,6 +124,8 @@ impl Service {
                 return 3u32;
             }
         };
+
+        println!("Mountpoints for user '{user}' loaded");
 
         // TODO: check for the mount to be approved by root
         // otherwise the user might mount everything he wants to
@@ -149,6 +153,13 @@ impl Service {
             for m in staged_mounts.iter() {
                 match mount(m.clone()) {
                     Ok(mount) => {
+                        println!(
+                            "Mounted device {} into {} for user '{}'",
+                            m.2.as_str(),
+                            m.3.as_str(),
+                            user.name().to_string_lossy()
+                        );
+
                         // Make the mount temporary, so that it will be unmounted on drop.
                         mounted_devices.push(mount.into_unmount_drop(UnmountFlags::DETACH));
                     }
@@ -171,6 +182,12 @@ impl Service {
                 user.home_dir().as_os_str().to_string_lossy().to_string(),
             )) {
                 Ok(mount) => {
+                    println!(
+                        "Mounted device {} on home directory for user '{}'",
+                        mounts.mount().device().as_str(),
+                        user.name().to_string_lossy()
+                    );
+
                     // Make the mount temporary, so that it will be unmounted on drop.
                     mounted_devices.push(mount.into_unmount_drop(UnmountFlags::DETACH));
                 }
@@ -181,6 +198,12 @@ impl Service {
             }
         }
 
+        println!(
+            "Successfilly mounted {} device for user '{}'",
+            mounted_devices.len(),
+            user.name().to_string_lossy()
+        );
+
         let mut guard = self.sessions.lock().await;
         guard.insert(
             user.name().to_os_string(),
@@ -189,10 +212,17 @@ impl Service {
             },
         );
 
+        println!(
+            "Successfilly opened session for user '{}'",
+            user.name().to_string_lossy()
+        );
+
         0u32 // OK
     }
 
     async fn close_user_session(&mut self, user: &str) -> u32 {
+        println!("Requested session for user '{user}' to be closed");
+
         let Some(user) = get_user_by_name(user) else {
             // cannot identify user
             return 7u32;
@@ -206,6 +236,11 @@ impl Service {
 
         let session = guard.remove(user.name());
         drop(session);
+
+        println!(
+            "Successfilly closed session for user '{}'",
+            user.name().to_string_lossy()
+        );
 
         0u32
     }
