@@ -162,7 +162,7 @@ impl PamHooks for PamQuickEmbedded {
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
             Ok(value) => println!("Starting dbus service on socket {value}"),
             Err(err) => {
-                eprintln!("Couldn't read dbus socket address: {err} - uusing default...");
+                eprintln!("Couldn't read dbus socket address: {err} - using default...");
                 std::env::set_var("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/dbus/system_bus_socket");
             },
         }
@@ -218,7 +218,7 @@ impl PamHooks for PamQuickEmbedded {
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
             Ok(value) => println!("Starting dbus service on socket {value}"),
             Err(err) => {
-                eprintln!("Couldn't read dbus socket address: {err} - uusing default...");
+                eprintln!("Couldn't read dbus socket address: {err} - using default...");
                 std::env::set_var("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/dbus/system_bus_socket");
             },
         }
