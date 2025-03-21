@@ -264,6 +264,14 @@ async fn main() -> Result<(), ServiceError> {
 
     let service = Service::new(contents.as_str());
 
+    match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
+        Ok(value) => println!("Starting dbus service on socket {value}"),
+        Err(err) => {
+            eprintln!("Couldn't read dbus socket address: {err} - uusing default...");
+            std::env::set_var("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/dbus/system_bus_socket");
+        },
+    }
+
     println!("Building the dbus object...");
 
     let _conn = connection::Builder::session()

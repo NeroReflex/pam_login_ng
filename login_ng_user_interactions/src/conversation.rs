@@ -17,14 +17,17 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::ffi::{CStr, CString};
-
+#[cfg(feature = "pam")]
 use crate::login::LoginUserInteractionHandler;
 
 #[cfg(feature = "pam")]
 use pam_client2::{ConversationHandler, ErrorCode};
 
-use std::sync::{Arc, Mutex};
+#[cfg(feature = "pam")]
+use std::{
+    ffi::{CStr, CString},
+    sync::{Arc, Mutex},
+};
 
 #[derive(Debug, Clone)]
 pub enum ConversationInteraction {

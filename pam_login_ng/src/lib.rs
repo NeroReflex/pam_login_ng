@@ -159,6 +159,14 @@ impl PamQuickEmbedded {
 
 impl PamHooks for PamQuickEmbedded {
     fn sm_close_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
+        match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
+            Ok(value) => println!("Starting dbus service on socket {value}"),
+            Err(err) => {
+                eprintln!("Couldn't read dbus socket address: {err} - uusing default...");
+                std::env::set_var("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/dbus/system_bus_socket");
+            },
+        }
+
         INIT.call_once(|| {
             // Initialize the Tokio runtime
             unsafe {
@@ -206,6 +214,14 @@ impl PamHooks for PamQuickEmbedded {
 
     fn sm_open_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
         println!("login_ng: open_session: enter");
+
+        match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
+            Ok(value) => println!("Starting dbus service on socket {value}"),
+            Err(err) => {
+                eprintln!("Couldn't read dbus socket address: {err} - uusing default...");
+                std::env::set_var("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/dbus/system_bus_socket");
+            },
+        }
 
         INIT.call_once(|| {
             // Initialize the Tokio runtime
