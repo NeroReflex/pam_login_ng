@@ -21,4 +21,3 @@ thiserror = "2.0.11"
 sys-mount = "3.0.1"
 rsa = { version = "0.9.7", features = ["pem", "std", "u64_digit"] }
 rand = "0.8.5"
-console-subscriber = "0.4.1"

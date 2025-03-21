@@ -21,8 +21,6 @@ extern crate rand;
 extern crate sys_mount;
 extern crate tokio;
 
-use rand::rngs::OsRng;
-
 use sys_mount::{Mount, MountFlags, SupportedFilesystems, Unmount, UnmountDrop, UnmountFlags};
 
 use login_ng::{
@@ -39,8 +37,11 @@ use tokio::sync::Mutex;
 use std::future::pending;
 use zbus::{connection, interface, Error as ZError};
 
+use std::fs::File;
+use std::io::Read;
+
 use rsa::{
-    pkcs1::EncodeRsaPublicKey, pkcs8::LineEnding, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
+    pkcs1::EncodeRsaPublicKey, pkcs8::{DecodePrivateKey, LineEnding}, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
 };
 
 #[derive(Debug, Error)]
@@ -50,6 +51,9 @@ pub enum ServiceError {
 
     #[error("DBus error: {0}")]
     ZbusError(#[from] ZError),
+
+    #[error("I/O error: {0}")]
+    IOError(#[from] std::io::Error),
 }
 
 struct UserSession {
@@ -63,9 +67,8 @@ struct Service {
 }
 
 impl Service {
-    pub fn new() -> Self {
-        let mut rng = rand::thread_rng();
-        let priv_key = RsaPrivateKey::new(&mut rng, 8192).expect("failed to generate a key");
+    pub fn new(rsa_pkcs8: &str) -> Self {
+        let priv_key = RsaPrivateKey::from_pkcs8_pem(rsa_pkcs8).unwrap();
         let pub_key = RsaPublicKey::from(&priv_key);
 
         let sessions = Arc::new(Mutex::new(HashMap::new()));
@@ -228,6 +231,8 @@ impl Service {
             return 7u32;
         };
 
+        let username = user.name().to_string_lossy();
+
         let mut guard = self.sessions.lock().await;
         if !guard.contains_key(user.name()) {
             // session already closed
@@ -237,10 +242,7 @@ impl Service {
         let session = guard.remove(user.name());
         drop(session);
 
-        println!(
-            "Successfilly closed session for user '{}'",
-            user.name().to_string_lossy()
-        );
+        println!("Successfilly closed session for user '{username}'");
 
         0u32
     }
@@ -248,16 +250,19 @@ impl Service {
 
 #[tokio::main]
 async fn main() -> Result<(), ServiceError> {
-    println!("Starting pam support service of login_ng...");
-
-    console_subscriber::init();
+    println!("Reading the private key...");
+    let file_path = "/etc/login_ng/private_key_pkcs8.pem";
+    let mut file = File::open(file_path)?;
+    let mut contents = String::new();
+    let read = file.read_to_string(&mut contents)?;
+    println!("Read private key file of {read} bytes");
 
     if users::get_current_uid() != 0 {
         eprintln!("Application started without root privileges: aborting...");
         return Err(ServiceError::MissingPrivilegesError);
     }
 
-    let service = Service::new();
+    let service = Service::new(contents.as_str());
 
     println!("Building the dbus object...");
 
