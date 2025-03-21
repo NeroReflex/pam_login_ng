@@ -13,7 +13,7 @@ name = "pam_login_ng-service"
 path = "src/pam_login_ng-service/main.rs"
 
 [dependencies]
-pam-bindings = "^0.1.1"
+pam = { git = "https://github.com/NeroReflex/pam-rs.git" }
 login_ng = { path = "../login_ng"}
 zbus = "5.5.0"
 tokio = { version = "^1.43", features = ["macros", "rt-multi-thread", "sync"] }

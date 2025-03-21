@@ -185,7 +185,7 @@ impl PamHooks for PamQuickEmbedded {
 
                 // Attempt to get the user item
                 match pamh.get_item::<pam::items::User>() {
-                    Ok(Some(username)) => String::from(username.to_string_lossy()),
+                    Ok(Some(username)) => username.to_string_lossy(),
                     Ok(None) => return PamResultCode::PAM_AUTH_ERR,
                     Err(err) => return err,
                 }
@@ -241,7 +241,7 @@ impl PamHooks for PamQuickEmbedded {
 
                 // Attempt to get the user item
                 match pamh.get_item::<pam::items::User>() {
-                    Ok(Some(username)) => String::from(username.to_string_lossy()),
+                    Ok(Some(username)) => username.to_string_lossy(),
                     Ok(None) => return PamResultCode::PAM_AUTH_ERR,
                     Err(err) => return err,
                 }
@@ -251,7 +251,7 @@ impl PamHooks for PamQuickEmbedded {
         println!("login_ng: open_session: user {username}");
 
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
-        let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username) {
+        let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string()) {
             Ok(user_cfg) => user_cfg,
             Err(pam_err_code) => return pam_err_code,
         };
@@ -298,7 +298,7 @@ impl PamHooks for PamQuickEmbedded {
 
                 // Attempt to get the user item
                 match pamh.get_item::<pam::items::User>() {
-                    Ok(Some(username)) => String::from(username.to_string_lossy()),
+                    Ok(Some(username)) => username.to_string_lossy(),
                     Ok(None) => return PamResultCode::PAM_AUTH_ERR,
                     Err(err) => return err,
                 }
@@ -306,7 +306,7 @@ impl PamHooks for PamQuickEmbedded {
         };
 
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
-        let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username) {
+        let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string()) {
             Ok(user_cfg) => user_cfg,
             Err(pam_err_code) => return pam_err_code,
         };
@@ -333,7 +333,7 @@ impl PamHooks for PamQuickEmbedded {
 
                 // Attempt to get the user item
                 match pamh.get_item::<pam::items::User>() {
-                    Ok(Some(username)) => String::from(username.to_string_lossy()),
+                    Ok(Some(username)) => username.to_string_lossy(),
                     Ok(None) => return PamResultCode::PAM_AUTH_ERR,
                     Err(err) => return err,
                 }
@@ -341,7 +341,7 @@ impl PamHooks for PamQuickEmbedded {
         };
 
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
-        let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username) {
+        let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string()) {
             Ok(user_cfg) => user_cfg,
             Err(pam_err_code) => return pam_err_code,
         };
