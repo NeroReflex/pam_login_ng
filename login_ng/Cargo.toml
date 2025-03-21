@@ -1,6 +1,6 @@
 [package]
 name = "login_ng"
-version = "0.1.18"
+version = "0.1.24"
 edition = "2021"
 license = "GPL-2.0-or-later"
 
