@@ -248,11 +248,18 @@ impl Service {
 
 #[tokio::main]
 async fn main() -> Result<(), ServiceError> {
+    println!("Starting pam support service of login_ng...");
+
+    console_subscriber::init();
+
     if users::get_current_uid() != 0 {
+        eprintln!("Application started without root privileges: aborting...");
         return Err(ServiceError::MissingPrivilegesError);
     }
 
     let service = Service::new();
+
+    println!("Building the dbus object...");
 
     let _conn = connection::Builder::session()
         .map_err(|err| ServiceError::ZbusError(err))?
@@ -263,6 +270,8 @@ async fn main() -> Result<(), ServiceError> {
         .build()
         .await
         .map_err(|err| ServiceError::ZbusError(err))?;
+
+    println!("Application running");
 
     // Do other things or go to wait forever
     pending::<()>().await;
