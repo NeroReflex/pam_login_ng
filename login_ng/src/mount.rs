@@ -100,8 +100,11 @@ impl MountPoints {
         F: Fn(&String, &MountParams) -> R,
     {
         self.mounts
-            .iter()
-            .map(|(a, b)| fun(a, b))
+            .keys()
+            .filter_map(|a| match self.mounts.get(a) {
+                Some(b) => Some(fun(&a, b)),
+                None => None,
+            })
             .collect::<Vec<R>>()
     }
 

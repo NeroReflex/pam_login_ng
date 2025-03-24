@@ -30,8 +30,8 @@ use login_ng::{
 
 use thiserror::Error;
 
-use std::sync::Arc;
 use std::{collections::HashMap, ffi::OsString, io};
+use std::{fs::create_dir, path::Path, sync::Arc};
 use tokio::sync::Mutex;
 
 use std::future::pending;
@@ -41,7 +41,9 @@ use std::fs::File;
 use std::io::Read;
 
 use rsa::{
-    pkcs1::EncodeRsaPublicKey, pkcs8::{DecodePrivateKey, LineEnding}, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
+    pkcs1::EncodeRsaPublicKey,
+    pkcs8::{DecodePrivateKey, LineEnding},
+    Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
 };
 
 #[derive(Debug, Error)]
@@ -82,6 +84,12 @@ impl Service {
 }
 
 fn mount(data: (String, String, String, String)) -> io::Result<Mount> {
+    let mount_path = Path::new(data.3.as_str());
+    if !mount_path.exists() || !mount_path.is_dir() {
+        // if the path is a file this will fail
+        create_dir(mount_path)?;
+    }
+
     match data.0.is_empty() {
         true => Mount::builder().mount(data.2.as_str(), data.3.as_str()),
         false => Mount::builder()
@@ -268,8 +276,11 @@ async fn main() -> Result<(), ServiceError> {
         Ok(value) => println!("Starting dbus service on socket {value}"),
         Err(err) => {
             eprintln!("Couldn't read dbus socket address: {err} - using default...");
-            std::env::set_var("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/dbus/system_bus_socket");
-        },
+            std::env::set_var(
+                "DBUS_SESSION_BUS_ADDRESS",
+                "unix:path=/run/dbus/system_bus_socket",
+            );
+        }
     }
 
     println!("Building the dbus object...");

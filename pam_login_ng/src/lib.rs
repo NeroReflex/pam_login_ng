@@ -141,7 +141,7 @@ impl PamQuickEmbedded {
                 println!("login_ng: open_session: cannot import public RSA key");
 
                 Ok(1u32)
-            },
+            }
         }
     }
 
@@ -163,8 +163,11 @@ impl PamHooks for PamQuickEmbedded {
             Ok(value) => println!("Starting dbus service on socket {value}"),
             Err(err) => {
                 eprintln!("Couldn't read dbus socket address: {err} - using default...");
-                std::env::set_var("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/dbus/system_bus_socket");
-            },
+                std::env::set_var(
+                    "DBUS_SESSION_BUS_ADDRESS",
+                    "unix:path=/run/dbus/system_bus_socket",
+                );
+            }
         }
 
         INIT.call_once(|| {
@@ -195,11 +198,7 @@ impl PamHooks for PamQuickEmbedded {
         unsafe {
             match &RUNTIME {
                 Some(runtime) => runtime.block_on(async {
-                    match PamQuickEmbedded::close_session_for_user(
-                        &String::from(username),
-                    )
-                    .await
-                    {
+                    match PamQuickEmbedded::close_session_for_user(&String::from(username)).await {
                         Ok(result) => match ServiceOperationResult::from(result) {
                             ServiceOperationResult::Ok => PamResultCode::PAM_SUCCESS,
                             _ => PamResultCode::PAM_SERVICE_ERR,
@@ -219,8 +218,11 @@ impl PamHooks for PamQuickEmbedded {
             Ok(value) => println!("Starting dbus service on socket {value}"),
             Err(err) => {
                 eprintln!("Couldn't read dbus socket address: {err} - using default...");
-                std::env::set_var("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/dbus/system_bus_socket");
-            },
+                std::env::set_var(
+                    "DBUS_SESSION_BUS_ADDRESS",
+                    "unix:path=/run/dbus/system_bus_socket",
+                );
+            }
         }
 
         INIT.call_once(|| {
@@ -251,10 +253,11 @@ impl PamHooks for PamQuickEmbedded {
         println!("login_ng: open_session: user {username}");
 
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
-        let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string()) {
-            Ok(user_cfg) => user_cfg,
-            Err(pam_err_code) => return pam_err_code,
-        };
+        let user_cfg =
+            match PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string()) {
+                Ok(user_cfg) => user_cfg,
+                Err(pam_err_code) => return pam_err_code,
+            };
 
         println!("login_ng: open_session: loaded data");
         // TODO: set environment variables
@@ -269,17 +272,21 @@ impl PamHooks for PamQuickEmbedded {
                     .await
                     {
                         Ok(result) => {
-                            println!("login_ng: open_session: pam_login_ng-service returned {result}");
+                            println!(
+                                "login_ng: open_session: pam_login_ng-service returned {result}"
+                            );
 
                             match ServiceOperationResult::from(result) {
                                 ServiceOperationResult::Ok => PamResultCode::PAM_SUCCESS,
                                 _ => PamResultCode::PAM_SERVICE_ERR,
                             }
-                        },
+                        }
                         Err(err) => {
-                            eprintln!("login_ng: open_session: pam_login_ng-service errored: {err}");
+                            eprintln!(
+                                "login_ng: open_session: pam_login_ng-service errored: {err}"
+                            );
                             PamResultCode::PAM_SERVICE_ERR
-                        },
+                        }
                     }
                 }),
                 None => return PamResultCode::PAM_SERVICE_ERR,
@@ -306,10 +313,11 @@ impl PamHooks for PamQuickEmbedded {
         };
 
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
-        let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string()) {
-            Ok(user_cfg) => user_cfg,
-            Err(pam_err_code) => return pam_err_code,
-        };
+        let user_cfg =
+            match PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string()) {
+                Ok(user_cfg) => user_cfg,
+                Err(pam_err_code) => return pam_err_code,
+            };
 
         // TODO: set environment variables
 
@@ -341,10 +349,11 @@ impl PamHooks for PamQuickEmbedded {
         };
 
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
-        let user_cfg = match PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string()) {
-            Ok(user_cfg) => user_cfg,
-            Err(pam_err_code) => return pam_err_code,
-        };
+        let user_cfg =
+            match PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string()) {
+                Ok(user_cfg) => user_cfg,
+                Err(pam_err_code) => return pam_err_code,
+            };
 
         // first of all check if the empty password is valid
         if let Ok(main_password) = user_cfg.main_by_auth(&Some(String::new())) {
