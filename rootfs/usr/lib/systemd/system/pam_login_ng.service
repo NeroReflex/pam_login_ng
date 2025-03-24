@@ -8,6 +8,7 @@ BusName=org.zbus.login_ng
 ExecStart=/usr/bin/pam_login_ng-service
 Restart=always
 IgnoreSIGPIPE=no
+KillSignal=SIGTERM
 
 [Install]
 WantedBy=multi-user.target
