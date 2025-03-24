@@ -29,6 +29,7 @@ use pam::module::{PamHandle, PamHooks};
 use pam::pam_try;
 use rsa::pkcs1::DecodeRsaPublicKey;
 use std::ffi::CStr;
+use std::fmt;
 use std::sync::Once;
 use tokio::runtime::Runtime;
 use zbus::{proxy, Connection, Result as ZResult};
@@ -38,6 +39,7 @@ use rsa::{Pkcs1v15Encrypt, RsaPublicKey};
 static INIT: Once = Once::new();
 static mut RUNTIME: Option<Runtime> = None;
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(C)]
 enum ServiceOperationResult {
     Ok = 0,
@@ -48,7 +50,26 @@ enum ServiceOperationResult {
     SessionAlreadyOpened = 5,
     SessionAlreadyClosed = 6,
     CannotIdentifyUser = 7,
+    EmptyPubKey = 8,
     Unknown,
+}
+
+impl fmt::Display for ServiceOperationResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let result_str = match self {
+            ServiceOperationResult::Ok => "Ok",
+            ServiceOperationResult::PubKeyError => "Public Key Error",
+            ServiceOperationResult::DataDecryptionFailed => "Data Decryption Failed",
+            ServiceOperationResult::CannotLoadUserMountError => "Cannot Load User Mount",
+            ServiceOperationResult::MountError => "Mount Error",
+            ServiceOperationResult::SessionAlreadyOpened => "Session Already Opened",
+            ServiceOperationResult::SessionAlreadyClosed => "Session Already Closed",
+            ServiceOperationResult::CannotIdentifyUser => "Cannot Identify User",
+            ServiceOperationResult::EmptyPubKey => "Empty Public Key",
+            ServiceOperationResult::Unknown => "Unknown Error",
+        };
+        write!(f, "{}", result_str)
+    }
 }
 
 impl From<u32> for ServiceOperationResult {
@@ -107,7 +128,7 @@ impl PamQuickEmbedded {
     pub(crate) async fn open_session_for_user(
         user: &String,
         plain_main_password: &String,
-    ) -> ZResult<u32> {
+    ) -> ZResult<ServiceOperationResult> {
         let connection = Connection::session().await?;
 
         let proxy = ServiceProxy::new(&connection).await?;
@@ -116,33 +137,24 @@ impl PamQuickEmbedded {
 
         // return an unknown error if the service was unable to serialize the RSA public key
         if pk.is_empty() {
-            println!("login_ng: open_session: public key is empty");
-
-            return Ok(u32::MAX);
+            return Ok(ServiceOperationResult::EmptyPubKey);
         }
 
-        match RsaPublicKey::from_pkcs1_pem(pk.as_str()) {
-            Ok(pubkey) => {
-                let mut rng = rand::thread_rng();
+        let Ok(pubkey) = RsaPublicKey::from_pkcs1_pem(pk.as_str()) else {
+            return Ok(ServiceOperationResult::PubKeyError);
+        };
 
-                let encrypted_password = pubkey
-                    .encrypt(&mut rng, Pkcs1v15Encrypt, plain_main_password.as_bytes())
-                    .unwrap();
+        let mut rng = rand::thread_rng();
 
-                let reply = proxy
-                    .open_user_session(user.as_str(), encrypted_password)
-                    .await?;
+        let encrypted_password = pubkey
+            .encrypt(&mut rng, Pkcs1v15Encrypt, plain_main_password.as_bytes())
+            .unwrap();
 
-                println!("login_ng: open_session: DBus service returned {reply}");
+        let reply = proxy
+            .open_user_session(user.as_str(), encrypted_password)
+            .await?;
 
-                Ok(reply)
-            }
-            Err(_) => {
-                println!("login_ng: open_session: cannot import public RSA key");
-
-                Ok(1u32)
-            }
-        }
+        Ok(ServiceOperationResult::from(reply))
     }
 
     pub(crate) async fn close_session_for_user(user: &String) -> ZResult<u32> {
@@ -160,9 +172,15 @@ impl PamQuickEmbedded {
 impl PamHooks for PamQuickEmbedded {
     fn sm_close_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
-            Ok(value) => println!("Starting dbus service on socket {value}"),
+            Ok(value) => pamh.log(
+                pam::module::LogLevel::Debug,
+                format!("Starting dbus service on socket {value}"),
+            ),
             Err(err) => {
-                eprintln!("Couldn't read dbus socket address: {err} - using default...");
+                pamh.log(
+                    pam::module::LogLevel::Error,
+                    format!("Couldn't read dbus socket address: {err} - using default..."),
+                );
                 std::env::set_var(
                     "DBUS_SESSION_BUS_ADDRESS",
                     "unix:path=/run/dbus/system_bus_socket",
@@ -212,12 +230,21 @@ impl PamHooks for PamQuickEmbedded {
     }
 
     fn sm_open_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
-        println!("login_ng: open_session: enter");
+        pamh.log(
+            pam::module::LogLevel::Debug,
+            format!("login_ng: open_session: enter"),
+        );
 
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
-            Ok(value) => println!("Starting dbus service on socket {value}"),
+            Ok(value) => pamh.log(
+                pam::module::LogLevel::Info,
+                format!("Starting dbus service on socket {value}"),
+            ),
             Err(err) => {
-                eprintln!("Couldn't read dbus socket address: {err} - using default...");
+                pamh.log(
+                    pam::module::LogLevel::Error,
+                    format!("Couldn't read dbus socket address: {err} - using default..."),
+                );
                 std::env::set_var(
                     "DBUS_SESSION_BUS_ADDRESS",
                     "unix:path=/run/dbus/system_bus_socket",
@@ -237,7 +264,10 @@ impl PamHooks for PamQuickEmbedded {
             Err(err) => {
                 // If the error is PAM_SUCCESS, we should not return an error
                 if err != PamResultCode::PAM_SUCCESS {
-                    eprintln!("login_ng: open_session: get_user failed");
+                    pamh.log(
+                        pam::module::LogLevel::Error,
+                        format!("login_ng: open_session: get_user failed"),
+                    );
                     return err;
                 }
 
@@ -250,7 +280,10 @@ impl PamHooks for PamQuickEmbedded {
             }
         };
 
-        println!("login_ng: open_session: user {username}");
+        pamh.log(
+            pam::module::LogLevel::Debug,
+            format!("login_ng: open_session: user {username}"),
+        );
 
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
         let user_cfg =
@@ -259,7 +292,10 @@ impl PamHooks for PamQuickEmbedded {
                 Err(pam_err_code) => return pam_err_code,
             };
 
-        println!("login_ng: open_session: loaded data");
+        pamh.log(
+            pam::module::LogLevel::Debug,
+            format!("login_ng: open_session: loaded data for user {username}"),
+        );
         // TODO: set environment variables
 
         unsafe {
@@ -272,19 +308,35 @@ impl PamHooks for PamQuickEmbedded {
                     .await
                     {
                         Ok(result) => {
-                            println!(
-                                "login_ng: open_session: pam_login_ng-service returned {result}"
-                            );
-
                             match ServiceOperationResult::from(result) {
-                                ServiceOperationResult::Ok => PamResultCode::PAM_SUCCESS,
-                                _ => PamResultCode::PAM_SERVICE_ERR,
+                                ServiceOperationResult::Ok => {
+                                    pamh.log(
+                                        pam::module::LogLevel::Info,
+                                        format!("login_ng: open_session: pam_login_ng-service was successful"),
+                                    );
+
+                                    PamResultCode::PAM_SUCCESS
+                                },
+                                err => {
+                                    pamh.log(
+                                        pam::module::LogLevel::Error,
+                                        format!(
+                                            "login_ng: open_session: pam_login_ng-service errored: {err}"
+                                        ),
+                                    );
+
+                                    PamResultCode::PAM_SERVICE_ERR
+                                },
                             }
                         }
                         Err(err) => {
-                            eprintln!(
-                                "login_ng: open_session: pam_login_ng-service errored: {err}"
+                            pamh.log(
+                                pam::module::LogLevel::Error,
+                                format!(
+                                    "login_ng: open_session: pam_login_ng-service dbus error: {err}"
+                                ),
                             );
+
                             PamResultCode::PAM_SERVICE_ERR
                         }
                     }
@@ -370,10 +422,19 @@ impl PamHooks for PamQuickEmbedded {
         let conv = match pamh.get_item::<Conv>() {
             Ok(Some(conv)) => conv,
             Ok(None) => {
-                unreachable!("No conv available");
+                pamh.log(
+                    pam::module::LogLevel::Critical,
+                    format!("No conv available"),
+                );
+
+                return PamResultCode::PAM_SERVICE_ERR;
             }
             Err(err) => {
-                println!("Couldn't get pam_conv");
+                pamh.log(
+                    pam::module::LogLevel::Error,
+                    format!("Couldn't get pam_conv: pam error {err}"),
+                );
+
                 return err;
             }
         };
