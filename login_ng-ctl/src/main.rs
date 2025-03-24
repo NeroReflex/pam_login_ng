@@ -80,9 +80,7 @@ enum Command {
 #[derive(FromArgs, PartialEq, Debug)]
 /// Print information about the software
 #[argh(subcommand, name = "info")]
-struct InfoCommand {
-    
-}
+struct InfoCommand {}
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Set the mount command that has to be used to mount the user home directory
@@ -278,6 +276,14 @@ fn main() {
         }
     };
 
+    let user_mounts = match load_user_mountpoints(&storage_source) {
+        Ok(existing_data) => existing_data,
+        Err(err) => {
+            eprintln!("Error in loading user mounts data: {err}");
+            std::process::exit(-1)
+        }
+    };
+
     let mut write_file = args.update_as_needed;
     match args.command {
         Command::Info(_) => {
@@ -288,55 +294,43 @@ fn main() {
             println!("under certain conditions.");
             println!("\n");
         }
-        Command::ChangeSecondaryMount(mount_data) => match load_user_mountpoints(&storage_source) {
-            Ok(existing_data) => {
-                let Some(mut new_data) = existing_data else {
-                    eprintln!("Error in changing user mounts: a main mount has not beed defined");
+        Command::ChangeSecondaryMount(mount_data) => {
+            let Some(mut new_data) = user_mounts else {
+                eprintln!("Error in changing user mounts: a main mount has not beed defined");
+                std::process::exit(-1)
+            };
+
+            new_data.add_premount(
+                &mount_data.dir,
+                &MountParams::new(mount_data.device, mount_data.fstype, mount_data.flags),
+            );
+
+            match store_user_mountpoints(new_data, &storage_source) {
+                Ok(_) => {}
+                Err(err) => {
+                    eprintln!("Error in changing user mounts: {err}");
                     std::process::exit(-1)
-                };
-
-                new_data.add_premount(
-                    &mount_data.dir,
-                    &MountParams::new(mount_data.device, mount_data.fstype, mount_data.flags),
-                );
-
-                match store_user_mountpoints(new_data, &storage_source) {
-                    Ok(_) => {}
-                    Err(err) => {
-                        eprintln!("Error in changing user mounts: {err}");
-                        std::process::exit(-1)
-                    }
                 }
             }
-            Err(err) => {
-                eprintln!("Error in loading the user mounts: {err}");
-                std::process::exit(-1)
-            }
-        },
-        Command::ChangeMainMount(mount_data) => match load_user_mountpoints(&storage_source) {
-            Ok(existing_data) => {
-                let mut new_data = match existing_data {
-                    Some(existing_data) => existing_data,
-                    None => MountPoints::default(),
-                };
+        }
+        Command::ChangeMainMount(mount_data) => {
+            let mut new_data = match user_mounts {
+                Some(existing_data) => existing_data,
+                None => MountPoints::default(),
+            };
 
-                new_data.set_mount(&MountParams::new(
-                    mount_data.device,
-                    mount_data.fstype,
-                    mount_data.flags,
-                ));
+            new_data.set_mount(&MountParams::new(
+                mount_data.device,
+                mount_data.fstype,
+                mount_data.flags,
+            ));
 
-                match store_user_mountpoints(new_data, &storage_source) {
-                    Ok(_) => {}
-                    Err(err) => {
-                        eprintln!("Error in changing user mounts: {err}");
-                        std::process::exit(-1)
-                    }
+            match store_user_mountpoints(new_data, &storage_source) {
+                Ok(_) => {}
+                Err(err) => {
+                    eprintln!("Error in changing user mounts: {err}");
+                    std::process::exit(-1)
                 }
-            }
-            Err(err) => {
-                eprintln!("Error in loading the user mounts: {err}");
-                std::process::exit(-1)
             }
         }
         Command::SetSession(session_data) => {
@@ -414,34 +408,28 @@ fn main() {
                 }
             }
 
-            match load_user_mountpoints(&storage_source) {
-                Ok(mounts) => match mounts {
-                    Some(mount_info) => {
-                        let hash = mount_info.hash();
-                        println!("hash: {hash:02X}");
+            match user_mounts {
+                Some(mount_info) => {
+                    let hash = mount_info.hash();
+                    println!("hash: {hash:02X}");
 
-                        let primary_mount = mount_info.mount();
-                        println!("device: {}", primary_mount.device());
-                        if !primary_mount.fstype().is_empty() {
-                            println!("filesystem: {}", primary_mount.fstype());
-                        }
-
-                        println!("args: {}", primary_mount.flags().join(","));
-
-                        mount_info.foreach(|a, b| {
-                            println!("***********************************************************");
-                            println!("    directory: {}", a.clone());
-                            println!("    device: {}", b.device().clone());
-                            println!("    filesystem: {}", b.fstype().clone());
-                            println!("    args: {}", b.flags().join(","))
-                        });
+                    let primary_mount = mount_info.mount();
+                    println!("device: {}", primary_mount.device());
+                    if !primary_mount.fstype().is_empty() {
+                        println!("filesystem: {}", primary_mount.fstype());
                     }
-                    None => println!("No user-defined mounts"),
-                },
-                Err(err) => {
-                    eprintln!("Error in reading user mounts: {}", err);
-                    std::process::exit(-1)
+
+                    println!("args: {}", primary_mount.flags().join(","));
+
+                    mount_info.foreach(|a, b| {
+                        println!("***********************************************************");
+                        println!("    directory: {}", a.clone());
+                        println!("    device: {}", b.device().clone());
+                        println!("    filesystem: {}", b.fstype().clone());
+                        println!("    args: {}", b.flags().join(","))
+                    });
                 }
+                None => println!("No user-defined mounts"),
             }
 
             println!("-----------------------------------------------------------");
