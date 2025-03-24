@@ -112,8 +112,21 @@ impl MountPoints {
         self.mounts.insert(dir.clone(), mnt.clone());
     }
 
+    pub fn with_premount(&self, dir: &String, mnt: &MountParams) -> Self {
+        let mut n: MountPoints = self.clone();
+        n.mounts.remove(dir);
+        n.add_premount(dir, mnt);
+        n
+    }
+
     pub fn mount(&self) -> MountParams {
         self.home.clone()
+    }
+
+    pub fn with_mount(&self, mnt: &MountParams) -> Self {
+        let mut n: MountPoints = self.clone();
+        n.set_mount(mnt);
+        n
     }
 
     pub fn set_mount(&mut self, mnt: &MountParams) {

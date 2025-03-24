@@ -487,7 +487,7 @@ pub fn load_user_mountpoints(source: &StorageSource) -> Result<Option<MountPoint
 }
 
 pub fn store_user_mountpoints(
-    mountpoints: MountPoints,
+    mountpoints_data: Option<MountPoints>,
     source: &StorageSource,
 ) -> Result<(), StorageError> {
     let home_dir_path = match source {
@@ -498,13 +498,6 @@ pub fn store_user_mountpoints(
     // this is used in case a future format will be required
     let manifest = AuthDataManifest::new();
     let manifest_serialization = manifest
-        .encode::<u16>()
-        .map_err(|err| StorageError::SerializationError(err))?;
-
-    let serialized_main_mount: MountPointSerialized =
-        MountPointSerialized::from((&String::new(), &mountpoints.mount()));
-
-    let main_mount = serialized_main_mount
         .encode::<u16>()
         .map_err(|err| StorageError::SerializationError(err))?;
 
@@ -522,13 +515,23 @@ pub fn store_user_mountpoints(
         }
     }
 
-    // once everything is serialized perform the writing
     xattr::set(
         home_dir_path.as_os_str(),
         format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
         manifest_serialization.as_slice(),
     )
     .map_err(|err| StorageError::XAttrError(err))?;
+
+    let Some(mountpoints) = mountpoints_data else {
+        return Ok(());
+    };
+
+    let serialized_main_mount: MountPointSerialized =
+        MountPointSerialized::from((&String::new(), &mountpoints.mount()));
+
+    let main_mount = serialized_main_mount
+        .encode::<u16>()
+        .map_err(|err| StorageError::SerializationError(err))?;
 
     for (index, val) in mountpoints
         .foreach(|a, b| (a.clone(), b.clone()))

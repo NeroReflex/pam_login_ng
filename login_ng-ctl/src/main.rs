@@ -190,7 +190,7 @@ fn main() {
     #[cfg(not(feature = "pam"))]
     let (storage_source, maybe_main_password) = match args.directory {
         Some(path) => (StorageSource::Path(path), args.password),
-        None => panic!("this software has been compiled without pam support: you must specify the home directory of the target user"),
+        None => panic!("This software has been compiled without pam support: you must specify the home directory of the target user"),
     };
 
     #[cfg(feature = "pam")]
@@ -268,15 +268,12 @@ fn main() {
             None => UserAuthData::new(),
         },
         Err(err) => {
-            eprintln!(
-                "There is a problem loading your configuration file: {}.\nAborting.",
-                err
-            );
+            eprintln!("There is a problem loading your configuration file: {err}.\nAborting.");
             std::process::exit(-1)
         }
     };
 
-    let user_mounts = match load_user_mountpoints(&storage_source) {
+    let mut user_mounts = match load_user_mountpoints(&storage_source) {
         Ok(existing_data) => existing_data,
         Err(err) => {
             eprintln!("Error in loading user mounts data: {err}");
@@ -295,43 +292,28 @@ fn main() {
             println!("\n");
         }
         Command::ChangeSecondaryMount(mount_data) => {
-            let Some(mut new_data) = user_mounts else {
+            let Some(new_data) = user_mounts else {
                 eprintln!("Error in changing user mounts: a main mount has not beed defined");
                 std::process::exit(-1)
             };
 
-            new_data.add_premount(
+            user_mounts = Some(new_data.with_premount(
                 &mount_data.dir,
                 &MountParams::new(mount_data.device, mount_data.fstype, mount_data.flags),
-            );
-
-            match store_user_mountpoints(new_data, &storage_source) {
-                Ok(_) => {}
-                Err(err) => {
-                    eprintln!("Error in changing user mounts: {err}");
-                    std::process::exit(-1)
-                }
-            }
+            ))
         }
         Command::ChangeMainMount(mount_data) => {
-            let mut new_data = match user_mounts {
-                Some(existing_data) => existing_data,
-                None => MountPoints::default(),
-            };
-
-            new_data.set_mount(&MountParams::new(
-                mount_data.device,
-                mount_data.fstype,
-                mount_data.flags,
-            ));
-
-            match store_user_mountpoints(new_data, &storage_source) {
-                Ok(_) => {}
-                Err(err) => {
-                    eprintln!("Error in changing user mounts: {err}");
-                    std::process::exit(-1)
-                }
-            }
+            user_mounts = Some(
+                (match user_mounts {
+                    Some(existing_data) => existing_data,
+                    None => MountPoints::default(),
+                })
+                .with_mount(&MountParams::new(
+                    mount_data.device,
+                    mount_data.fstype,
+                    mount_data.flags,
+                )),
+            );
         }
         Command::SetSession(session_data) => {
             let command = SessionCommand::new(session_data.cmd, session_data.args);
@@ -409,7 +391,7 @@ fn main() {
             }
 
             match user_mounts {
-                Some(mount_info) => {
+                Some(ref mount_info) => {
                     let hash = mount_info.hash();
                     println!("hash: {hash:02X}");
 
@@ -567,6 +549,9 @@ fn main() {
 
     if write_file.unwrap_or_default() {
         store_user_auth_data(user_cfg, &storage_source)
-            .expect("Error saving the updated configuration.\nAborting.");
+            .expect("Error saving the updated user auth data.\nAborting.");
+
+        store_user_mountpoints(user_mounts, &storage_source)
+            .expect("Error saving the updated user mount data.\nAborting.");
     }
 }
