@@ -89,7 +89,7 @@ impl From<u32> for ServiceOperationResult {
 }
 
 #[proxy(
-    interface = "org.zbus.login_ng",
+    interface = "org.zbus.login_ng1",
     default_service = "org.zbus.login_ng",
     default_path = "/org/zbus/login_ng"
 )]

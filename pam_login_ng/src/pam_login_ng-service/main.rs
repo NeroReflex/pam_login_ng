@@ -99,7 +99,7 @@ fn mount(data: (String, String, String, String)) -> io::Result<Mount> {
     }
 }
 
-#[interface(name = "org.zbus.login_ng")]
+#[interface(name = "org.zbus.login_ng1")]
 impl Service {
     async fn get_pubkey(&self) -> String {
         match self.pub_key.to_pkcs1_pem(LineEnding::CRLF) {
@@ -247,6 +247,7 @@ impl Service {
             return 6u32;
         }
 
+        // due to how directories are mounted discarding the session also umounts all mount points
         let session = guard.remove(user.name());
         drop(session);
 
