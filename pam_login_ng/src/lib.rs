@@ -21,20 +21,20 @@ extern crate pam;
 extern crate rand;
 pub extern crate zbus;
 
-use login_ng::storage::{load_user_auth_data, StorageSource};
-use login_ng::user::UserAuthData;
-use pam::constants::{PamFlag, PamResultCode, *};
-use pam::conv::Conv;
-use pam::module::{PamHandle, PamHooks};
-use pam::pam_try;
-use rsa::pkcs1::DecodeRsaPublicKey;
-use std::ffi::CStr;
-use std::fmt;
-use std::sync::Once;
+use login_ng::{
+    storage::{load_user_auth_data, StorageSource},
+    user::UserAuthData,
+};
+use pam::{
+    constants::{PamFlag, PamResultCode, *},
+    conv::Conv,
+    module::{PamHandle, PamHooks},
+    pam_try,
+};
+use rsa::{pkcs1::DecodeRsaPublicKey, Pkcs1v15Encrypt, RsaPublicKey};
+use std::{ffi::CStr, fmt, sync::Once};
 use tokio::runtime::Runtime;
 use zbus::{proxy, Connection, Result as ZResult};
-
-use rsa::{Pkcs1v15Encrypt, RsaPublicKey};
 
 static INIT: Once = Once::new();
 static mut RUNTIME: Option<Runtime> = None;
