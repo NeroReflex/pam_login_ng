@@ -59,7 +59,8 @@ jobs:
       run: apt-get install -y libpam0g-dev
     - name: Create a new user
       run: |
-        useradd -m newuser
+        mkdir -p /home
+        useradd -m -d /home/newuser newuser
         echo "newuser:password" | chpasswd
         usermod -aG sudo newuser
     - name: Switch to new user and run commands
@@ -75,8 +76,7 @@ jobs:
     - name: Build deb
       run: |
         sudo --preserve-env -u newuser bash << 'EOF'
-        echo "building on $(pwd) with cargo in $HOME"
-        source $HOME/.cargo/env
+        . /home/newuser/.cargo/env
         cargo install cargo-deb
         make deb
         EOF
