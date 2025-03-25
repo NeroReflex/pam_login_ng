@@ -17,10 +17,10 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-pub extern crate rand;
-pub extern crate zbus;
-pub extern crate rsa;
 pub extern crate login_ng;
+pub extern crate rand;
+pub extern crate rsa;
+pub extern crate zbus;
 
 pub mod dbus;
 pub(crate) mod mount;

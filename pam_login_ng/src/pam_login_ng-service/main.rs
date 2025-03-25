@@ -25,8 +25,9 @@ use std::io::Read;
 use tokio::signal::unix::{signal, SignalKind};
 
 use pam_login_ng_common::{
-    login_ng::users, zbus::connection,
     dbus::{Service, ServiceError},
+    login_ng::users,
+    zbus::connection,
 };
 
 #[tokio::main]

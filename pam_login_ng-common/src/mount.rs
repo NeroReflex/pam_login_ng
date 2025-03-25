@@ -79,7 +79,11 @@ fn mount(data: (String, String, String, String)) -> io::Result<Mount> {
     }
 }
 
-pub(crate) fn mount_all(mounts: MountPoints, username: String, homedir: String) -> Vec<UnmountDrop<Mount>> {
+pub(crate) fn mount_all(
+    mounts: MountPoints,
+    username: String,
+    homedir: String,
+) -> Vec<UnmountDrop<Mount>> {
     let mut mounted_devices = vec![];
 
     for m in mounts

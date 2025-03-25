@@ -20,20 +20,20 @@
 extern crate pam;
 extern crate pam_login_ng_common;
 
-use pam_login_ng_common::login_ng::{
-    storage::{load_user_auth_data, StorageSource},
-    user::UserAuthData,
-};
 use pam::{
     constants::{PamFlag, PamResultCode, *},
     conv::Conv,
     module::{PamHandle, PamHooks},
     pam_try,
 };
+use pam_login_ng_common::login_ng::{
+    storage::{load_user_auth_data, StorageSource},
+    user::UserAuthData,
+};
 use pam_login_ng_common::{
+    dbus::ServiceProxy,
     rsa::{pkcs1::DecodeRsaPublicKey, Pkcs1v15Encrypt, RsaPublicKey},
     zbus::{Connection, Result as ZResult},
-    dbus::ServiceProxy
 };
 
 use std::{ffi::CStr, fmt, sync::Once};
@@ -399,7 +399,11 @@ impl PamHooks for PamQuickEmbedded {
 
         // first of all check if the empty password is valid
         if let Ok(main_password) = user_cfg.main_by_auth(&Some(String::new())) {
-            if let Ok(password_matches) = user_cfg.check_main(&main_password) { if password_matches { return PamResultCode::PAM_SUCCESS } }
+            if let Ok(password_matches) = user_cfg.check_main(&main_password) {
+                if password_matches {
+                    return PamResultCode::PAM_SUCCESS;
+                }
+            }
         }
 
         // if the empty password was not valid then continue and ask for a password

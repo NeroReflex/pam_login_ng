@@ -311,8 +311,7 @@ pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData
         None => return Ok(None),
     };
 
-    let xattrs = xattr::list_deref(home_dir_path.as_os_str())
-        .map_err(StorageError::XAttrError)?;
+    let xattrs = xattr::list_deref(home_dir_path.as_os_str()).map_err(StorageError::XAttrError)?;
     for attr in xattrs.into_iter() {
         if let Some(s) = attr.to_str() {
             if s.starts_with(format!("{}.auth.", crate::DEFAULT_XATTR_NAME).as_str()) {
@@ -337,8 +336,7 @@ pub fn remove_user_data(source: &StorageSource) -> Result<(), StorageError> {
         StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
     };
 
-    let xattrs = xattr::list_deref(home_dir_path.as_os_str())
-        .map_err(StorageError::XAttrError)?;
+    let xattrs = xattr::list_deref(home_dir_path.as_os_str()).map_err(StorageError::XAttrError)?;
     for attr in xattrs.into_iter() {
         if attr
             .to_string_lossy()
@@ -376,8 +374,7 @@ pub fn store_user_auth_data(
     };
 
     // remove everything that was already present
-    let xattrs = xattr::list_deref(home_dir_path.as_os_str())
-        .map_err(StorageError::XAttrError)?;
+    let xattrs = xattr::list_deref(home_dir_path.as_os_str()).map_err(StorageError::XAttrError)?;
     for attr in xattrs.into_iter() {
         let current_xattr = attr.to_string_lossy();
 
@@ -457,8 +454,7 @@ pub fn load_user_mountpoints(source: &StorageSource) -> Result<Option<MountPoint
 
     let mut mounts = HashMap::new();
 
-    let xattrs = xattr::list_deref(home_dir_path.as_os_str())
-        .map_err(StorageError::XAttrError)?;
+    let xattrs = xattr::list_deref(home_dir_path.as_os_str()).map_err(StorageError::XAttrError)?;
     for attr in xattrs.into_iter() {
         if let Some(s) = attr.to_str() {
             if s.starts_with(format!("{}.mounts.", crate::DEFAULT_XATTR_NAME).as_str()) {
@@ -494,8 +490,7 @@ pub fn store_user_mountpoints(
         .map_err(StorageError::SerializationError)?;
 
     // remove everything that was already present
-    let xattrs = xattr::list_deref(home_dir_path.as_os_str())
-        .map_err(StorageError::XAttrError)?;
+    let xattrs = xattr::list_deref(home_dir_path.as_os_str()).map_err(StorageError::XAttrError)?;
     for attr in xattrs.into_iter() {
         let current_xattr = attr.to_string_lossy();
 

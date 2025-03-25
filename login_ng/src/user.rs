@@ -67,8 +67,8 @@ bytevec_decl! {
 impl From<AuthDataNonce> for [u8; 12] {
     fn from(val: AuthDataNonce) -> Self {
         [
-            val.a0, val.a1, val.a2, val.a3, val.a4, val.a5, val.a6, val.a7, val.a8,
-            val.a9, val.a10, val.a11,
+            val.a0, val.a1, val.a2, val.a3, val.a4, val.a5, val.a6, val.a7, val.a8, val.a9,
+            val.a10, val.a11,
         ]
     }
 }
@@ -133,10 +133,10 @@ bytevec_decl! {
 impl From<AuthDataSalt> for [u8; 32] {
     fn from(val: AuthDataSalt) -> Self {
         [
-            val.a0, val.a1, val.a2, val.a3, val.a4, val.a5, val.a6, val.a7, val.a8,
-            val.a9, val.a10, val.a11, val.a12, val.a13, val.a14, val.a15, val.a16,
-            val.a17, val.a18, val.a19, val.a20, val.a21, val.a22, val.a23, val.a24,
-            val.a25, val.a26, val.a27, val.a28, val.a29, val.a30, val.a31,
+            val.a0, val.a1, val.a2, val.a3, val.a4, val.a5, val.a6, val.a7, val.a8, val.a9,
+            val.a10, val.a11, val.a12, val.a13, val.a14, val.a15, val.a16, val.a17, val.a18,
+            val.a19, val.a20, val.a21, val.a22, val.a23, val.a24, val.a25, val.a26, val.a27,
+            val.a28, val.a29, val.a30, val.a31,
         ]
     }
 }
@@ -198,11 +198,10 @@ impl MainPassword {
         intermediate_key: &String,
         intermediate_salt: &[u8; 32],
     ) -> Result<Self, UserOperationError> {
-        let main_hash =
-            hash(main, DEFAULT_COST).map_err(UserOperationError::HashingError)?;
+        let main_hash = hash(main, DEFAULT_COST).map_err(UserOperationError::HashingError)?;
 
-        let intermediate_key_hash = hash(intermediate_key, DEFAULT_COST)
-            .map_err(UserOperationError::HashingError)?;
+        let intermediate_key_hash =
+            hash(intermediate_key, DEFAULT_COST).map_err(UserOperationError::HashingError)?;
 
         let intermediate_derived_key =
             crate::derive_key(intermediate_key.as_str(), intermediate_salt);
@@ -227,9 +226,7 @@ impl MainPassword {
     }
 
     pub fn plain(&self, ik_or_main: &String) -> Result<Vec<u8>, UserOperationError> {
-        if verify(ik_or_main, self.main_hash.as_str())
-            .map_err(UserOperationError::HashingError)?
-        {
+        if verify(ik_or_main, self.main_hash.as_str()).map_err(UserOperationError::HashingError)? {
             return Ok(crate::password_to_vec(ik_or_main));
         }
 
@@ -270,8 +267,8 @@ impl MainPassword {
     }
 
     pub fn check(&self, main_password: &String) -> Result<bool, UserOperationError> {
-        let main_password_hash = hash(main_password, DEFAULT_COST)
-            .map_err(UserOperationError::HashingError)?;
+        let main_password_hash =
+            hash(main_password, DEFAULT_COST).map_err(UserOperationError::HashingError)?;
 
         Ok(self.main_hash == main_password_hash)
     }

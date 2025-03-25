@@ -29,7 +29,6 @@ pub struct MountParams {
     flags: Vec<String>,
 }
 
-
 impl MountParams {
     pub fn new(device: String, fstype: String, flags: Vec<String>) -> Self {
         Self {
@@ -71,7 +70,6 @@ pub struct MountPoints {
 
     home: MountParams,
 }
-
 
 impl MountPoints {
     pub fn new(home: MountParams, mounts: HashMap<String, MountParams>) -> Self {

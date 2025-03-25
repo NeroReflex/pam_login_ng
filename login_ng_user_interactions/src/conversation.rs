@@ -59,17 +59,13 @@ impl SimpleConversationRecorder {
 
 impl ConversationRecorder for SimpleConversationRecorder {
     fn record_echo_on(&mut self, prompt: String, response: String) {
-        self.recording.push(ConversationInteraction::EchoOn {
-            prompt,
-            response,
-        });
+        self.recording
+            .push(ConversationInteraction::EchoOn { prompt, response });
     }
 
     fn record_echo_off(&mut self, prompt: String, response: String) {
-        self.recording.push(ConversationInteraction::EchoOff {
-            prompt,
-            response,
-        });
+        self.recording
+            .push(ConversationInteraction::EchoOff { prompt, response });
     }
 
     fn recorded_username(&self, user_prompt: &Option<&str>) -> Option<String> {

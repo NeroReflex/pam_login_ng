@@ -53,8 +53,8 @@ impl SecondaryPassword {
         let password_salt_arr =
             <[u8; 32]>::try_from(Aes256Gcm::generate_key(&mut OsRng).to_vec().as_slice()).unwrap();
 
-        let password_hash = hash(password.as_str(), DEFAULT_COST)
-            .map_err(UserOperationError::HashingError)?;
+        let password_hash =
+            hash(password.as_str(), DEFAULT_COST).map_err(UserOperationError::HashingError)?;
 
         let password_derived_key = crate::derive_key(password.as_str(), &password_salt_arr);
 

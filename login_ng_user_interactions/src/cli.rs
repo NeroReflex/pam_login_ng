@@ -198,7 +198,6 @@ impl CommandLineLoginUserInteractionHandler {
     }
 }
 
-
 impl LoginUserInteractionHandler for CommandLineLoginUserInteractionHandler {
     fn provide_username(&mut self, username: &String) {
         self.maybe_user =

@@ -304,12 +304,13 @@ fn main() {
         }
         Command::ChangeMainMount(mount_data) => {
             user_mounts = Some(
-                user_mounts.unwrap_or_default()
-                .with_mount(&MountParams::new(
-                    mount_data.device,
-                    mount_data.fstype,
-                    mount_data.flags,
-                )),
+                user_mounts
+                    .unwrap_or_default()
+                    .with_mount(&MountParams::new(
+                        mount_data.device,
+                        mount_data.fstype,
+                        mount_data.flags,
+                    )),
             );
         }
         Command::SetSession(session_data) => {

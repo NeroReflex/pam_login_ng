@@ -28,8 +28,8 @@ use login_ng::{
     users::{get_user_by_name, os::unix::UserExt},
 };
 
-use std::{collections::HashMap, ffi::OsString};
 use std::sync::Arc;
+use std::{collections::HashMap, ffi::OsString};
 use thiserror::Error;
 
 use rsa::{
@@ -77,12 +77,12 @@ impl Service {
     }
 }
 
-#[interface(name = "org.zbus.login_ng1",
-proxy(
-    default_service = "org.zbus.login_ng",
-    default_path = "/org/zbus/login_ng"
-)
-
+#[interface(
+    name = "org.zbus.login_ng1",
+    proxy(
+        default_service = "org.zbus.login_ng",
+        default_path = "/org/zbus/login_ng"
+    )
 )]
 impl Service {
     async fn get_pubkey(&self) -> String {
