@@ -300,7 +300,9 @@ fn main() {
             user_mounts = Some(new_data.with_premount(
                 &mount_data.dir,
                 &MountParams::new(mount_data.device, mount_data.fstype, mount_data.flags),
-            ))
+            ));
+
+            write_file = Some(true)
         }
         Command::ChangeMainMount(mount_data) => {
             user_mounts = Some(
@@ -312,6 +314,8 @@ fn main() {
                         mount_data.flags,
                     )),
             );
+
+            write_file = Some(true)
         }
         Command::SetSession(session_data) => {
             let command = SessionCommand::new(session_data.cmd, session_data.args);
