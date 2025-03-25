@@ -77,6 +77,7 @@ jobs:
       run: |
         sudo --preserve-env -u newuser bash << 'EOF'
         . /home/newuser/.cargo/env
+        export PATH="/home/newuser/.cargo/bin:$PATH"
         cargo install cargo-deb
         make deb
         EOF
