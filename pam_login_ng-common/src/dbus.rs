@@ -38,7 +38,10 @@ use rsa::{
     Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
 };
 
-use crate::mount::mount_all;
+use crate::{
+    mount::mount_all,
+    security::*
+};
 
 #[derive(Debug, Error)]
 pub enum ServiceError {
@@ -59,19 +62,21 @@ struct UserSession {
 pub struct Service {
     priv_key: RsaPrivateKey,
     pub_key: RsaPublicKey,
-    sessions: Arc<Mutex<HashMap<OsString, UserSession>>>,
+    one_time_tokens: Vec<Vec<u8>>,
+    sessions: HashMap<OsString, UserSession>,
 }
 
 impl Service {
     pub fn new(rsa_pkcs8: &str) -> Self {
         let priv_key = RsaPrivateKey::from_pkcs8_pem(rsa_pkcs8).unwrap();
         let pub_key = RsaPublicKey::from(&priv_key);
-
-        let sessions = Arc::new(Mutex::new(HashMap::new()));
+        let one_time_tokens = vec![];
+        let sessions = HashMap::new();
 
         Self {
             priv_key,
             pub_key,
+            one_time_tokens,
             sessions,
         }
     }
@@ -85,14 +90,20 @@ impl Service {
     )
 )]
 impl Service {
-    async fn get_pubkey(&self) -> String {
-        match self.pub_key.to_pkcs1_pem(LineEnding::CRLF) {
+    async fn get_pubkey(&mut self) -> String {
+        let pub_pkcs1_pem = match self.pub_key.to_pkcs1_pem(LineEnding::CRLF) {
             Ok(key) => key,
             Err(err) => {
                 println!("failed to serialize the RSA key: {err}");
-                String::new()
+                return String::new()
             }
-        }
+        };
+
+        let otp = SessionPrelude::new(pub_pkcs1_pem);
+
+        self.one_time_tokens.push(otp.one_time_token());
+        
+        otp.to_string()
     }
 
     async fn open_user_session(&mut self, user: &str, password: Vec<u8>) -> u32 {
@@ -163,8 +174,7 @@ impl Service {
             _mounts: mounted_devices,
         };
 
-        let mut guard = self.sessions.lock().await;
-        guard.insert(user.name().to_os_string(), user_session);
+        self.sessions.insert(user.name().to_os_string(), user_session);
 
         println!(
             "Successfully opened session for user '{}'",
@@ -184,12 +194,10 @@ impl Service {
 
         let username = user.name().to_string_lossy();
 
-        let mut guard = self.sessions.lock().await;
-
         // due to how directories are mounted discarding the session also umounts all mount points:
         // either remove the user session from the collection and destroy the session or
         // report to the caller that the requested session is already closed
-        match guard.remove(user.name()) {
+        match self.sessions.remove(user.name()) {
             Some(user_session) => drop(user_session),
             None => return 6u32,
         };

@@ -21,6 +21,9 @@ pub extern crate login_ng;
 pub extern crate rand;
 pub extern crate rsa;
 pub extern crate zbus;
+pub extern crate serde;
+pub extern crate serde_json;
 
+pub mod security;
 pub mod dbus;
-pub(crate) mod mount;
+pub mod mount;
