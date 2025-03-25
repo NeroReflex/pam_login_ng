@@ -57,30 +57,15 @@ jobs:
       run: apt-get install -y clang llvm lld libclang-dev
     - name: Install pam-sys Dependencies
       run: apt-get install -y libpam0g-dev
-    - name: Create a new user
-      run: |
-        mkdir -p /home
-        useradd -m -d /home/newuser newuser
-        echo "newuser:password" | chpasswd
-        usermod -aG sudo newuser
-    - name: Switch to new user and run commands
-      run: |
-        sudo -i -u newuser bash << 'EOF'
-        whoami
-        EOF
     - name: Install Rust toolchain
       run: |
-        sudo -i -u newuser bash << 'EOF'
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y
-        EOF
     - name: Build deb
       run: |
-        sudo --preserve-env -u newuser bash << 'EOF'
-        . /home/newuser/.cargo/env
-        export PATH="/home/newuser/.cargo/bin:$PATH"
+        . $HOME/.cargo/env
+        export PATH="$HOME/.cargo/bin:$PATH"
         cargo install cargo-deb
         make deb
-        EOF
     - name: Move debs
       run: |
         mv target/debian/*.deb .
