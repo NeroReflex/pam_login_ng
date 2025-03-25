@@ -26,14 +26,17 @@ use pam::{
     module::{PamHandle, PamHooks},
     pam_try,
 };
-use pam_login_ng_common::login_ng::{
-    storage::{load_user_auth_data, StorageSource},
-    user::UserAuthData,
-};
 use pam_login_ng_common::{
     dbus::ServiceProxy,
     rsa::{pkcs1::DecodeRsaPublicKey, Pkcs1v15Encrypt, RsaPublicKey},
     zbus::{Connection, Result as ZResult},
+};
+use pam_login_ng_common::{
+    login_ng::{
+        storage::{load_user_auth_data, StorageSource},
+        user::UserAuthData,
+    },
+    security::SessionPrelude,
 };
 
 use std::{ffi::CStr, fmt, sync::Once};
@@ -54,6 +57,7 @@ enum ServiceOperationResult {
     SessionAlreadyClosed = 6,
     CannotIdentifyUser = 7,
     EmptyPubKey = 8,
+    EncryptionError = 9,
     Unknown,
 }
 
@@ -69,6 +73,7 @@ impl fmt::Display for ServiceOperationResult {
             ServiceOperationResult::SessionAlreadyClosed => "Session Already Closed",
             ServiceOperationResult::CannotIdentifyUser => "Cannot Identify User",
             ServiceOperationResult::EmptyPubKey => "Empty Public Key",
+            ServiceOperationResult::EncryptionError => "Encryption error",
             ServiceOperationResult::Unknown => "Unknown Error",
         };
         write!(f, "{}", result_str)
@@ -86,6 +91,8 @@ impl From<u32> for ServiceOperationResult {
             5 => ServiceOperationResult::SessionAlreadyOpened,
             6 => ServiceOperationResult::SessionAlreadyClosed,
             7 => ServiceOperationResult::CannotIdentifyUser,
+            8 => ServiceOperationResult::EmptyPubKey,
+            9 => ServiceOperationResult::EncryptionError,
             _ => ServiceOperationResult::Unknown,
         }
     }
@@ -130,15 +137,11 @@ impl PamQuickEmbedded {
             return Ok(ServiceOperationResult::EmptyPubKey);
         }
 
-        let Ok(pubkey) = RsaPublicKey::from_pkcs1_pem(pk.as_str()) else {
-            return Ok(ServiceOperationResult::PubKeyError);
+        let session_prelude = SessionPrelude::from_string(pk.as_str());
+
+        let Ok(encrypted_password) = session_prelude.encrypt(plain_main_password) else {
+            return Ok(ServiceOperationResult::EncryptionError);
         };
-
-        let mut rng = pam_login_ng_common::rand::thread_rng();
-
-        let encrypted_password = pubkey
-            .encrypt(&mut rng, Pkcs1v15Encrypt, plain_main_password.as_bytes())
-            .unwrap();
 
         let reply = proxy
             .open_user_session(user.as_str(), encrypted_password)

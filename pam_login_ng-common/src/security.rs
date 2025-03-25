@@ -1,5 +1,17 @@
-use serde::{Serialize, Deserialize};
+use rsa::{pkcs1::DecodeRsaPublicKey, Error as RSAError, Pkcs1v15Encrypt, RsaPublicKey};
+use serde::{Deserialize, Serialize};
 use serde_json;
+
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum SessionPreludeError {
+    #[error("Error importing the pem public key")]
+    PubKeyImportError,
+
+    #[error("RSA error: {0}")]
+    RSAError(#[from] RSAError),
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SessionPrelude {
@@ -29,5 +41,17 @@ impl SessionPrelude {
 
     pub fn one_time_token(&self) -> Vec<u8> {
         self.one_time_token.clone()
+    }
+
+    pub fn encrypt(&self, plain_main_password: &String) -> Result<Vec<u8>, SessionPreludeError> {
+        let Ok(pubkey) = RsaPublicKey::from_pkcs1_pem(self.pub_pkcs1_pem.as_str()) else {
+            return Err(SessionPreludeError::PubKeyImportError);
+        };
+
+        let mut rng = rand::thread_rng();
+
+        Ok(pubkey
+            .encrypt(&mut rng, Pkcs1v15Encrypt, plain_main_password.as_bytes())
+            .map_err(SessionPreludeError::RSAError)?)
     }
 }

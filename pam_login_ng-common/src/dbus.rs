@@ -19,8 +19,6 @@
 
 use zbus::{interface, Error as ZError};
 
-use tokio::sync::Mutex;
-
 use sys_mount::{Mount, UnmountDrop};
 
 use login_ng::{
@@ -28,7 +26,6 @@ use login_ng::{
     users::{get_user_by_name, os::unix::UserExt},
 };
 
-use std::sync::Arc;
 use std::{collections::HashMap, ffi::OsString};
 use thiserror::Error;
 
@@ -38,10 +35,7 @@ use rsa::{
     Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
 };
 
-use crate::{
-    mount::mount_all,
-    security::*
-};
+use crate::{mount::mount_all, security::*};
 
 #[derive(Debug, Error)]
 pub enum ServiceError {
@@ -95,14 +89,14 @@ impl Service {
             Ok(key) => key,
             Err(err) => {
                 println!("failed to serialize the RSA key: {err}");
-                return String::new()
+                return String::new();
             }
         };
 
         let otp = SessionPrelude::new(pub_pkcs1_pem);
 
         self.one_time_tokens.push(otp.one_time_token());
-        
+
         otp.to_string()
     }
 
@@ -174,7 +168,8 @@ impl Service {
             _mounts: mounted_devices,
         };
 
-        self.sessions.insert(user.name().to_os_string(), user_session);
+        self.sessions
+            .insert(user.name().to_os_string(), user_session);
 
         println!(
             "Successfully opened session for user '{}'",
