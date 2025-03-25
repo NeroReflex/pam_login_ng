@@ -74,7 +74,7 @@ jobs:
         EOF
     - name: Build deb
       run: |
-        sudo -i -u newuser bash << 'EOF'
+        sudo --preserve-env -u newuser bash << 'EOF'
         echo "building on $(pwd) with cargo in $HOME"
         source $HOME/.cargo/env
         cargo install cargo-deb
