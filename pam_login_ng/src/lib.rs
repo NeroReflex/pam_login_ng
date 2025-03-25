@@ -18,10 +18,9 @@
 */
 
 extern crate pam;
-extern crate rand;
-pub extern crate zbus;
+extern crate pam_login_ng_common;
 
-use login_ng::{
+use pam_login_ng_common::login_ng::{
     storage::{load_user_auth_data, StorageSource},
     user::UserAuthData,
 };
@@ -31,10 +30,14 @@ use pam::{
     module::{PamHandle, PamHooks},
     pam_try,
 };
-use rsa::{pkcs1::DecodeRsaPublicKey, Pkcs1v15Encrypt, RsaPublicKey};
+use pam_login_ng_common::{
+    rsa::{pkcs1::DecodeRsaPublicKey, Pkcs1v15Encrypt, RsaPublicKey},
+    zbus::{Connection, Result as ZResult},
+    dbus::ServiceProxy
+};
+
 use std::{ffi::CStr, fmt, sync::Once};
 use tokio::runtime::Runtime;
-use zbus::{proxy, Connection, Result as ZResult};
 
 static INIT: Once = Once::new();
 static mut RUNTIME: Option<Runtime> = None;
@@ -88,19 +91,6 @@ impl From<u32> for ServiceOperationResult {
     }
 }
 
-#[proxy(
-    interface = "org.zbus.login_ng1",
-    default_service = "org.zbus.login_ng",
-    default_path = "/org/zbus/login_ng"
-)]
-trait Service {
-    async fn get_pubkey(&self) -> ZResult<String>;
-
-    async fn open_user_session(&self, user: &str, password: Vec<u8>) -> ZResult<u32>;
-
-    async fn close_user_session(&self, user: &str) -> ZResult<u32>;
-}
-
 struct PamQuickEmbedded;
 pam::pam_hooks!(PamQuickEmbedded);
 
@@ -144,7 +134,7 @@ impl PamQuickEmbedded {
             return Ok(ServiceOperationResult::PubKeyError);
         };
 
-        let mut rng = rand::thread_rng();
+        let mut rng = pam_login_ng_common::rand::thread_rng();
 
         let encrypted_password = pubkey
             .encrypt(&mut rng, Pkcs1v15Encrypt, plain_main_password.as_bytes())

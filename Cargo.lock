@@ -1093,8 +1093,17 @@ dependencies = [
 name = "pam_login_ng"
 version = "0.1.0"
 dependencies = [
- "login_ng",
  "pam",
+ "pam_login_ng_common",
+ "thiserror 2.0.11",
+ "tokio",
+]
+
+[[package]]
+name = "pam_login_ng_common"
+version = "0.0.0"
+dependencies = [
+ "login_ng",
  "rand",
  "rsa",
  "sys-mount",
