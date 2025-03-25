@@ -51,18 +51,39 @@ jobs:
         apt-get upgrade -y
     - name: Install Build Dependencies
       run: apt-get install -y build-essential devscripts debhelper curl
-    - name: Install Rust toolchain
-      run: |
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y
-        . $HOME/.cargo/env
     - name: Install clang-sys Dependencies
       run: apt-get install -y clang llvm lld libclang-dev
     - name: Install pam-sys Dependencies
       run: apt-get install -y libpam0g-dev
+    - name: Create a new user
+      run: |
+        sudo useradd -m newuser
+        echo "newuser:password" | sudo chpasswd
+        sudo usermod -aG sudo newuser
+
+    - name: Switch to new user and run commands
+      run: |
+        sudo -i -u newuser bash << 'EOF'
+        whoami
+        EOF
+    - name: Install Rust toolchain
+      run: |
+        sudo -i -u newuser bash << 'EOF'
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y
+        . $HOME/.cargo/env
+        EOF
     - name: Install cargo-deb
-      run: cargo install cargo-deb
+      run: |
+        sudo -i -u newuser bash << 'EOF'
+        . $HOME/.cargo/env
+        cargo install cargo-deb
+        EOF
     - name: Build deb
-      run: make deb
+      run: |
+        sudo -i -u newuser bash << 'EOF'
+        . $HOME/.cargo/env
+        make deb
+        EOF
     - name: Move debs
       run: |
         mv target/debian/*.deb .
