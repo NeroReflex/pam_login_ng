@@ -22,22 +22,13 @@ use std::hash::{BuildHasher, Hasher};
 
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct MountParams {
     fstype: String,
     device: String,
     flags: Vec<String>,
 }
 
-impl Default for MountParams {
-    fn default() -> Self {
-        Self {
-            fstype: Default::default(),
-            device: Default::default(),
-            flags: Default::default(),
-        }
-    }
-}
 
 impl MountParams {
     pub fn new(device: String, fstype: String, flags: Vec<String>) -> Self {
@@ -73,7 +64,7 @@ impl MountParams {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct MountPoints {
     /// hashmap of directories -> mountdata
     mounts: HashMap<String, MountParams>,
@@ -81,14 +72,6 @@ pub struct MountPoints {
     home: MountParams,
 }
 
-impl Default for MountPoints {
-    fn default() -> Self {
-        Self {
-            mounts: Default::default(),
-            home: Default::default(),
-        }
-    }
-}
 
 impl MountPoints {
     pub fn new(home: MountParams, mounts: HashMap<String, MountParams>) -> Self {
@@ -101,10 +84,7 @@ impl MountPoints {
     {
         self.mounts
             .keys()
-            .filter_map(|a| match self.mounts.get(a) {
-                Some(b) => Some(fun(&a, b)),
-                None => None,
-            })
+            .filter_map(|a| self.mounts.get(a).map(|b| fun(a, b)))
             .collect::<Vec<R>>()
     }
 

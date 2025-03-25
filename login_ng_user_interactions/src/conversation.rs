@@ -45,6 +45,7 @@ pub trait ConversationRecorder {
     fn recorded_password(&self) -> Option<String>;
 }
 
+#[derive(Default)]
 pub struct SimpleConversationRecorder {
     recording: Vec<ConversationInteraction>,
 }
@@ -59,15 +60,15 @@ impl SimpleConversationRecorder {
 impl ConversationRecorder for SimpleConversationRecorder {
     fn record_echo_on(&mut self, prompt: String, response: String) {
         self.recording.push(ConversationInteraction::EchoOn {
-            prompt: prompt,
-            response: response,
+            prompt,
+            response,
         });
     }
 
     fn record_echo_off(&mut self, prompt: String, response: String) {
         self.recording.push(ConversationInteraction::EchoOff {
-            prompt: prompt,
-            response: response,
+            prompt,
+            response,
         });
     }
 

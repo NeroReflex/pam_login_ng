@@ -57,14 +57,14 @@ async fn main() -> Result<(), ServiceError> {
     println!("Building the dbus object...");
 
     let dbus_conn = connection::Builder::session()
-        .map_err(|err| ServiceError::ZbusError(err))?
+        .map_err(ServiceError::ZbusError)?
         .name("org.zbus.login_ng")
-        .map_err(|err| ServiceError::ZbusError(err))?
+        .map_err(ServiceError::ZbusError)?
         .serve_at("/org/zbus/login_ng", Service::new(contents.as_str()))
-        .map_err(|err| ServiceError::ZbusError(err))?
+        .map_err(ServiceError::ZbusError)?
         .build()
         .await
-        .map_err(|err| ServiceError::ZbusError(err))?;
+        .map_err(ServiceError::ZbusError)?;
 
     println!("Application running");
 
@@ -75,5 +75,6 @@ async fn main() -> Result<(), ServiceError> {
     // Wait for a SIGTERM signal
     sigterm.recv().await;
 
-    Ok(drop(dbus_conn))
+    drop(dbus_conn);
+    Ok(())
 }

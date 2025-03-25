@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use chrono::Local;
 use chrono::TimeZone;
 use login_ng::command::SessionCommand;
-use login_ng::mount::{MountParams, MountPoints};
+use login_ng::mount::MountParams;
 use login_ng::storage::load_user_mountpoints;
 use login_ng::storage::load_user_session_command;
 use login_ng::storage::store_user_mountpoints;
@@ -304,10 +304,7 @@ fn main() {
         }
         Command::ChangeMainMount(mount_data) => {
             user_mounts = Some(
-                (match user_mounts {
-                    Some(existing_data) => existing_data,
-                    None => MountPoints::default(),
-                })
+                user_mounts.unwrap_or_default()
                 .with_mount(&MountParams::new(
                     mount_data.device,
                     mount_data.fstype,

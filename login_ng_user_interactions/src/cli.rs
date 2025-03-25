@@ -165,6 +165,7 @@ impl ConversationHandler for CommandLineConversation {
     }
 }
 
+#[derive(Default)]
 pub struct CommandLineLoginUserInteractionHandler {
     attempt_autologin: bool,
 
@@ -197,16 +198,6 @@ impl CommandLineLoginUserInteractionHandler {
     }
 }
 
-impl Default for CommandLineLoginUserInteractionHandler {
-    fn default() -> Self {
-        Self {
-            attempt_autologin: bool::default(),
-            maybe_user: Default::default(),
-            maybe_username: Default::default(),
-            maybe_password: Default::default(),
-        }
-    }
-}
 
 impl LoginUserInteractionHandler for CommandLineLoginUserInteractionHandler {
     fn provide_username(&mut self, username: &String) {

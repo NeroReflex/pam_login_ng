@@ -214,7 +214,7 @@ impl PamHooks for PamQuickEmbedded {
                         Err(_) => PamResultCode::PAM_SERVICE_ERR,
                     }
                 }),
-                None => return PamResultCode::PAM_SERVICE_ERR,
+                None => PamResultCode::PAM_SERVICE_ERR,
             }
         }
     }
@@ -222,7 +222,7 @@ impl PamHooks for PamQuickEmbedded {
     fn sm_open_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
         pamh.log(
             pam::module::LogLevel::Debug,
-            format!("login_ng: open_session: enter"),
+            "login_ng: open_session: enter".to_string(),
         );
 
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
@@ -256,7 +256,7 @@ impl PamHooks for PamQuickEmbedded {
                 if err != PamResultCode::PAM_SUCCESS {
                     pamh.log(
                         pam::module::LogLevel::Error,
-                        format!("login_ng: open_session: get_user failed"),
+                        "login_ng: open_session: get_user failed".to_string(),
                     );
                     return err;
                 }
@@ -298,11 +298,11 @@ impl PamHooks for PamQuickEmbedded {
                     .await
                     {
                         Ok(result) => {
-                            match ServiceOperationResult::from(result) {
+                            match result {
                                 ServiceOperationResult::Ok => {
                                     pamh.log(
                                         pam::module::LogLevel::Info,
-                                        format!("login_ng: open_session: pam_login_ng-service was successful"),
+                                        "login_ng: open_session: pam_login_ng-service was successful".to_string(),
                                     );
 
                                     PamResultCode::PAM_SUCCESS
@@ -331,7 +331,7 @@ impl PamHooks for PamQuickEmbedded {
                         }
                     }
                 }),
-                None => return PamResultCode::PAM_SERVICE_ERR,
+                None => PamResultCode::PAM_SERVICE_ERR,
             }
         }
     }
@@ -399,13 +399,7 @@ impl PamHooks for PamQuickEmbedded {
 
         // first of all check if the empty password is valid
         if let Ok(main_password) = user_cfg.main_by_auth(&Some(String::new())) {
-            match user_cfg.check_main(&main_password) {
-                Ok(password_matches) => match password_matches {
-                    true => return PamResultCode::PAM_SUCCESS,
-                    false => {}
-                },
-                _ => {}
-            }
+            if let Ok(password_matches) = user_cfg.check_main(&main_password) { if password_matches { return PamResultCode::PAM_SUCCESS } }
         }
 
         // if the empty password was not valid then continue and ask for a password
@@ -414,7 +408,7 @@ impl PamHooks for PamQuickEmbedded {
             Ok(None) => {
                 pamh.log(
                     pam::module::LogLevel::Critical,
-                    format!("No conv available"),
+                    "No conv available".to_string(),
                 );
 
                 return PamResultCode::PAM_SERVICE_ERR;

@@ -88,7 +88,7 @@ pub(crate) fn load_session_from_conf(content: String) -> SessionCommand {
             Some(value) => SessionCommand::new(
                 value.clone(),
                 match config.get("Session", "arguments") {
-                    Some(args) => args.split(" ").map(|arg| String::from(arg)).collect(),
+                    Some(args) => args.split(" ").map(String::from).collect(),
                     None => vec![],
                 },
             ),

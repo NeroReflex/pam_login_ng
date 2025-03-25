@@ -19,9 +19,9 @@
 
 #[test]
 fn test_autologin() {
-    let correct_main = format!("main password <3");
-    let intermediate = format!("intermediate_key");
-    let autologin = format!("");
+    let correct_main = "main password <3".to_string();
+    let intermediate = "intermediate_key".to_string();
+    let autologin = String::new();
 
     let mut user_cfg = crate::user::UserAuthData::new();
     user_cfg.set_main(&correct_main, &intermediate).unwrap();
@@ -38,9 +38,9 @@ fn test_autologin() {
 
 #[test]
 fn test_secondary() {
-    let correct_main = format!("main password <3");
-    let intermediate = format!("intermediate_key");
-    let secondary_passwords = vec![format!("daisujda"), format!("sfaffsss")];
+    let correct_main = "main password <3".to_string();
+    let intermediate = "intermediate_key".to_string();
+    let secondary_passwords = [format!("daisujda"), format!("sfaffsss")];
 
     let mut user_cfg = crate::user::UserAuthData::new();
     user_cfg.set_main(&correct_main, &intermediate).unwrap();

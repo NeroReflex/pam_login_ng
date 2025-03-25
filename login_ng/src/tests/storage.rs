@@ -19,8 +19,8 @@
 
 #[test]
 fn test_main_password_serialization() {
-    let first_main = format!("main password <3");
-    let intermediate = format!("intermediate_key");
+    let first_main = "main password <3".to_string();
+    let intermediate = "intermediate_key".to_string();
 
     let provided_password = Some(first_main.clone());
 
@@ -66,9 +66,9 @@ fn test_main_password_serialization() {
 
 #[test]
 fn test_secondary_password_serialization() {
-    let correct_main = format!("main password <3");
-    let intermediate = format!("intermediate_key");
-    let secondary_passwords = vec![format!("daisujda"), format!("sfaffsss")];
+    let correct_main = "main password <3".to_string();
+    let intermediate = "intermediate_key".to_string();
+    let secondary_passwords = [format!("daisujda"), format!("sfaffsss")];
 
     let dir_name = "test2";
     let source = crate::storage::StorageSource::Path(std::path::PathBuf::from(dir_name));

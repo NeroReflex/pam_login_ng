@@ -83,8 +83,8 @@ pub fn prompt_plain(prompt: &str) -> Result<String, Box<dyn std::error::Error>> 
         .open("/dev/tty")?;
 
     Ok(stream
-        .write_all(prompt.to_string().as_str().as_bytes())
+        .write_all(prompt.to_string().as_bytes())
         .and_then(|_| stream.flush())
         .and_then(|_| read_plain(stream))
-        .map_err(|err| Box::new(err))?)
+        .map_err(Box::new)?)
 }

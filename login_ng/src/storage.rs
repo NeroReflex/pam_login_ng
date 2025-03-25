@@ -124,16 +124,16 @@ bytevec_decl! {
 
 impl From<&SessionCommand> for SessionCommandSerialized {
     fn from(value: &SessionCommand) -> Self {
-        let command = String::from(value.command());
+        let command = value.command();
         let args = value.args();
 
         Self { command, args }
     }
 }
 
-impl Into<SessionCommand> for SessionCommandSerialized {
-    fn into(self) -> SessionCommand {
-        SessionCommand::new(self.command.clone(), self.args.clone())
+impl From<SessionCommandSerialized> for SessionCommand {
+    fn from(val: SessionCommandSerialized) -> Self {
+        SessionCommand::new(val.command.clone(), val.args.clone())
     }
 }
 
@@ -151,7 +151,7 @@ impl TryFrom<&SecondaryAuth> for AuthDataSerialized {
     type Error = StorageError;
 
     fn try_from(value: &SecondaryAuth) -> Result<Self, Self::Error> {
-        let name = String::from(value.name());
+        let name = value.name();
         let creation_date = value.creation_date();
 
         let (auth_type, auth_data) = match value.data() {
@@ -159,7 +159,7 @@ impl TryFrom<&SecondaryAuth> for AuthDataSerialized {
                 0,
                 secondary_password
                     .encode::<u16>()
-                    .map_err(|err| Self::Error::SerializationError(err))?,
+                    .map_err(Self::Error::SerializationError)?,
             ),
         };
 
@@ -181,7 +181,7 @@ impl TryInto<SecondaryAuth> for AuthDataSerialized {
                 self.name.as_str(),
                 Some(self.creation_date),
                 SecondaryPassword::decode::<u16>(self.auth_data.as_slice())
-                    .map_err(|err| StorageError::SerializationError(err))?,
+                    .map_err(StorageError::SerializationError)?,
             )),
             _ => Err(StorageError::DeserializationError),
         }
@@ -209,7 +209,7 @@ pub fn load_user_session_command(
     source: &StorageSource,
 ) -> Result<Option<SessionCommand>, StorageError> {
     let home_dir_path = match source {
-        StorageSource::Username(username) => homedir_by_username(&username)?,
+        StorageSource::Username(username) => homedir_by_username(username)?,
         StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
     };
 
@@ -217,7 +217,7 @@ pub fn load_user_session_command(
         home_dir_path.as_os_str(),
         format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
     )
-    .map_err(|err| StorageError::XAttrError(err))?;
+    .map_err(StorageError::XAttrError)?;
     if manifest.is_none() {
         return Ok(None);
     }
@@ -226,7 +226,7 @@ pub fn load_user_session_command(
         home_dir_path.as_os_str(),
         format!("{}.session", crate::DEFAULT_XATTR_NAME),
     )
-    .map_err(|err| StorageError::XAttrError(err))?
+    .map_err(StorageError::XAttrError)?
     {
         Some(bytes) => Ok(Some(
             SessionCommandSerialized::decode::<u32>(bytes.as_slice())
@@ -242,7 +242,7 @@ pub fn store_user_session_command(
     source: &StorageSource,
 ) -> Result<(), StorageError> {
     let home_dir_path = match source {
-        StorageSource::Username(username) => homedir_by_username(&username)?,
+        StorageSource::Username(username) => homedir_by_username(username)?,
         StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
     };
 
@@ -250,7 +250,7 @@ pub fn store_user_session_command(
     let manifest = AuthDataManifest::new();
     let manifest_serialization = manifest
         .encode::<u16>()
-        .map_err(|err| StorageError::SerializationError(err))?;
+        .map_err(StorageError::SerializationError)?;
 
     // once everything is serialized perform the writing
     xattr::set(
@@ -258,12 +258,12 @@ pub fn store_user_session_command(
         format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
         manifest_serialization.as_slice(),
     )
-    .map_err(|err| StorageError::XAttrError(err))?;
+    .map_err(StorageError::XAttrError)?;
 
     let session_data = SessionCommandSerialized::from(settings);
     let session_serialization = session_data
         .encode::<u32>()
-        .map_err(|err| StorageError::SerializationError(err))?;
+        .map_err(StorageError::SerializationError)?;
 
     // once everything is serialized perform the writing
     xattr::set(
@@ -271,14 +271,14 @@ pub fn store_user_session_command(
         format!("{}.session", crate::DEFAULT_XATTR_NAME),
         session_serialization.as_slice(),
     )
-    .map_err(|err| StorageError::XAttrError(err))?;
+    .map_err(StorageError::XAttrError)?;
 
     Ok(())
 }
 
 pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData>, StorageError> {
     let home_dir_path = match source {
-        StorageSource::Username(username) => homedir_by_username(&username)?,
+        StorageSource::Username(username) => homedir_by_username(username)?,
         StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
     };
 
@@ -286,7 +286,7 @@ pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData
         home_dir_path.as_os_str(),
         format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
     )
-    .map_err(|err| StorageError::XAttrError(err))?;
+    .map_err(StorageError::XAttrError)?;
     if manifest.is_none() {
         return Ok(None);
     }
@@ -295,8 +295,8 @@ pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData
         home_dir_path.as_os_str(),
         format!("{}.main", crate::DEFAULT_XATTR_NAME),
     )
-    .map_err(|err| StorageError::XAttrError(err))?;
-    if let None = main {
+    .map_err(StorageError::XAttrError)?;
+    if main.is_none() {
         return Ok(None);
     }
 
@@ -305,29 +305,26 @@ pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData
     match main {
         Some(a) => {
             let main = MainPassword::decode::<u16>(a.as_slice())
-                .map_err(|err| StorageError::SerializationError(err))?;
+                .map_err(StorageError::SerializationError)?;
             auth_data.push_main(main);
         }
         None => return Ok(None),
     };
 
     let xattrs = xattr::list_deref(home_dir_path.as_os_str())
-        .map_err(|err| StorageError::XAttrError(err))?;
+        .map_err(StorageError::XAttrError)?;
     for attr in xattrs.into_iter() {
-        match attr.to_str() {
-            Some(s) => {
-                if s.starts_with(format!("{}.auth.", crate::DEFAULT_XATTR_NAME).as_str()) {
-                    let raw_data = xattr::get_deref(home_dir_path.as_os_str(), s)
-                        .map_err(|err| StorageError::XAttrError(err))?
-                        .unwrap();
-                    let serialized_data = AuthDataSerialized::decode::<u32>(raw_data.as_slice())?;
+        if let Some(s) = attr.to_str() {
+            if s.starts_with(format!("{}.auth.", crate::DEFAULT_XATTR_NAME).as_str()) {
+                let raw_data = xattr::get_deref(home_dir_path.as_os_str(), s)
+                    .map_err(StorageError::XAttrError)?
+                    .unwrap();
+                let serialized_data = AuthDataSerialized::decode::<u32>(raw_data.as_slice())?;
 
-                    let secondary_auth: SecondaryAuth = serialized_data.try_into()?;
+                let secondary_auth: SecondaryAuth = serialized_data.try_into()?;
 
-                    auth_data.push_secondary(secondary_auth);
-                }
+                auth_data.push_secondary(secondary_auth);
             }
-            None => {}
         }
     }
 
@@ -336,19 +333,19 @@ pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData
 
 pub fn remove_user_data(source: &StorageSource) -> Result<(), StorageError> {
     let home_dir_path = match source {
-        StorageSource::Username(username) => homedir_by_username(&username)?,
+        StorageSource::Username(username) => homedir_by_username(username)?,
         StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
     };
 
     let xattrs = xattr::list_deref(home_dir_path.as_os_str())
-        .map_err(|err| StorageError::XAttrError(err))?;
+        .map_err(StorageError::XAttrError)?;
     for attr in xattrs.into_iter() {
         if attr
             .to_string_lossy()
             .starts_with(crate::DEFAULT_XATTR_NAME)
         {
             xattr::remove_deref(home_dir_path.as_os_str(), attr.as_os_str())
-                .map_err(|err| StorageError::XAttrError(err))?
+                .map_err(StorageError::XAttrError)?
         }
     }
 
@@ -360,7 +357,7 @@ pub fn store_user_auth_data(
     source: &StorageSource,
 ) -> Result<(), StorageError> {
     let home_dir_path = match source {
-        StorageSource::Username(username) => homedir_by_username(&username)?,
+        StorageSource::Username(username) => homedir_by_username(username)?,
         StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
     };
 
@@ -368,19 +365,19 @@ pub fn store_user_auth_data(
     let manifest = AuthDataManifest::new();
     let manifest_serialization = manifest
         .encode::<u16>()
-        .map_err(|err| StorageError::SerializationError(err))?;
+        .map_err(StorageError::SerializationError)?;
 
     let maybe_main_password_serialization = match auth_data.main_password() {
         Some(m) => Some(
             m.encode::<u16>()
-                .map_err(|err| StorageError::SerializationError(err))?,
+                .map_err(StorageError::SerializationError)?,
         ),
         None => None,
     };
 
     // remove everything that was already present
     let xattrs = xattr::list_deref(home_dir_path.as_os_str())
-        .map_err(|err| StorageError::XAttrError(err))?;
+        .map_err(StorageError::XAttrError)?;
     for attr in xattrs.into_iter() {
         let current_xattr = attr.to_string_lossy();
 
@@ -388,7 +385,7 @@ pub fn store_user_auth_data(
             || current_xattr.starts_with(format!("{}.main", crate::DEFAULT_XATTR_NAME).as_str())
         {
             xattr::remove_deref(home_dir_path.as_os_str(), attr.as_os_str())
-                .map_err(|err| StorageError::XAttrError(err))?
+                .map_err(StorageError::XAttrError)?
         }
     }
 
@@ -398,39 +395,37 @@ pub fn store_user_auth_data(
         format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
         manifest_serialization.as_slice(),
     )
-    .map_err(|err| StorageError::XAttrError(err))?;
+    .map_err(StorageError::XAttrError)?;
 
-    Ok(match &maybe_main_password_serialization {
-        Some(data) => {
-            // save the main password first so that if something bad happens after one or more secondary auth may be usable
+    if let Some(data) = &maybe_main_password_serialization {
+        // save the main password first so that if something bad happens after one or more secondary auth may be usable
+        xattr::set(
+            home_dir_path.as_os_str(),
+            format!("{}.main", crate::DEFAULT_XATTR_NAME),
+            data.as_slice(),
+        )
+        .map_err(StorageError::XAttrError)?;
+
+        for (index, val) in auth_data.secondary().enumerate() {
+            let serialized_data: AuthDataSerialized = val.try_into()?;
+            let raw_data = serialized_data
+                .encode::<u32>()
+                .map_err(StorageError::SerializationError)?;
+
             xattr::set(
                 home_dir_path.as_os_str(),
-                format!("{}.main", crate::DEFAULT_XATTR_NAME),
-                data.as_slice(),
+                format!("{}.auth.{}", crate::DEFAULT_XATTR_NAME, index),
+                raw_data.as_slice(),
             )
-            .map_err(|err| StorageError::XAttrError(err))?;
-
-            for (index, val) in auth_data.secondary().enumerate() {
-                let serialized_data: AuthDataSerialized = val.try_into()?;
-                let raw_data = serialized_data
-                    .encode::<u32>()
-                    .map_err(|err| StorageError::SerializationError(err))?;
-
-                xattr::set(
-                    home_dir_path.as_os_str(),
-                    format!("{}.auth.{}", crate::DEFAULT_XATTR_NAME, index),
-                    raw_data.as_slice(),
-                )
-                .map_err(|err| StorageError::XAttrError(err))?
-            }
+            .map_err(StorageError::XAttrError)?
         }
-        None => {}
-    })
+    };
+    Ok(())
 }
 
 pub fn load_user_mountpoints(source: &StorageSource) -> Result<Option<MountPoints>, StorageError> {
     let home_dir_path = match source {
-        StorageSource::Username(username) => homedir_by_username(&username)?,
+        StorageSource::Username(username) => homedir_by_username(username)?,
         StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
     };
 
@@ -438,7 +433,7 @@ pub fn load_user_mountpoints(source: &StorageSource) -> Result<Option<MountPoint
         home_dir_path.as_os_str(),
         format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
     )
-    .map_err(|err| StorageError::XAttrError(err))?;
+    .map_err(StorageError::XAttrError)?;
     if manifest.is_none() {
         return Ok(None);
     }
@@ -447,15 +442,15 @@ pub fn load_user_mountpoints(source: &StorageSource) -> Result<Option<MountPoint
         home_dir_path.as_os_str(),
         format!("{}.mount", crate::DEFAULT_XATTR_NAME),
     )
-    .map_err(|err| StorageError::XAttrError(err))?;
-    if let None = main {
+    .map_err(StorageError::XAttrError)?;
+    if main.is_none() {
         return Ok(None);
     }
 
     let mount_data: (String, MountParams) = match main {
         Some(a) => <(String, MountParams)>::from(
             &MountPointSerialized::decode::<u16>(a.as_slice())
-                .map_err(|err| StorageError::SerializationError(err))?,
+                .map_err(StorageError::SerializationError)?,
         ),
         None => return Ok(None),
     };
@@ -463,23 +458,20 @@ pub fn load_user_mountpoints(source: &StorageSource) -> Result<Option<MountPoint
     let mut mounts = HashMap::new();
 
     let xattrs = xattr::list_deref(home_dir_path.as_os_str())
-        .map_err(|err| StorageError::XAttrError(err))?;
+        .map_err(StorageError::XAttrError)?;
     for attr in xattrs.into_iter() {
-        match attr.to_str() {
-            Some(s) => {
-                if s.starts_with(format!("{}.mounts.", crate::DEFAULT_XATTR_NAME).as_str()) {
-                    let raw_data = xattr::get_deref(home_dir_path.as_os_str(), s)
-                        .map_err(|err| StorageError::XAttrError(err))?
-                        .unwrap();
+        if let Some(s) = attr.to_str() {
+            if s.starts_with(format!("{}.mounts.", crate::DEFAULT_XATTR_NAME).as_str()) {
+                let raw_data = xattr::get_deref(home_dir_path.as_os_str(), s)
+                    .map_err(StorageError::XAttrError)?
+                    .unwrap();
 
-                    let secondary_auth = <(String, MountParams)>::from(
-                        &MountPointSerialized::decode::<u32>(raw_data.as_slice())?,
-                    );
+                let secondary_auth = <(String, MountParams)>::from(
+                    &MountPointSerialized::decode::<u32>(raw_data.as_slice())?,
+                );
 
-                    mounts.insert(secondary_auth.0, secondary_auth.1);
-                }
+                mounts.insert(secondary_auth.0, secondary_auth.1);
             }
-            None => {}
         }
     }
 
@@ -491,7 +483,7 @@ pub fn store_user_mountpoints(
     source: &StorageSource,
 ) -> Result<(), StorageError> {
     let home_dir_path = match source {
-        StorageSource::Username(username) => homedir_by_username(&username)?,
+        StorageSource::Username(username) => homedir_by_username(username)?,
         StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),
     };
 
@@ -499,11 +491,11 @@ pub fn store_user_mountpoints(
     let manifest = AuthDataManifest::new();
     let manifest_serialization = manifest
         .encode::<u16>()
-        .map_err(|err| StorageError::SerializationError(err))?;
+        .map_err(StorageError::SerializationError)?;
 
     // remove everything that was already present
     let xattrs = xattr::list_deref(home_dir_path.as_os_str())
-        .map_err(|err| StorageError::XAttrError(err))?;
+        .map_err(StorageError::XAttrError)?;
     for attr in xattrs.into_iter() {
         let current_xattr = attr.to_string_lossy();
 
@@ -511,7 +503,7 @@ pub fn store_user_mountpoints(
             || current_xattr.starts_with(format!("{}.mounts.", crate::DEFAULT_XATTR_NAME).as_str())
         {
             xattr::remove_deref(home_dir_path.as_os_str(), attr.as_os_str())
-                .map_err(|err| StorageError::XAttrError(err))?
+                .map_err(StorageError::XAttrError)?
         }
     }
 
@@ -520,7 +512,7 @@ pub fn store_user_mountpoints(
         format!("{}.manifest", crate::DEFAULT_XATTR_NAME),
         manifest_serialization.as_slice(),
     )
-    .map_err(|err| StorageError::XAttrError(err))?;
+    .map_err(StorageError::XAttrError)?;
 
     let Some(mountpoints) = mountpoints_data else {
         return Ok(());
@@ -531,7 +523,7 @@ pub fn store_user_mountpoints(
 
     let main_mount = serialized_main_mount
         .encode::<u16>()
-        .map_err(|err| StorageError::SerializationError(err))?;
+        .map_err(StorageError::SerializationError)?;
 
     for (index, val) in mountpoints
         .foreach(|a, b| (a.clone(), b.clone()))
@@ -541,14 +533,14 @@ pub fn store_user_mountpoints(
         let serialized_data = MountPointSerialized::from((&val.0, &val.1));
         let raw_data = serialized_data
             .encode::<u32>()
-            .map_err(|err| StorageError::SerializationError(err))?;
+            .map_err(StorageError::SerializationError)?;
 
         xattr::set(
             home_dir_path.as_os_str(),
             format!("{}.mounts.{}", crate::DEFAULT_XATTR_NAME, index),
             raw_data.as_slice(),
         )
-        .map_err(|err| StorageError::XAttrError(err))?
+        .map_err(StorageError::XAttrError)?
     }
 
     // save the home mount last so that if something bad happens an invalid mount won't be attempted
@@ -557,7 +549,7 @@ pub fn store_user_mountpoints(
         format!("{}.mount", crate::DEFAULT_XATTR_NAME),
         main_mount.as_slice(),
     )
-    .map_err(|err| StorageError::XAttrError(err))?;
+    .map_err(StorageError::XAttrError)?;
 
     Ok(())
 }

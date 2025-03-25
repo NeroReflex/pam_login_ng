@@ -64,11 +64,11 @@ bytevec_decl! {
     }
 }
 
-impl Into<[u8; 12]> for AuthDataNonce {
-    fn into(self) -> [u8; 12] {
+impl From<AuthDataNonce> for [u8; 12] {
+    fn from(val: AuthDataNonce) -> Self {
         [
-            self.a0, self.a1, self.a2, self.a3, self.a4, self.a5, self.a6, self.a7, self.a8,
-            self.a9, self.a10, self.a11,
+            val.a0, val.a1, val.a2, val.a3, val.a4, val.a5, val.a6, val.a7, val.a8,
+            val.a9, val.a10, val.a11,
         ]
     }
 }
@@ -130,13 +130,13 @@ bytevec_decl! {
     }
 }
 
-impl Into<[u8; 32]> for AuthDataSalt {
-    fn into(self) -> [u8; 32] {
+impl From<AuthDataSalt> for [u8; 32] {
+    fn from(val: AuthDataSalt) -> Self {
         [
-            self.a0, self.a1, self.a2, self.a3, self.a4, self.a5, self.a6, self.a7, self.a8,
-            self.a9, self.a10, self.a11, self.a12, self.a13, self.a14, self.a15, self.a16,
-            self.a17, self.a18, self.a19, self.a20, self.a21, self.a22, self.a23, self.a24,
-            self.a25, self.a26, self.a27, self.a28, self.a29, self.a30, self.a31,
+            val.a0, val.a1, val.a2, val.a3, val.a4, val.a5, val.a6, val.a7, val.a8,
+            val.a9, val.a10, val.a11, val.a12, val.a13, val.a14, val.a15, val.a16,
+            val.a17, val.a18, val.a19, val.a20, val.a21, val.a22, val.a23, val.a24,
+            val.a25, val.a26, val.a27, val.a28, val.a29, val.a30, val.a31,
         ]
     }
 }
@@ -199,13 +199,13 @@ impl MainPassword {
         intermediate_salt: &[u8; 32],
     ) -> Result<Self, UserOperationError> {
         let main_hash =
-            hash(main, DEFAULT_COST).map_err(|err| UserOperationError::HashingError(err))?;
+            hash(main, DEFAULT_COST).map_err(UserOperationError::HashingError)?;
 
         let intermediate_key_hash = hash(intermediate_key, DEFAULT_COST)
-            .map_err(|err| UserOperationError::HashingError(err))?;
+            .map_err(UserOperationError::HashingError)?;
 
         let intermediate_derived_key =
-            crate::derive_key(&intermediate_key.as_str(), intermediate_salt);
+            crate::derive_key(intermediate_key.as_str(), intermediate_salt);
 
         let key = Key::<Aes256Gcm>::from_slice(&intermediate_derived_key);
 
@@ -219,7 +219,7 @@ impl MainPassword {
                 main_hash,
                 enc_main,
                 enc_main_nonce: AuthDataNonce::from(temp),
-                intermediate_key_salt: AuthDataSalt::from(intermediate_salt.clone()),
+                intermediate_key_salt: AuthDataSalt::from(*intermediate_salt),
                 intermediate_key_hash,
             }),
             Err(err) => Err(UserOperationError::EncryptionError(err)),
@@ -227,17 +227,17 @@ impl MainPassword {
     }
 
     pub fn plain(&self, ik_or_main: &String) -> Result<Vec<u8>, UserOperationError> {
-        if verify(ik_or_main, &self.main_hash.as_str())
-            .map_err(|err| UserOperationError::HashingError(err))?
+        if verify(ik_or_main, self.main_hash.as_str())
+            .map_err(UserOperationError::HashingError)?
         {
-            return Ok(crate::password_to_vec(&ik_or_main));
+            return Ok(crate::password_to_vec(ik_or_main));
         }
 
         // provided data was not the main password itself: threat it as the intermediate key
         let intermediate_key = ik_or_main;
 
         if !verify(intermediate_key, self.intermediate_key_hash.as_str())
-            .map_err(|err| UserOperationError::HashingError(err))?
+            .map_err(UserOperationError::HashingError)?
         {
             return Err(UserOperationError::User(
                 UserAuthDataError::WrongIntermediateKey,
@@ -246,7 +246,7 @@ impl MainPassword {
 
         let temp: [u8; 32] = self.intermediate_key_salt.into();
         let intermediate_derived_key =
-            crate::derive_key(&intermediate_key.as_str(), temp.as_slice());
+            crate::derive_key(intermediate_key.as_str(), temp.as_slice());
 
         let key = Key::<Aes256Gcm>::from_slice(&intermediate_derived_key);
 
@@ -256,10 +256,10 @@ impl MainPassword {
 
         let decrypted_main = main_cipher
             .decrypt(main_nonce, self.enc_main.as_ref())
-            .map_err(|err| UserOperationError::EncryptionError(err))?;
+            .map_err(UserOperationError::EncryptionError)?;
 
         if !verify(decrypted_main.as_slice(), &self.main_hash)
-            .map_err(|err| UserOperationError::HashingError(err))?
+            .map_err(UserOperationError::HashingError)?
         {
             return Err(UserOperationError::User(
                 UserAuthDataError::WrongIntermediateKey,
@@ -271,13 +271,13 @@ impl MainPassword {
 
     pub fn check(&self, main_password: &String) -> Result<bool, UserOperationError> {
         let main_password_hash = hash(main_password, DEFAULT_COST)
-            .map_err(|err| UserOperationError::HashingError(err))?;
+            .map_err(UserOperationError::HashingError)?;
 
         Ok(self.main_hash == main_password_hash)
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct UserAuthData {
     main: Option<MainPassword>,
     auth: Vec<SecondaryAuth>,
@@ -314,7 +314,7 @@ impl UserAuthData {
     }
 
     pub fn has_main(&self) -> bool {
-        return self.main.is_some();
+        self.main.is_some()
     }
 
     /// Check if the given main passowrd is the same as the stored one
@@ -326,7 +326,7 @@ impl UserAuthData {
             ));
         };
 
-        stored_main.check(&main_password)
+        stored_main.check(main_password)
     }
 
     /// Function to get the main password from a secondary password.
@@ -347,7 +347,7 @@ impl UserAuthData {
             }
         }
 
-        for sec_auth in (&self.auth).into_iter() {
+        for sec_auth in self.auth.iter() {
             if let Ok(intermediate) = sec_auth.intermediate(secondary_password) {
                 if let Ok(main_pw_as_vec) = main.plain(&intermediate) {
                     return Ok(crate::vec_to_password(&main_pw_as_vec));
@@ -391,7 +391,7 @@ impl UserAuthData {
         match &self.main {
             Some(m) => {
                 if !verify(intermediate_key, &m.intermediate_key_hash)
-                    .map_err(|err| UserOperationError::HashingError(err))?
+                    .map_err(UserOperationError::HashingError)?
                 {
                     return Err(UserOperationError::User(
                         UserAuthDataError::WrongIntermediateKey,
