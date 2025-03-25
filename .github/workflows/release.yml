@@ -105,7 +105,7 @@ jobs:
       - name: Make release
         uses: softprops/action-gh-release@v2
         with:
-          name: ${GITHUB_REF#refs/tags/}
+          name: login-ng v${GITHUB_REF#refs/tags/}
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: false
           prerelease: true
