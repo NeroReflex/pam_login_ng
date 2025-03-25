@@ -71,18 +71,13 @@ jobs:
       run: |
         sudo -i -u newuser bash << 'EOF'
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y
-        . $HOME/.cargo/env
-        EOF
-    - name: Install cargo-deb
-      run: |
-        sudo -i -u newuser bash << 'EOF'
-        . $HOME/.cargo/env
-        cargo install cargo-deb
         EOF
     - name: Build deb
       run: |
         sudo -i -u newuser bash << 'EOF'
-        . $HOME/.cargo/env
+        echo "building on $(pwd) with cargo in $HOME"
+        source $HOME/.cargo/env
+        cargo install cargo-deb
         make deb
         EOF
     - name: Move debs
