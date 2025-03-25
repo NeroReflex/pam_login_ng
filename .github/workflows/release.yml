@@ -49,18 +49,19 @@ jobs:
       run: |
         apt-get update -y
         apt-get upgrade -y
+    - name: Install Basic Software
+      run: apt-get install -y sudo curl
     - name: Install Build Dependencies
-      run: apt-get install -y build-essential devscripts debhelper curl
+      run: apt-get install -y build-essential devscripts debhelper
     - name: Install clang-sys Dependencies
       run: apt-get install -y clang llvm lld libclang-dev
     - name: Install pam-sys Dependencies
       run: apt-get install -y libpam0g-dev
     - name: Create a new user
       run: |
-        sudo useradd -m newuser
-        echo "newuser:password" | sudo chpasswd
-        sudo usermod -aG sudo newuser
-
+        useradd -m newuser
+        echo "newuser:password" | chpasswd
+        usermod -aG sudo newuser
     - name: Switch to new user and run commands
       run: |
         sudo -i -u newuser bash << 'EOF'
@@ -106,7 +107,6 @@ jobs:
         with:
           name: bookworm-package
           path: ${{ env.PKGDEST }}
-
       - name: Make release
         uses: softprops/action-gh-release@v2
         with:
