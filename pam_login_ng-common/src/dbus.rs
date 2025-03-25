@@ -26,16 +26,17 @@ use login_ng::{
     users::{get_user_by_name, os::unix::UserExt},
 };
 
-use std::{collections::HashMap, ffi::OsString};
+use std::{collections::{HashMap, hash_map::DefaultHasher}, ffi::OsString, sync::Arc};
+use std::hash::{Hash, Hasher};
 use thiserror::Error;
 
 use rsa::{
     pkcs1::EncodeRsaPublicKey,
     pkcs8::{DecodePrivateKey, LineEnding},
-    Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
+    RsaPrivateKey, RsaPublicKey,
 };
 
-use crate::{mount::mount_all, security::*};
+use crate::{mount::mount_all, security::*, result::*};
 
 #[derive(Debug, Error)]
 pub enum ServiceError {
@@ -54,17 +55,17 @@ struct UserSession {
 }
 
 pub struct Service {
-    priv_key: RsaPrivateKey,
+    priv_key: Arc<RsaPrivateKey>,
     pub_key: RsaPublicKey,
-    one_time_tokens: Vec<Vec<u8>>,
+    one_time_tokens: HashMap<u64, Vec<u8>>,
     sessions: HashMap<OsString, UserSession>,
 }
 
 impl Service {
     pub fn new(rsa_pkcs8: &str) -> Self {
-        let priv_key = RsaPrivateKey::from_pkcs8_pem(rsa_pkcs8).unwrap();
-        let pub_key = RsaPublicKey::from(&priv_key);
-        let one_time_tokens = vec![];
+        let priv_key = Arc::new(RsaPrivateKey::from_pkcs8_pem(rsa_pkcs8).unwrap());
+        let pub_key = RsaPublicKey::from(priv_key.as_ref());
+        let one_time_tokens = HashMap::new();
         let sessions = HashMap::new();
 
         Self {
@@ -84,7 +85,7 @@ impl Service {
     )
 )]
 impl Service {
-    async fn get_pubkey(&mut self) -> String {
+    async fn initiate_session(&mut self) -> String {
         let pub_pkcs1_pem = match self.pub_key.to_pkcs1_pem(LineEnding::CRLF) {
             Ok(key) => key,
             Err(err) => {
@@ -93,11 +94,17 @@ impl Service {
             }
         };
 
-        let otp = SessionPrelude::new(pub_pkcs1_pem);
+        let session = SessionPrelude::new(pub_pkcs1_pem);
 
-        self.one_time_tokens.push(otp.one_time_token());
+        let otp = session.one_time_token();
 
-        otp.to_string()
+        let mut hasher = DefaultHasher::new();
+        otp.hash(&mut hasher);
+        let key = hasher.finish();
+
+        self.one_time_tokens.insert(key, otp);
+
+        session.to_string()
     }
 
     async fn open_user_session(&mut self, user: &str, password: Vec<u8>) -> u32 {
@@ -106,27 +113,36 @@ impl Service {
         let source = login_ng::storage::StorageSource::Username(String::from(user));
 
         let Some(user) = get_user_by_name(user) else {
-            // cannot identify user
-            return 7u32;
+            return ServiceOperationResult::CannotIdentifyUser.into();
         };
 
-        let password = match self.priv_key.decrypt(Pkcs1v15Encrypt, &password) {
-            Ok(password) => {
-                // TODO: defeat replay attacks!!!
+        if self.sessions.contains_key(&user.name().to_os_string()) {
+            return ServiceOperationResult::SessionAlreadyOpened.into();
+        }
 
-                password
-            }
+        let (otp, password) = match SessionPrelude::decrypt(self.priv_key.clone(), password) {
+            Ok(result) => result,
             Err(err) => {
                 eprintln!("Failed to decrypt data: {err}");
-                return 2u32;
+                return ServiceOperationResult::DataDecryptionFailed.into();
             }
         };
+
+        // check the OTP to be available to defeat replay attacks
+        let mut hasher = DefaultHasher::new();
+        otp.hash(&mut hasher);
+        match self.one_time_tokens.remove(&hasher.finish()) {
+            Some(stored) => if stored != otp {
+                return ServiceOperationResult::EncryptionError.into()
+            },
+            None => return ServiceOperationResult::EncryptionError.into(),
+        }
 
         let user_mounts = match load_user_mountpoints(&source) {
             Ok(user_cfg) => user_cfg,
             Err(err) => {
                 eprintln!("Failed to load user mount data: {err}");
-                return 3u32;
+                return ServiceOperationResult::CannotLoadUserMountError.into();
             }
         };
 
@@ -150,7 +166,7 @@ impl Service {
                         user.name().to_string_lossy()
                     );
 
-                    return 4u32;
+                    return ServiceOperationResult::MountError.into();
                 }
 
                 println!(
@@ -176,15 +192,14 @@ impl Service {
             user.name().to_string_lossy()
         );
 
-        0u32 // OK
+        return ServiceOperationResult::Ok.into();
     }
 
     async fn close_user_session(&mut self, user: &str) -> u32 {
         println!("Requested session for user '{user}' to be closed");
 
         let Some(user) = get_user_by_name(user) else {
-            // cannot identify user
-            return 7u32;
+            return ServiceOperationResult::CannotIdentifyUser.into();
         };
 
         let username = user.name().to_string_lossy();
@@ -194,11 +209,11 @@ impl Service {
         // report to the caller that the requested session is already closed
         match self.sessions.remove(user.name()) {
             Some(user_session) => drop(user_session),
-            None => return 6u32,
+            None => return ServiceOperationResult::SessionAlreadyClosed.into(),
         };
 
         println!("Successfully closed session for user '{username}'");
 
-        0u32
+        return ServiceOperationResult::Ok.into();
     }
 }

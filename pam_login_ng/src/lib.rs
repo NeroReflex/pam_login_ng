@@ -28,7 +28,6 @@ use pam::{
 };
 use pam_login_ng_common::{
     dbus::ServiceProxy,
-    rsa::{pkcs1::DecodeRsaPublicKey, Pkcs1v15Encrypt, RsaPublicKey},
     zbus::{Connection, Result as ZResult},
 };
 use pam_login_ng_common::{
@@ -37,66 +36,14 @@ use pam_login_ng_common::{
         user::UserAuthData,
     },
     security::SessionPrelude,
+    result::ServiceOperationResult,
 };
 
-use std::{ffi::CStr, fmt, sync::Once};
+use std::{ffi::CStr, sync::Once};
 use tokio::runtime::Runtime;
 
 static INIT: Once = Once::new();
 static mut RUNTIME: Option<Runtime> = None;
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-#[repr(C)]
-enum ServiceOperationResult {
-    Ok = 0,
-    PubKeyError = 1,
-    DataDecryptionFailed = 2,
-    CannotLoadUserMountError = 3,
-    MountError = 4,
-    SessionAlreadyOpened = 5,
-    SessionAlreadyClosed = 6,
-    CannotIdentifyUser = 7,
-    EmptyPubKey = 8,
-    EncryptionError = 9,
-    Unknown,
-}
-
-impl fmt::Display for ServiceOperationResult {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let result_str = match self {
-            ServiceOperationResult::Ok => "Ok",
-            ServiceOperationResult::PubKeyError => "Public Key Error",
-            ServiceOperationResult::DataDecryptionFailed => "Data Decryption Failed",
-            ServiceOperationResult::CannotLoadUserMountError => "Cannot Load User Mount",
-            ServiceOperationResult::MountError => "Mount Error",
-            ServiceOperationResult::SessionAlreadyOpened => "Session Already Opened",
-            ServiceOperationResult::SessionAlreadyClosed => "Session Already Closed",
-            ServiceOperationResult::CannotIdentifyUser => "Cannot Identify User",
-            ServiceOperationResult::EmptyPubKey => "Empty Public Key",
-            ServiceOperationResult::EncryptionError => "Encryption error",
-            ServiceOperationResult::Unknown => "Unknown Error",
-        };
-        write!(f, "{}", result_str)
-    }
-}
-
-impl From<u32> for ServiceOperationResult {
-    fn from(value: u32) -> Self {
-        match value {
-            0 => ServiceOperationResult::Ok,
-            1 => ServiceOperationResult::PubKeyError,
-            2 => ServiceOperationResult::DataDecryptionFailed,
-            3 => ServiceOperationResult::CannotLoadUserMountError,
-            4 => ServiceOperationResult::MountError,
-            5 => ServiceOperationResult::SessionAlreadyOpened,
-            6 => ServiceOperationResult::SessionAlreadyClosed,
-            7 => ServiceOperationResult::CannotIdentifyUser,
-            8 => ServiceOperationResult::EmptyPubKey,
-            9 => ServiceOperationResult::EncryptionError,
-            _ => ServiceOperationResult::Unknown,
-        }
-    }
-}
 
 struct PamQuickEmbedded;
 pam::pam_hooks!(PamQuickEmbedded);
@@ -124,13 +71,13 @@ impl PamQuickEmbedded {
 
     pub(crate) async fn open_session_for_user(
         user: &String,
-        plain_main_password: &String,
+        plain_main_password: String,
     ) -> ZResult<ServiceOperationResult> {
         let connection = Connection::session().await?;
 
         let proxy = ServiceProxy::new(&connection).await?;
 
-        let pk = proxy.get_pubkey().await?;
+        let pk = proxy.initiate_session().await?;
 
         // return an unknown error if the service was unable to serialize the RSA public key
         if pk.is_empty() {
@@ -296,7 +243,7 @@ impl PamHooks for PamQuickEmbedded {
                 Some(runtime) => runtime.block_on(async {
                     match PamQuickEmbedded::open_session_for_user(
                         &String::from(username),
-                        &String::from(""), // TODO: fetch the real passowrd
+                        String::from(""), // TODO: fetch the real passowrd
                     )
                     .await
                     {
