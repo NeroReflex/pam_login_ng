@@ -17,3 +17,16 @@ pam_login_ng_common = { path = "../pam_login_ng-common" }
 pam = { git = "https://github.com/NeroReflex/pam-rs.git" }
 tokio = { version = "^1.43", features = ["macros", "rt-multi-thread", "sync", "signal"] }
 thiserror = "2.0.11"
+
+[package.metadata.deb]
+license-file = ["../LICENSE.md", "4"]
+extended-description = """\
+Additional pam module and service to login the user."""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/pam_login_ng-service", "usr/bin/", "755"],
+    ["../rootfs/usr/lib/systemd/system/pam_login_ng.service", "usr/lib/systemd/system/", "644"],
+    ["../rootfs/usr/share/dbus-1/system.d/org.zbus.login_ng.conf", "usr/share/dbus-1/system.d/", "644"],
+]

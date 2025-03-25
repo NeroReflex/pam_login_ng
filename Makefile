@@ -42,3 +42,9 @@ clean:
 
 .PHONY: all
 all: build
+
+.PHONY: deb
+deb: fetch
+	cd login_ng-cli && cargo deb --all-features
+	cd login_ng-ctl && cargo deb --all-features
+	cd pam_login_ng && cargo deb --all-features

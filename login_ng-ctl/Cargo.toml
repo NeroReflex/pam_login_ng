@@ -13,3 +13,16 @@ login_ng_user_interactions = { path = "../login_ng_user_interactions", features 
 [features]
 default = []
 pam = ["login_ng_user_interactions/pam"]
+
+[package.metadata.deb]
+license-file = ["../LICENSE.md", "4"]
+extended-description = """\
+A command-line utility to manage authentication \
+data on user accounts."""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/login_ng-ctl", "usr/bin/", "755"],
+    ["../rootfs/etc/pam.d/login_ng-ctl", "etc/pam.d/", "644"],
+]

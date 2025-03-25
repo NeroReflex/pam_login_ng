@@ -14,3 +14,18 @@ login_ng_user_interactions = { path = "../login_ng_user_interactions", features 
 default = ["greetd"]  # Enable greetd feature by default
 greetd = ["login_ng_user_interactions/greetd"]
 pam = ["login_ng_user_interactions/pam"]
+
+[package.metadata.deb]
+license-file = ["../LICENSE.md", "4"]
+extended-description = """\
+A command-line utility to login into a user accounts: \
+supports either greetd and pam."""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/login_ng-cli", "usr/bin/", "755"],
+    ["../rootfs/usr/lib/systemd/system/login_ng@.service", "usr/lib/systemd/system/", "644"],
+    ["../rootfs/etc/pam.d/login_ng", "etc/pam.d/", "644"],
+    ["../rootfs/etc/pam.d/login_ng-autologin", "etc/pam.d/", "644"],
+]
