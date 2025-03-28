@@ -19,10 +19,15 @@
 
 extern crate tokio;
 
-use std::fs::File;
-use std::io::Read;
+use std::fs::{self, create_dir, File};
+use std::io::{Read, Write};
+use std::path::Path;
 
+use pam_login_ng_common::rsa::pkcs1::EncodeRsaPrivateKey;
+use pam_login_ng_common::rsa::pkcs8::LineEnding;
 use tokio::signal::unix::{signal, SignalKind};
+
+use std::os::unix::fs::PermissionsExt;
 
 use pam_login_ng_common::{
     dbus::{Service, ServiceError},
@@ -33,11 +38,74 @@ use pam_login_ng_common::{
 #[tokio::main]
 async fn main() -> Result<(), ServiceError> {
     println!("Reading the private key...");
-    let file_path = "/etc/login_ng/private_key_pkcs8.pem";
-    let mut file = File::open(file_path)?;
-    let mut contents = String::new();
-    let read = file.read_to_string(&mut contents)?;
-    println!("Read private key file of {read} bytes");
+
+    let file_name_str = "private_key_pkcs1.pem";
+    let dir_path_str = "/etc/login_ng/";
+    let dir_path = Path::new(dir_path_str);
+
+    if !dir_path.exists() {
+        match create_dir(dir_path) {
+            Ok(_) => {
+                println!("Directory {dir_path_str} created");
+
+                let mut permissions = fs::metadata(dir_path)?.permissions();
+                permissions.set_mode(0o700);
+
+                fs::set_permissions(dir_path, permissions)?;
+            }
+            Err(err) => {
+                eprintln!("Could not create directory {dir_path_str}: {err}");
+            }
+        }
+    }
+
+    let file_path = dir_path.join(file_name_str);
+
+    let contents = match file_path.exists() {
+        true => {
+            let mut contents = String::new();
+
+            let mut file = File::open(file_path)?;
+            let read = file.read_to_string(&mut contents)?;
+            println!("Read private key file of {read} bytes");
+
+            contents
+        }
+        false => {
+            eprintln!("File {dir_path_str}/{file_name_str} not found: a new one will be generated");
+
+            let mut rng = pam_login_ng_common::rand::thread_rng();
+            let priv_key = pam_login_ng_common::rsa::RsaPrivateKey::new(&mut rng, 4096)
+                .expect("failed to generate a key");
+
+            let contents = priv_key.to_pkcs1_pem(LineEnding::CRLF)?.to_string();
+
+            match File::create(&file_path) {
+                Ok(mut file) => {
+                    let metadata = file.metadata()?;
+                    let mut perm = metadata.permissions();
+                    perm.set_mode(0o700);
+
+                    fs::set_permissions(file_path, perm)?;
+                    match file.write_all(format!("{}", contents).as_bytes()) {
+                        Ok(_) => {
+                            println!(
+                                "Generated key has been saved to {dir_path_str}/{file_name_str}"
+                            )
+                        }
+                        Err(err) => {
+                            eprintln!("Failed to write the generated key to {dir_path_str}/{file_name_str}: {err}")
+                        }
+                    };
+                }
+                Err(err) => {
+                    eprintln!("Failed to create the file {dir_path_str}/{file_name_str}: {err}")
+                }
+            };
+
+            contents
+        }
+    };
 
     if users::get_current_uid() != 0 {
         eprintln!("Application started without root privileges: aborting...");

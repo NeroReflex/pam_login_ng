@@ -35,8 +35,8 @@ use pam_login_ng_common::{
         storage::{load_user_auth_data, StorageSource},
         user::UserAuthData,
     },
-    security::SessionPrelude,
     result::ServiceOperationResult,
+    security::SessionPrelude,
 };
 
 use std::{ffi::CStr, sync::Once};

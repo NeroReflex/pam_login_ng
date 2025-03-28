@@ -26,5 +26,5 @@ pub extern crate zbus;
 
 pub mod dbus;
 pub mod mount;
-pub mod security;
 pub mod result;
+pub mod security;

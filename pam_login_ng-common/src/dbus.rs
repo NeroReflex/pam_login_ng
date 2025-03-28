@@ -26,17 +26,20 @@ use login_ng::{
     users::{get_user_by_name, os::unix::UserExt},
 };
 
-use std::{collections::{HashMap, hash_map::DefaultHasher}, ffi::OsString, sync::Arc};
 use std::hash::{Hash, Hasher};
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    ffi::OsString,
+    sync::Arc,
+};
 use thiserror::Error;
 
 use rsa::{
-    pkcs1::EncodeRsaPublicKey,
-    pkcs8::{DecodePrivateKey, LineEnding},
+    pkcs1::{DecodeRsaPrivateKey, EncodeRsaPublicKey, LineEnding},
     RsaPrivateKey, RsaPublicKey,
 };
 
-use crate::{mount::mount_all, security::*, result::*};
+use crate::{mount::mount_all, result::*, security::*};
 
 #[derive(Debug, Error)]
 pub enum ServiceError {
@@ -48,6 +51,9 @@ pub enum ServiceError {
 
     #[error("I/O error: {0}")]
     IOError(#[from] std::io::Error),
+
+    #[error("pkcs1 error: {0}")]
+    PKCS1Error(#[from] rsa::pkcs1::Error),
 }
 
 struct UserSession {
@@ -62,8 +68,8 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn new(rsa_pkcs8: &str) -> Self {
-        let priv_key = Arc::new(RsaPrivateKey::from_pkcs8_pem(rsa_pkcs8).unwrap());
+    pub fn new(key_string: &str) -> Self {
+        let priv_key = Arc::new(RsaPrivateKey::from_pkcs1_pem(key_string).unwrap());
         let pub_key = RsaPublicKey::from(priv_key.as_ref());
         let one_time_tokens = HashMap::new();
         let sessions = HashMap::new();
@@ -132,9 +138,11 @@ impl Service {
         let mut hasher = DefaultHasher::new();
         otp.hash(&mut hasher);
         match self.one_time_tokens.remove(&hasher.finish()) {
-            Some(stored) => if stored != otp {
-                return ServiceOperationResult::EncryptionError.into()
-            },
+            Some(stored) => {
+                if stored != otp {
+                    return ServiceOperationResult::EncryptionError.into();
+                }
+            }
             None => return ServiceOperationResult::EncryptionError.into(),
         }
 
