@@ -21,23 +21,29 @@ extern crate tokio;
 
 use std::fs::{self, create_dir, File};
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
+use pam_login_ng_common::mount::{MountAuth, MountAuthDBus};
 use pam_login_ng_common::rsa::pkcs1::EncodeRsaPrivateKey;
 use pam_login_ng_common::rsa::pkcs8::LineEnding;
 use tokio::signal::unix::{signal, SignalKind};
+use tokio::sync::RwLock;
 
 use std::os::unix::fs::PermissionsExt;
 
 use pam_login_ng_common::{
-    session::{Service, ServiceError},
-    login_ng::users,
-    zbus::connection,
+    login_ng::users, service::ServiceError, session::Sessions, zbus::connection,
 };
 
 #[tokio::main]
 async fn main() -> Result<(), ServiceError> {
     println!("Reading the private key...");
+
+    if users::get_current_uid() != 0 {
+        eprintln!("Application started without root privileges: aborting...");
+        return Err(ServiceError::MissingPrivilegesError);
+    }
 
     let file_name_str = "private_key_pkcs1.pem";
     let dir_path_str = "/etc/login_ng/";
@@ -107,11 +113,6 @@ async fn main() -> Result<(), ServiceError> {
         }
     };
 
-    if users::get_current_uid() != 0 {
-        eprintln!("Application started without root privileges: aborting...");
-        return Err(ServiceError::MissingPrivilegesError);
-    }
-
     match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
         Ok(value) => println!("Starting dbus service on socket {value}"),
         Err(err) => {
@@ -123,13 +124,31 @@ async fn main() -> Result<(), ServiceError> {
         }
     }
 
+    let mounts_auth = Arc::new(RwLock::new(MountAuth::default() /*load_from_file("").unwrap()*/));
+
     println!("Building the dbus object...");
 
-    let dbus_conn = connection::Builder::session()
+    let dbus_mounts_auth_con = connection::Builder::session()
         .map_err(ServiceError::ZbusError)?
-        .name("org.neroreflex.login_ng")
+        .name("org.neroreflex.login_ng_mount")
         .map_err(ServiceError::ZbusError)?
-        .serve_at("/org/zbus/login_ng", Service::new(contents.as_str()))
+        .serve_at(
+            "/org/zbus/login_ng_mount",
+            MountAuthDBus::new(PathBuf::from(dir_path.join("")), mounts_auth.clone()),
+        )
+        .map_err(ServiceError::ZbusError)?
+        .build()
+        .await
+        .map_err(ServiceError::ZbusError)?;
+
+    let dbus_session_conn = connection::Builder::session()
+        .map_err(ServiceError::ZbusError)?
+        .name("org.neroreflex.login_ng_session")
+        .map_err(ServiceError::ZbusError)?
+        .serve_at(
+            "/org/zbus/login_ng_session",
+            Sessions::new(mounts_auth, contents.as_str()),
+        )
         .map_err(ServiceError::ZbusError)?
         .build()
         .await
@@ -144,6 +163,8 @@ async fn main() -> Result<(), ServiceError> {
     // Wait for a SIGTERM signal
     sigterm.recv().await;
 
-    drop(dbus_conn);
+    drop(dbus_session_conn);
+    drop(dbus_mounts_auth_con);
+
     Ok(())
 }

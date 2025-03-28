@@ -20,13 +20,26 @@
 use sys_mount::{Mount, Unmount, UnmountDrop, UnmountFlags};
 
 use login_ng::mount::MountPoints;
+use tokio::sync::RwLock;
 
 use std::collections::HashMap;
+use std::fs::File;
+use std::ops::Deref;
+use std::path::PathBuf;
+use std::sync::Arc;
 use std::{fs::create_dir, path::Path};
 
-use zbus::{interface, Error as ZError};
+use std::io::{self, Write};
 
-use std::io;
+use serde::{Deserialize, Serialize};
+use serde_json;
+
+use crate::result::ServiceOperationResult;
+use crate::service::ServiceError;
+
+use zbus::interface;
+
+use tokio::time::{sleep, Duration};
 
 /// Mounts a filesystem at the specified path.
 ///
@@ -138,20 +151,47 @@ pub(crate) fn mount_all(
     mounted_devices
 }
 
-use serde::{Deserialize, Serialize};
-use serde_json;
-
 #[derive(Serialize, Deserialize, Default, Clone, PartialEq, Debug)]
 pub struct MountAuth {
     authorizations: HashMap<String, Vec<u64>>,
 }
 
 impl MountAuth {
-    pub fn load_from_file() -> Self {
-        todo!()
+    pub fn new(json_str: &str) -> Result<Self, ServiceError> {
+        let auth: MountAuth = serde_json::from_str(json_str)?;
+        Ok(auth)
     }
 
-    
+    pub fn load_from_file(file_path: &str) -> Result<Self, ServiceError> {
+        let json_str = std::fs::read_to_string(file_path)?;
+        Self::new(&json_str)
+    }
+
+    pub fn add_authorization(&mut self, username: String, hash: u64) {
+        self.authorizations
+            .entry(username)
+            .or_insert_with(Vec::new)
+            .push(hash);
+    }
+
+    pub fn authorized(&self, username: &str, hash: u64) -> bool {
+        let Some(values) = self.authorizations.get(&String::from(username)) else {
+            return false;
+        };
+
+        values.contains(&hash)
+    }
+}
+
+pub struct MountAuthDBus {
+    file_path: PathBuf,
+    mounts_auth: Arc<RwLock<MountAuth>>,
+}
+
+impl MountAuthDBus {
+    pub fn new(file_path: PathBuf, mounts_auth: Arc<RwLock<MountAuth>>) -> Self {
+        Self { file_path, mounts_auth }
+    }
 }
 
 #[interface(
@@ -161,12 +201,58 @@ impl MountAuth {
         default_path = "/org/zbus/login_ng_mount"
     )
 )]
-impl MountAuth {
-    pub fn is_authorized(&self, username: &str, hash: u64) -> bool {
-        let Some(values) = self.authorizations.get(&String::from(username)) else {
-            return false
+impl MountAuthDBus {
+    async fn authorize(&mut self, username: String, hash: u64) -> u32 {
+        let mut lock = self.mounts_auth
+            .write()
+            .await;
+
+        let prev = lock.clone();
+
+        lock.add_authorization(username, hash);
+
+        let mut file = match File::create(self.file_path.as_path()) {
+            Ok(file) => file,
+            Err(err) => {
+                eprintln!("Error opening mount authorizations file: {err}");
+
+                *lock = prev;
+
+                return ServiceOperationResult::CannotIdentifyUser.into()
+            }
         };
 
-        values.contains(&hash)
+        match file.write(serde_json::to_string(lock.deref()).unwrap().as_bytes()) {
+            Ok(_written) => (),
+            Err(err) => {
+                eprintln!("Error writing data to mount authorizations file: {err}");
+
+                *lock = prev;
+
+                return ServiceOperationResult::CannotIdentifyUser.into()
+            }
+        }
+
+        match file.flush() {
+            Ok(res) => res,
+            Err(err) => {
+                eprintln!("Error finalizing the mount authorizations file: {err}");
+
+                *lock = prev;
+
+                return ServiceOperationResult::CannotIdentifyUser.into()
+            }
+        }
+
+        drop(file);
+
+        ServiceOperationResult::Ok.into()
+    }
+
+    async fn check(&self, username: &str, hash: u64) -> bool {
+        // Defeat brute-force searches in an attempt to find an hash collision
+        sleep(Duration::from_secs(1)).await;
+
+        self.mounts_auth.read().await.authorized(username, hash)
     }
 }

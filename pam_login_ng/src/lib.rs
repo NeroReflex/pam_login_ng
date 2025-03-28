@@ -27,16 +27,16 @@ use pam::{
     pam_try,
 };
 use pam_login_ng_common::{
-    session::ServiceProxy,
-    zbus::{Connection, Result as ZResult},
-};
-use pam_login_ng_common::{
     login_ng::{
         storage::{load_user_auth_data, StorageSource},
         user::UserAuthData,
     },
     result::ServiceOperationResult,
     security::SessionPrelude,
+};
+use pam_login_ng_common::{
+    session::SessionsProxy,
+    zbus::{Connection, Result as ZResult},
 };
 
 use std::{ffi::CStr, sync::Once};
@@ -75,7 +75,7 @@ impl PamQuickEmbedded {
     ) -> ZResult<ServiceOperationResult> {
         let connection = Connection::session().await?;
 
-        let proxy = ServiceProxy::new(&connection).await?;
+        let proxy = SessionsProxy::new(&connection).await?;
 
         let pk = proxy.initiate_session().await?;
 
@@ -100,7 +100,7 @@ impl PamQuickEmbedded {
     pub(crate) async fn close_session_for_user(user: &String) -> ZResult<u32> {
         let connection = Connection::session().await?;
 
-        let proxy = ServiceProxy::new(&connection).await?;
+        let proxy = SessionsProxy::new(&connection).await?;
         let reply = proxy.close_user_session(user.as_str()).await?;
 
         Ok(reply)

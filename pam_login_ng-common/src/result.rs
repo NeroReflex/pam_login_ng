@@ -32,6 +32,7 @@ pub enum ServiceOperationResult {
     CannotIdentifyUser = 7,
     EmptyPubKey = 8,
     EncryptionError = 9,
+    UnauthorizedMount = 10,
     Unknown,
 }
 
@@ -48,6 +49,7 @@ impl fmt::Display for ServiceOperationResult {
             ServiceOperationResult::CannotIdentifyUser => "Cannot Identify User",
             ServiceOperationResult::EmptyPubKey => "Empty Public Key",
             ServiceOperationResult::EncryptionError => "Encryption error",
+            ServiceOperationResult::UnauthorizedMount => "Unauthorized mount attempted",
             ServiceOperationResult::Unknown => "Unknown Error",
         };
         write!(f, "{}", result_str)
@@ -73,6 +75,7 @@ impl From<u32> for ServiceOperationResult {
             7 => ServiceOperationResult::CannotIdentifyUser,
             8 => ServiceOperationResult::EmptyPubKey,
             9 => ServiceOperationResult::EncryptionError,
+            10 => ServiceOperationResult::UnauthorizedMount,
             _ => ServiceOperationResult::Unknown,
         }
     }

@@ -17,7 +17,8 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use zbus::{interface, Error as ZError};
+use tokio::sync::RwLock;
+use zbus::interface;
 
 use sys_mount::{Mount, UnmountDrop};
 
@@ -32,49 +33,39 @@ use std::{
     ffi::OsString,
     sync::Arc,
 };
-use thiserror::Error;
 
 use rsa::{
     pkcs1::{DecodeRsaPrivateKey, EncodeRsaPublicKey, LineEnding},
     RsaPrivateKey, RsaPublicKey,
 };
 
-use crate::{mount::{mount_all, MountAuth}, result::*, security::*};
-
-#[derive(Debug, Error)]
-pub enum ServiceError {
-    #[error("Permission error: not running as the root user")]
-    MissingPrivilegesError,
-
-    #[error("DBus error: {0}")]
-    ZbusError(#[from] ZError),
-
-    #[error("I/O error: {0}")]
-    IOError(#[from] std::io::Error),
-
-    #[error("pkcs1 error: {0}")]
-    PKCS1Error(#[from] rsa::pkcs1::Error),
-}
+use crate::{
+    mount::{mount_all, MountAuth},
+    result::*,
+    security::*,
+};
 
 struct UserSession {
     _mounts: Vec<UnmountDrop<Mount>>,
 }
 
-pub struct Service {
+pub struct Sessions {
+    mounts_auth: Arc<RwLock<MountAuth>>,
     priv_key: Arc<RsaPrivateKey>,
     pub_key: RsaPublicKey,
     one_time_tokens: HashMap<u64, Vec<u8>>,
     sessions: HashMap<OsString, UserSession>,
 }
 
-impl Service {
-    pub fn new(key_string: &str) -> Self {
+impl Sessions {
+    pub fn new(mounts_auth: Arc<RwLock<MountAuth>>, key_string: &str) -> Self {
         let priv_key = Arc::new(RsaPrivateKey::from_pkcs1_pem(key_string).unwrap());
         let pub_key = RsaPublicKey::from(priv_key.as_ref());
         let one_time_tokens = HashMap::new();
         let sessions = HashMap::new();
 
         Self {
+            mounts_auth,
             priv_key,
             pub_key,
             one_time_tokens,
@@ -84,13 +75,13 @@ impl Service {
 }
 
 #[interface(
-    name = "org.neroreflex.login_ng_session",
+    name = "org.neroreflex.login_ng_session1",
     proxy(
-        default_service = "org.neroreflex.login_ng",
-        default_path = "/org/zbus/login_ng"
+        default_service = "org.neroreflex.login_ng_session",
+        default_path = "/org/zbus/login_ng_session"
     )
 )]
-impl Service {
+impl Sessions {
     async fn initiate_session(&mut self) -> String {
         let pub_pkcs1_pem = match self.pub_key.to_pkcs1_pem(LineEnding::CRLF) {
             Ok(key) => key,
@@ -157,13 +148,19 @@ impl Service {
         // mount every directory in order or throw an error
         let mounted_devices = match user_mounts {
             Some(mounts) => {
-                // TODO: check for the mount to be approved by root
+                // Check for the mount to be approved by root
                 // otherwise the user might mount everything he wants to
                 // with every dmask, potentially compromising the
                 // security and integrity of the whole system.
-                let mount_authorizations = MountAuth::load_from_file();
-                /*mounts.hash()
-                username*/
+                let authorized = self
+                    .mounts_auth
+                    .read()
+                    .await
+                    .authorized(username, mounts.hash());
+                if !authorized {
+                    eprintln!("User {username} attempted an unauthorized mount.");
+                    return ServiceOperationResult::UnauthorizedMount.into();
+                }
 
                 let mounted_devices = mount_all(
                     mounts,
@@ -203,7 +200,7 @@ impl Service {
             user.name().to_string_lossy()
         );
 
-        return ServiceOperationResult::Ok.into();
+        ServiceOperationResult::Ok.into()
     }
 
     async fn close_user_session(&mut self, user: &str) -> u32 {
@@ -225,6 +222,6 @@ impl Service {
 
         println!("Successfully closed session for user '{username}'");
 
-        return ServiceOperationResult::Ok.into();
+        ServiceOperationResult::Ok.into()
     }
 }
