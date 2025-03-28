@@ -38,10 +38,8 @@ use pam_login_ng_common::{
 
 #[tokio::main]
 async fn main() -> Result<(), ServiceError> {
-    println!("Reading the private key...");
-
     if users::get_current_uid() != 0 {
-        eprintln!("Application started without root privileges: aborting...");
+        eprintln!("🚫 Application started without root privileges: aborting...");
         return Err(ServiceError::MissingPrivilegesError);
     }
 
@@ -52,7 +50,7 @@ async fn main() -> Result<(), ServiceError> {
     if !dir_path.exists() {
         match create_dir(dir_path) {
             Ok(_) => {
-                println!("Directory {dir_path_str} created");
+                println!("📁 Directory {dir_path_str} created");
 
                 let mut permissions = fs::metadata(dir_path)?.permissions();
                 permissions.set_mode(0o700);
@@ -60,7 +58,7 @@ async fn main() -> Result<(), ServiceError> {
                 fs::set_permissions(dir_path, permissions)?;
             }
             Err(err) => {
-                eprintln!("Could not create directory {dir_path_str}: {err}");
+                eprintln!("❌ Could not create directory {dir_path_str}: {err}");
             }
         }
     }
@@ -73,12 +71,14 @@ async fn main() -> Result<(), ServiceError> {
 
             let mut file = File::open(file_path)?;
             let read = file.read_to_string(&mut contents)?;
-            println!("Read private key file of {read} bytes");
+            println!("📖 Read private key file of {read} bytes");
 
             contents
         }
         false => {
-            eprintln!("File {dir_path_str}/{file_name_str} not found: a new one will be generated");
+            eprintln!(
+                "🖊️ File {dir_path_str}/{file_name_str} not found: a new one will be generated..."
+            );
 
             let mut rng = pam_login_ng_common::rand::thread_rng();
             let priv_key = pam_login_ng_common::rsa::RsaPrivateKey::new(&mut rng, 4096)
@@ -96,11 +96,11 @@ async fn main() -> Result<(), ServiceError> {
                     match file.write_all(format!("{}", contents).as_bytes()) {
                         Ok(_) => {
                             println!(
-                                "Generated key has been saved to {dir_path_str}/{file_name_str}"
+                                "✅ Generated key has been saved to {dir_path_str}/{file_name_str}"
                             )
                         }
                         Err(err) => {
-                            eprintln!("Failed to write the generated key to {dir_path_str}/{file_name_str}: {err}")
+                            eprintln!("❌ Failed to write the generated key to {dir_path_str}/{file_name_str}: {err}")
                         }
                     };
                 }
@@ -116,7 +116,7 @@ async fn main() -> Result<(), ServiceError> {
     match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
         Ok(value) => println!("Starting dbus service on socket {value}"),
         Err(err) => {
-            eprintln!("Couldn't read dbus socket address: {err} - using default...");
+            eprintln!("🟠 Couldn't read dbus socket address: {err} - using default...");
             std::env::set_var(
                 "DBUS_SESSION_BUS_ADDRESS",
                 "unix:path=/run/dbus/system_bus_socket",
@@ -124,9 +124,11 @@ async fn main() -> Result<(), ServiceError> {
         }
     }
 
-    let mounts_auth = Arc::new(RwLock::new(MountAuth::default() /*load_from_file("").unwrap()*/));
+    let mounts_auth = Arc::new(RwLock::new(
+        MountAuth::default(), /*load_from_file("").unwrap()*/
+    ));
 
-    println!("Building the dbus object...");
+    println!("🔧 Building the dbus object...");
 
     let dbus_mounts_auth_con = connection::Builder::session()
         .map_err(ServiceError::ZbusError)?
@@ -134,7 +136,10 @@ async fn main() -> Result<(), ServiceError> {
         .map_err(ServiceError::ZbusError)?
         .serve_at(
             "/org/zbus/login_ng_mount",
-            MountAuthDBus::new(PathBuf::from(dir_path.join("")), mounts_auth.clone()),
+            MountAuthDBus::new(
+                PathBuf::from(dir_path.join("authorized_mounts.json")),
+                mounts_auth.clone(),
+            ),
         )
         .map_err(ServiceError::ZbusError)?
         .build()
@@ -154,7 +159,7 @@ async fn main() -> Result<(), ServiceError> {
         .await
         .map_err(ServiceError::ZbusError)?;
 
-    println!("Application running");
+    println!("🔄 Application running");
 
     // Create a signal listener for SIGTERM
     let mut sigterm =

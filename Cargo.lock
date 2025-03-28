@@ -1093,6 +1093,7 @@ dependencies = [
 name = "pam_login_ng"
 version = "0.1.0"
 dependencies = [
+ "argh",
  "pam",
  "pam_login_ng_common",
  "thiserror 2.0.11",

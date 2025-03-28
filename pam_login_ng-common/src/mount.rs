@@ -190,7 +190,10 @@ pub struct MountAuthDBus {
 
 impl MountAuthDBus {
     pub fn new(file_path: PathBuf, mounts_auth: Arc<RwLock<MountAuth>>) -> Self {
-        Self { file_path, mounts_auth }
+        Self {
+            file_path,
+            mounts_auth,
+        }
     }
 }
 
@@ -203,46 +206,46 @@ impl MountAuthDBus {
 )]
 impl MountAuthDBus {
     async fn authorize(&mut self, username: String, hash: u64) -> u32 {
-        let mut lock = self.mounts_auth
-            .write()
-            .await;
+        let mut lock = self.mounts_auth.write().await;
 
         let prev = lock.clone();
 
-        lock.add_authorization(username, hash);
+        lock.add_authorization(username.clone(), hash);
 
         let mut file = match File::create(self.file_path.as_path()) {
             Ok(file) => file,
             Err(err) => {
-                eprintln!("Error opening mount authorizations file: {err}");
+                eprintln!("❌ Error opening mount authorizations file: {err}");
 
                 *lock = prev;
 
-                return ServiceOperationResult::CannotIdentifyUser.into()
+                return ServiceOperationResult::CannotIdentifyUser.into();
             }
         };
 
-        match file.write(serde_json::to_string(lock.deref()).unwrap().as_bytes()) {
+        match file.write((serde_json::to_string_pretty(lock.deref()).unwrap() + "\n").as_bytes()) {
             Ok(_written) => (),
             Err(err) => {
-                eprintln!("Error writing data to mount authorizations file: {err}");
+                eprintln!("❌ Error writing data to mount authorizations file: {err}");
 
                 *lock = prev;
 
-                return ServiceOperationResult::CannotIdentifyUser.into()
+                return ServiceOperationResult::CannotIdentifyUser.into();
             }
         }
 
         match file.flush() {
             Ok(res) => res,
             Err(err) => {
-                eprintln!("Error finalizing the mount authorizations file: {err}");
+                eprintln!("❌ Error finalizing the mount authorizations file: {err}");
 
                 *lock = prev;
 
-                return ServiceOperationResult::CannotIdentifyUser.into()
+                return ServiceOperationResult::CannotIdentifyUser.into();
             }
         }
+
+        println!("✅ New mount authorized to user {username}");
 
         drop(file);
 

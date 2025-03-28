@@ -12,8 +12,13 @@ crate-type = ["cdylib"]
 name = "pam_login_ng-service"
 path = "src/pam_login_ng-service/main.rs"
 
+[[bin]]
+name = "pam_login_ng-mount"
+path = "src/pam_login_ng-mount/main.rs"
+
 [dependencies]
 pam_login_ng_common = { path = "../pam_login_ng-common" }
+argh = "^0.1"
 pam = { git = "https://github.com/NeroReflex/pam-rs.git" }
 tokio = { version = "^1.43", features = ["macros", "rt-multi-thread", "sync", "signal"] }
 thiserror = "2.0.11"
