@@ -30,7 +30,7 @@ use tokio::signal::unix::{signal, SignalKind};
 use std::os::unix::fs::PermissionsExt;
 
 use pam_login_ng_common::{
-    dbus::{Service, ServiceError},
+    session::{Service, ServiceError},
     login_ng::users,
     zbus::connection,
 };
@@ -127,7 +127,7 @@ async fn main() -> Result<(), ServiceError> {
 
     let dbus_conn = connection::Builder::session()
         .map_err(ServiceError::ZbusError)?
-        .name("org.zbus.login_ng")
+        .name("org.neroreflex.login_ng")
         .map_err(ServiceError::ZbusError)?
         .serve_at("/org/zbus/login_ng", Service::new(contents.as_str()))
         .map_err(ServiceError::ZbusError)?

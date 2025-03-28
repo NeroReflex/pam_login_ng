@@ -24,7 +24,7 @@ pub extern crate serde;
 pub extern crate serde_json;
 pub extern crate zbus;
 
-pub mod dbus;
+pub mod session;
 pub mod mount;
 pub mod result;
 pub mod security;

@@ -21,7 +21,10 @@ use sys_mount::{Mount, Unmount, UnmountDrop, UnmountFlags};
 
 use login_ng::mount::MountPoints;
 
+use std::collections::HashMap;
 use std::{fs::create_dir, path::Path};
+
+use zbus::{interface, Error as ZError};
 
 use std::io;
 
@@ -133,4 +136,37 @@ pub(crate) fn mount_all(
     }
 
     mounted_devices
+}
+
+use serde::{Deserialize, Serialize};
+use serde_json;
+
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq, Debug)]
+pub struct MountAuth {
+    authorizations: HashMap<String, Vec<u64>>,
+}
+
+impl MountAuth {
+    pub fn load_from_file() -> Self {
+        todo!()
+    }
+
+    
+}
+
+#[interface(
+    name = "org.neroreflex.login_ng_mount1",
+    proxy(
+        default_service = "org.neroreflex.login_ng_mount",
+        default_path = "/org/zbus/login_ng_mount"
+    )
+)]
+impl MountAuth {
+    pub fn is_authorized(&self, username: &str, hash: u64) -> bool {
+        let Some(values) = self.authorizations.get(&String::from(username)) else {
+            return false
+        };
+
+        values.contains(&hash)
+    }
 }

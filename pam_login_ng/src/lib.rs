@@ -27,7 +27,7 @@ use pam::{
     pam_try,
 };
 use pam_login_ng_common::{
-    dbus::ServiceProxy,
+    session::ServiceProxy,
     zbus::{Connection, Result as ZResult},
 };
 use pam_login_ng_common::{

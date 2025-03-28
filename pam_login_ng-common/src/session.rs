@@ -39,7 +39,7 @@ use rsa::{
     RsaPrivateKey, RsaPublicKey,
 };
 
-use crate::{mount::mount_all, result::*, security::*};
+use crate::{mount::{mount_all, MountAuth}, result::*, security::*};
 
 #[derive(Debug, Error)]
 pub enum ServiceError {
@@ -84,9 +84,9 @@ impl Service {
 }
 
 #[interface(
-    name = "org.zbus.login_ng1",
+    name = "org.neroreflex.login_ng_session",
     proxy(
-        default_service = "org.zbus.login_ng",
+        default_service = "org.neroreflex.login_ng",
         default_path = "/org/zbus/login_ng"
     )
 )]
@@ -113,12 +113,12 @@ impl Service {
         session.to_string()
     }
 
-    async fn open_user_session(&mut self, user: &str, password: Vec<u8>) -> u32 {
-        println!("Requested session for user '{user}' to be opened");
+    async fn open_user_session(&mut self, username: &str, password: Vec<u8>) -> u32 {
+        println!("Requested session for user '{username}' to be opened");
 
-        let source = login_ng::storage::StorageSource::Username(String::from(user));
+        let source = login_ng::storage::StorageSource::Username(String::from(username));
 
-        let Some(user) = get_user_by_name(user) else {
+        let Some(user) = get_user_by_name(username) else {
             return ServiceOperationResult::CannotIdentifyUser.into();
         };
 
@@ -154,14 +154,17 @@ impl Service {
             }
         };
 
-        // TODO: check for the mount to be approved by root
-        // otherwise the user might mount everything he wants to
-        // with every dmask, potentially compromising the
-        // security and integrity of the whole system.
-
         // mount every directory in order or throw an error
         let mounted_devices = match user_mounts {
             Some(mounts) => {
+                // TODO: check for the mount to be approved by root
+                // otherwise the user might mount everything he wants to
+                // with every dmask, potentially compromising the
+                // security and integrity of the whole system.
+                let mount_authorizations = MountAuth::load_from_file();
+                /*mounts.hash()
+                username*/
+
                 let mounted_devices = mount_all(
                     mounts,
                     user.name().to_string_lossy().to_string(),
