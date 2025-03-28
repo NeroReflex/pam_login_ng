@@ -53,16 +53,6 @@ use std::io;
 /// - The specified mount path does not exist and cannot be created due to permission issues.
 /// - The mount operation fails due to invalid parameters or system errors.
 ///
-/// # Example
-///
-/// ```rust
-/// let mount_data = (String::from("ext4"), String::from("rw"), String::from("/dev/sda1"), String::from("/mnt/my_mount"));
-/// match mount(mount_data) {
-///     Ok(mount) => println!("Mounted successfully: {:?}", mount),
-///     Err(e) => eprintln!("Failed to mount: {}", e),
-/// }
-/// ```
-///
 fn mount(data: (String, String, String, String)) -> io::Result<Mount> {
     let mount_path = Path::new(data.3.as_str());
     if !mount_path.exists() || !mount_path.is_dir() {
