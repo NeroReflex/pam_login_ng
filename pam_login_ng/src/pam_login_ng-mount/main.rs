@@ -23,6 +23,7 @@ use std::path::PathBuf;
 
 use pam_login_ng_common::login_ng::storage::{load_user_mountpoints, StorageSource};
 use pam_login_ng_common::mount::MountAuthDBusProxy;
+use pam_login_ng_common::result::ServiceOperationResult;
 use pam_login_ng_common::zbus::Connection;
 
 use pam_login_ng_common::service::ServiceError;
@@ -109,12 +110,16 @@ async fn main() -> Result<(), ServiceError> {
                 std::process::exit(-1)
             };
 
-            proxy
+            let reply = proxy
                 .authorize(auth_data.username.clone(), loaded_mounts.hash())
-                .await
-                .unwrap();
+                .await?;
 
-            ()
+            let result = ServiceOperationResult::from(reply);
+
+            if result != ServiceOperationResult::Ok {
+                eprintln!("Error in authorizing the user mouunt: {result}");
+                std::process::exit(-1)
+            }
         }
     };
 
