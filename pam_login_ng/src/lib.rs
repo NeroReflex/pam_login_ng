@@ -29,7 +29,8 @@ use pam::{
 use pam_login_ng_common::{
     login_ng::{
         storage::{load_user_auth_data, StorageSource},
-        user::UserAuthData, users::{gid_t, uid_t},
+        user::UserAuthData,
+        users::{gid_t, uid_t},
     },
     result::ServiceOperationResult,
     security::SessionPrelude,
@@ -263,7 +264,7 @@ impl PamHooks for PamQuickEmbedded {
                                         Ok(_) => {
                                             pamh.log(
                                                 pam::module::LogLevel::Info,
-                                                format!("login_ng: open_session: session opened and XDG_RUNTIME_DIR set"),
+                                                "login_ng: open_session: session opened and XDG_RUNTIME_DIR set".to_string(),
                                             );
                                         },
                                         Err(err) => {

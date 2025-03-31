@@ -104,7 +104,11 @@ impl Sessions {
         session.to_string()
     }
 
-    async fn open_user_session(&mut self, username: &str, password: Vec<u8>) -> (u32, uid_t, gid_t) {
+    async fn open_user_session(
+        &mut self,
+        username: &str,
+        password: Vec<u8>,
+    ) -> (u32, uid_t, gid_t) {
         println!("Requested session for user '{username}' to be opened");
 
         let source = login_ng::storage::StorageSource::Username(String::from(username));
@@ -141,7 +145,11 @@ impl Sessions {
             Ok(user_cfg) => user_cfg,
             Err(err) => {
                 eprintln!("❌ Error loading user mount data: {err}");
-                return (ServiceOperationResult::CannotLoadUserMountError.into(), 0, 0);
+                return (
+                    ServiceOperationResult::CannotLoadUserMountError.into(),
+                    0,
+                    0,
+                );
             }
         };
 
@@ -184,7 +192,11 @@ impl Sessions {
 
         println!("✅ Successfully opened session for user {username}");
 
-        (ServiceOperationResult::Ok.into(), user.uid(), user.primary_group_id())
+        (
+            ServiceOperationResult::Ok.into(),
+            user.uid(),
+            user.primary_group_id(),
+        )
     }
 
     async fn close_user_session(&mut self, user: &str) -> u32 {

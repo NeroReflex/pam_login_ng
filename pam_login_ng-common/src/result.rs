@@ -56,9 +56,9 @@ impl fmt::Display for ServiceOperationResult {
     }
 }
 
-impl Into<u32> for ServiceOperationResult {
-    fn into(self) -> u32 {
-        self as u32
+impl From<ServiceOperationResult> for u32 {
+    fn from(val: ServiceOperationResult) -> Self {
+        val as u32
     }
 }
 

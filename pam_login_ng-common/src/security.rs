@@ -119,13 +119,13 @@ impl SessionPrelude {
 
         let mut rng = rand::thread_rng();
 
-        Ok(pubkey
+        pubkey
             .encrypt(
                 &mut rng,
                 Pkcs1v15Encrypt,
                 combine(self.one_time_token.clone(), plain_vec).as_slice(),
             )
-            .map_err(SessionPreludeError::RSAError)?)
+            .map_err(SessionPreludeError::RSAError)
     }
 
     pub fn decrypt(

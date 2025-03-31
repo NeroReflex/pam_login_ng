@@ -68,7 +68,7 @@ fn test_main_password_serialization() {
 fn test_secondary_password_serialization() {
     let correct_main = "main password <3".to_string();
     let intermediate = "intermediate_key".to_string();
-    let secondary_passwords = [format!("daisujda"), format!("sfaffsss")];
+    let secondary_passwords = ["daisujda".to_string(), "sfaffsss".to_string()];
 
     let dir_name = "test2";
     let source = crate::storage::StorageSource::Path(std::path::PathBuf::from(dir_name));

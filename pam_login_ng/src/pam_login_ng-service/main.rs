@@ -21,7 +21,7 @@ extern crate tokio;
 
 use std::fs::{self, create_dir, File};
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use pam_login_ng_common::mount::{MountAuth, MountAuthDBus};
@@ -93,7 +93,7 @@ async fn main() -> Result<(), ServiceError> {
                     perm.set_mode(0o700);
 
                     fs::set_permissions(file_path, perm)?;
-                    match file.write_all(format!("{}", contents).as_bytes()) {
+                    match file.write_all(contents.to_string().as_bytes()) {
                         Ok(_) => {
                             println!(
                                 "✅ Generated key has been saved to {dir_path_str}/{file_name_str}"
@@ -136,10 +136,7 @@ async fn main() -> Result<(), ServiceError> {
         .map_err(ServiceError::ZbusError)?
         .serve_at(
             "/org/zbus/login_ng_mount",
-            MountAuthDBus::new(
-                PathBuf::from(dir_path.join("authorized_mounts.json")),
-                mounts_auth.clone(),
-            ),
+            MountAuthDBus::new(dir_path.join("authorized_mounts.json"), mounts_auth.clone()),
         )
         .map_err(ServiceError::ZbusError)?
         .build()

@@ -117,9 +117,9 @@ pub(crate) fn mount_xdg(
     }
 
     let mount_data = (
-        format!("tmpfs"),
+        "tmpfs".to_string(),
         format!("uid={uid},gid={gid}"),
-        format!("tmpfs"),
+        "tmpfs".to_string(),
         user_xdg_path.as_os_str(),
     );
     match mount(mount_data) {
@@ -129,7 +129,7 @@ pub(crate) fn mount_xdg(
                 "❌ Error mounting the xdg path for user {username} ({}): {err}",
                 user_xdg_path.as_os_str().to_string_lossy()
             );
-            return None;
+            None
         }
     }
 }
@@ -226,10 +226,7 @@ impl MountAuth {
     }
 
     pub fn add_authorization(&mut self, username: String, hash: u64) {
-        self.authorizations
-            .entry(username)
-            .or_insert_with(Vec::new)
-            .push(hash);
+        self.authorizations.entry(username).or_default().push(hash);
     }
 
     pub fn authorized(&self, username: &str, hash: u64) -> bool {

@@ -40,7 +40,7 @@ fn test_autologin() {
 fn test_secondary() {
     let correct_main = "main password <3".to_string();
     let intermediate = "intermediate_key".to_string();
-    let secondary_passwords = [format!("daisujda"), format!("sfaffsss")];
+    let secondary_passwords = ["daisujda".to_string(), "sfaffsss".to_string()];
 
     let mut user_cfg = crate::user::UserAuthData::new();
     user_cfg.set_main(&correct_main, &intermediate).unwrap();
