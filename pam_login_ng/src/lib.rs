@@ -29,7 +29,7 @@ use pam::{
 use pam_login_ng_common::{
     login_ng::{
         storage::{load_user_auth_data, StorageSource},
-        user::UserAuthData,
+        user::UserAuthData, users::{gid_t, uid_t},
     },
     result::ServiceOperationResult,
     security::SessionPrelude,
@@ -39,7 +39,7 @@ use pam_login_ng_common::{
     zbus::{Connection, Result as ZResult},
 };
 
-use std::{ffi::CStr, sync::Once};
+use std::{borrow::Cow, ffi::CStr, path::PathBuf, sync::Once};
 use tokio::runtime::Runtime;
 
 static INIT: Once = Once::new();
@@ -72,7 +72,7 @@ impl PamQuickEmbedded {
     pub(crate) async fn open_session_for_user(
         user: &String,
         plain_main_password: String,
-    ) -> ZResult<ServiceOperationResult> {
+    ) -> ZResult<(ServiceOperationResult, uid_t, gid_t)> {
         let connection = Connection::session().await?;
 
         let proxy = SessionsProxy::new(&connection).await?;
@@ -81,20 +81,20 @@ impl PamQuickEmbedded {
 
         // return an unknown error if the service was unable to serialize the RSA public key
         if pk.is_empty() {
-            return Ok(ServiceOperationResult::EmptyPubKey);
+            return Ok((ServiceOperationResult::EmptyPubKey, 0, 0));
         }
 
         let session_prelude = SessionPrelude::from_string(pk.as_str());
 
         let Ok(encrypted_password) = session_prelude.encrypt(plain_main_password) else {
-            return Ok(ServiceOperationResult::EncryptionError);
+            return Ok((ServiceOperationResult::EncryptionError, 0, 0));
         };
 
         let reply = proxy
             .open_user_session(user.as_str(), encrypted_password)
             .await?;
 
-        Ok(ServiceOperationResult::from(reply))
+        Ok((ServiceOperationResult::from(reply.0), reply.1, reply.2))
     }
 
     pub(crate) async fn close_session_for_user(user: &String) -> ZResult<u32> {
@@ -236,7 +236,6 @@ impl PamHooks for PamQuickEmbedded {
             pam::module::LogLevel::Debug,
             format!("login_ng: open_session: loaded data for user {username}"),
         );
-        // TODO: set environment variables
 
         unsafe {
             match &RUNTIME {
@@ -248,12 +247,32 @@ impl PamHooks for PamQuickEmbedded {
                     .await
                     {
                         Ok(result) => {
-                            match result {
+                            match result.0 {
                                 ServiceOperationResult::Ok => {
                                     pamh.log(
                                         pam::module::LogLevel::Info,
                                         "login_ng: open_session: pam_login_ng-service was successful".to_string(),
                                     );
+
+                                    let uid = result.1;
+                                    let _gid = result.2;
+
+                                    let xdg_user_path = PathBuf::from(pam_login_ng_common::XDG_RUNTIME_DIR_PATH).join(format!("{uid}"));
+
+                                    match pamh.env_set(Cow::from("XDG_RUNTIME_DIR"), xdg_user_path.to_string_lossy()) {
+                                        Ok(_) => {
+                                            pamh.log(
+                                                pam::module::LogLevel::Info,
+                                                format!("login_ng: open_session: session opened and XDG_RUNTIME_DIR set"),
+                                            );
+                                        },
+                                        Err(err) => {
+                                            pamh.log(
+                                                pam::module::LogLevel::Warning,
+                                                format!("login_ng: open_session: could not set XDG_RUNTIME_DIR: {err}"),
+                                            );
+                                        }
+                                    }
 
                                     PamResultCode::PAM_SUCCESS
                                 },

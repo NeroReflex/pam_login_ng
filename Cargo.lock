@@ -1067,7 +1067,7 @@ dependencies = [
 [[package]]
 name = "pam"
 version = "0.1.1"
-source = "git+https://github.com/NeroReflex/pam-rs.git#ec92f8ae87b3420d63fa7fd4366a6a8403eff028"
+source = "git+https://github.com/NeroReflex/pam-rs.git?rev=ec92f8ae87b3420d63fa7fd4366a6a8403eff028#ec92f8ae87b3420d63fa7fd4366a6a8403eff028"
 dependencies = [
  "libc",
  "strum",

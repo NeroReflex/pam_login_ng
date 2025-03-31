@@ -24,7 +24,7 @@ use sys_mount::{Mount, UnmountDrop};
 
 use login_ng::{
     storage::load_user_mountpoints,
-    users::{get_user_by_name, os::unix::UserExt},
+    users::{get_user_by_name, gid_t, os::unix::UserExt, uid_t},
 };
 
 use std::hash::{Hash, Hasher};
@@ -104,24 +104,24 @@ impl Sessions {
         session.to_string()
     }
 
-    async fn open_user_session(&mut self, username: &str, password: Vec<u8>) -> u32 {
+    async fn open_user_session(&mut self, username: &str, password: Vec<u8>) -> (u32, uid_t, gid_t) {
         println!("Requested session for user '{username}' to be opened");
 
         let source = login_ng::storage::StorageSource::Username(String::from(username));
 
         let Some(user) = get_user_by_name(username) else {
-            return ServiceOperationResult::CannotIdentifyUser.into();
+            return (ServiceOperationResult::CannotIdentifyUser.into(), 0, 0);
         };
 
         if self.sessions.contains_key(&user.name().to_os_string()) {
-            return ServiceOperationResult::SessionAlreadyOpened.into();
+            return (ServiceOperationResult::SessionAlreadyOpened.into(), 0, 0);
         }
 
         let (otp, password) = match SessionPrelude::decrypt(self.priv_key.clone(), password) {
             Ok(result) => result,
             Err(err) => {
                 eprintln!("Failed to decrypt data: {err}");
-                return ServiceOperationResult::DataDecryptionFailed.into();
+                return (ServiceOperationResult::DataDecryptionFailed.into(), 0, 0);
             }
         };
 
@@ -131,17 +131,17 @@ impl Sessions {
         match self.one_time_tokens.remove(&hasher.finish()) {
             Some(stored) => {
                 if stored != otp {
-                    return ServiceOperationResult::EncryptionError.into();
+                    return (ServiceOperationResult::EncryptionError.into(), 0, 0);
                 }
             }
-            None => return ServiceOperationResult::EncryptionError.into(),
+            None => return (ServiceOperationResult::EncryptionError.into(), 0, 0),
         }
 
         let user_mounts = match load_user_mountpoints(&source) {
             Ok(user_cfg) => user_cfg,
             Err(err) => {
                 eprintln!("❌ Error loading user mount data: {err}");
-                return ServiceOperationResult::CannotLoadUserMountError.into();
+                return (ServiceOperationResult::CannotLoadUserMountError.into(), 0, 0);
             }
         };
 
@@ -157,7 +157,7 @@ impl Sessions {
                 .authorized(username, mounts.hash())
             {
                 eprintln!("🚫 User {username} attempted an unauthorized mount.");
-                return ServiceOperationResult::UnauthorizedMount.into();
+                return (ServiceOperationResult::UnauthorizedMount.into(), 0, 0);
             }
         };
 
@@ -172,7 +172,7 @@ impl Sessions {
         if mounted_devices.is_empty() {
             eprintln!("❌ Error mounting one or more devices for user {username}");
 
-            return ServiceOperationResult::MountError.into();
+            return (ServiceOperationResult::MountError.into(), 0, 0);
         }
 
         let user_session = UserSession {
@@ -184,7 +184,7 @@ impl Sessions {
 
         println!("✅ Successfully opened session for user {username}");
 
-        ServiceOperationResult::Ok.into()
+        (ServiceOperationResult::Ok.into(), user.uid(), user.primary_group_id())
     }
 
     async fn close_user_session(&mut self, user: &str) -> u32 {
