@@ -29,3 +29,5 @@ pub mod result;
 pub mod security;
 pub mod service;
 pub mod session;
+
+pub const XDG_RUNTIME_DIR_PATH: &str = "/tmp/xdg/";

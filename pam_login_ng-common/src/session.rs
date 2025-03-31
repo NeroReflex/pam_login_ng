@@ -86,7 +86,7 @@ impl Sessions {
         let pub_pkcs1_pem = match self.pub_key.to_pkcs1_pem(LineEnding::CRLF) {
             Ok(key) => key,
             Err(err) => {
-                println!("failed to serialize the RSA key: {err}");
+                println!("❌ Error serializing the RSA key: {err}");
                 return String::new();
             }
         };
@@ -140,53 +140,40 @@ impl Sessions {
         let user_mounts = match load_user_mountpoints(&source) {
             Ok(user_cfg) => user_cfg,
             Err(err) => {
-                eprintln!("Failed to load user mount data: {err}");
+                eprintln!("❌ Error loading user mount data: {err}");
                 return ServiceOperationResult::CannotLoadUserMountError.into();
             }
         };
 
-        // mount every directory in order or throw an error
-        let mounted_devices = match user_mounts {
-            Some(mounts) => {
-                // Check for the mount to be approved by root
-                // otherwise the user might mount everything he wants to
-                // with every dmask, potentially compromising the
-                // security and integrity of the whole system.
-                let authorized = self
-                    .mounts_auth
-                    .read()
-                    .await
-                    .authorized(username, mounts.hash());
-                if !authorized {
-                    eprintln!("User {username} attempted an unauthorized mount.");
-                    return ServiceOperationResult::UnauthorizedMount.into();
-                }
-
-                let mounted_devices = mount_all(
-                    mounts,
-                    user.name().to_string_lossy().to_string(),
-                    user.home_dir().as_os_str().to_string_lossy().to_string(),
-                );
-
-                if mounted_devices.is_empty() {
-                    eprintln!(
-                        "Failed to mount one or more devices for user '{}'",
-                        user.name().to_string_lossy()
-                    );
-
-                    return ServiceOperationResult::MountError.into();
-                }
-
-                println!(
-                    "Successfully mounted {} device for user '{}'",
-                    mounted_devices.len(),
-                    user.name().to_string_lossy()
-                );
-
-                mounted_devices
+        // Check for the mount to be approved by root
+        // otherwise the user might mount everything he wants to
+        // with every dmask, potentially compromising the
+        // security and integrity of the whole system.
+        if let Some(mounts) = user_mounts.clone() {
+            if !self
+                .mounts_auth
+                .read()
+                .await
+                .authorized(username, mounts.hash())
+            {
+                eprintln!("🚫 User {username} attempted an unauthorized mount.");
+                return ServiceOperationResult::UnauthorizedMount.into();
             }
-            None => vec![],
         };
+
+        let mounted_devices = mount_all(
+            user_mounts,
+            user.uid(),
+            user.primary_group_id(),
+            user.name().to_string_lossy().to_string(),
+            user.home_dir().as_os_str().to_string_lossy().to_string(),
+        );
+
+        if mounted_devices.is_empty() {
+            eprintln!("❌ Error mounting one or more devices for user {username}");
+
+            return ServiceOperationResult::MountError.into();
+        }
 
         let user_session = UserSession {
             _mounts: mounted_devices,
@@ -195,10 +182,7 @@ impl Sessions {
         self.sessions
             .insert(user.name().to_os_string(), user_session);
 
-        println!(
-            "Successfully opened session for user '{}'",
-            user.name().to_string_lossy()
-        );
+        println!("✅ Successfully opened session for user {username}");
 
         ServiceOperationResult::Ok.into()
     }
@@ -220,7 +204,7 @@ impl Sessions {
             None => return ServiceOperationResult::SessionAlreadyClosed.into(),
         };
 
-        println!("Successfully closed session for user '{username}'");
+        println!("✅ Successfully closed session for user '{username}'");
 
         ServiceOperationResult::Ok.into()
     }

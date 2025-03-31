@@ -17,13 +17,14 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
+use login_ng::users;
 use sys_mount::{Mount, Unmount, UnmountDrop, UnmountFlags};
 
 use login_ng::mount::MountPoints;
 use tokio::sync::RwLock;
 
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{self, File};
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -69,8 +70,11 @@ use tokio::time::{sleep, Duration};
 /// - The specified mount path does not exist and cannot be created due to permission issues.
 /// - The mount operation fails due to invalid parameters or system errors.
 ///
-fn mount(data: (String, String, String, String)) -> io::Result<Mount> {
-    let mount_path = Path::new(data.3.as_str());
+fn mount<PATH>(data: (String, String, String, PATH)) -> io::Result<Mount>
+where
+    PATH: AsRef<Path>,
+{
+    let mount_path = Path::new(data.3.as_ref());
     if !mount_path.exists() || !mount_path.is_dir() {
         // if the path is a file this will fail
         create_dir(mount_path)?;
@@ -81,70 +85,124 @@ fn mount(data: (String, String, String, String)) -> io::Result<Mount> {
         false => Mount::builder()
             .fstype(data.0.as_str())
             .data(data.1.as_str())
-            .mount(data.2.as_str(), data.3.as_str()),
+            .mount(data.2.as_str(), data.3.as_ref()),
+    }
+}
+
+pub(crate) fn mount_xdg(
+    uid: users::uid_t,
+    gid: users::gid_t,
+    username: &str,
+) -> Option<UnmountDrop<Mount>> {
+    let xdg_path = PathBuf::from(crate::XDG_RUNTIME_DIR_PATH);
+    if !xdg_path.exists() {
+        if let Err(err) = fs::create_dir(xdg_path.clone()) {
+            eprintln!("❌ Error creating the xdg base path: {err}");
+            return None;
+        }
+    } else if !xdg_path.is_dir() {
+        eprintln!("🚫 Failed to use xdg base path: not a directory");
+        return None;
+    }
+
+    let user_xdg_path = xdg_path.join(format!("{uid}"));
+    if !user_xdg_path.exists() {
+        if let Err(err) = fs::create_dir(user_xdg_path.clone()) {
+            eprintln!("❌ Error creating the xdg path for user {username}: {err}");
+            return None;
+        }
+    } else if !xdg_path.is_dir() {
+        eprintln!("🚫 Failed to use xdg path for user {username}: not a directory");
+        return None;
+    }
+
+    let mount_data = (
+        format!("tmpfs"),
+        format!("uid={uid},gid={gid}"),
+        format!("tmpfs"),
+        user_xdg_path.as_os_str(),
+    );
+    match mount(mount_data) {
+        Ok(mount) => Some(mount.into_unmount_drop(UnmountFlags::DETACH)),
+        Err(err) => {
+            eprintln!(
+                "❌ Error mounting the xdg path for user {username} ({}): {err}",
+                user_xdg_path.as_os_str().to_string_lossy()
+            );
+            return None;
+        }
     }
 }
 
 pub(crate) fn mount_all(
-    mounts: MountPoints,
+    mounts: Option<MountPoints>,
+    uid: users::uid_t,
+    gid: users::gid_t,
     username: String,
     homedir: String,
 ) -> Vec<UnmountDrop<Mount>> {
-    let mut mounted_devices = vec![];
+    let Some(xdg_mounted_dir) = mount_xdg(uid, gid, username.as_str()) else {
+        return vec![];
+    };
 
-    for m in mounts
-        .foreach(|a, b| {
-            (
-                b.fstype().clone(),
-                b.flags().join(",").clone(),
-                b.device().clone(),
-                a.clone(),
-            )
-        })
-        .iter()
-    {
-        match mount(m.clone()) {
+    // mount xdg folder first
+    let mut mounted_devices = vec![xdg_mounted_dir];
+
+    if let Some(mounts) = mounts {
+        for m in mounts
+            .foreach(|a, b| {
+                (
+                    b.fstype().clone(),
+                    b.flags().join(",").clone(),
+                    b.device().clone(),
+                    a.clone(),
+                )
+            })
+            .iter()
+        {
+            match mount(m.clone()) {
+                Ok(mount) => {
+                    println!(
+                        "🟢 Mounted device {} into {} for user '{username}'",
+                        m.2.as_str(),
+                        m.3.as_str(),
+                    );
+
+                    // Make the mount temporary, so that it will be unmounted on drop.
+                    mounted_devices.push(mount.into_unmount_drop(UnmountFlags::DETACH));
+                }
+                Err(err) => {
+                    eprintln!(
+                        "❌ Error mounting device {} into {}: {}",
+                        m.2.as_str(),
+                        m.3.as_str(),
+                        err
+                    );
+
+                    return vec![];
+                }
+            }
+        }
+
+        match mount((
+            mounts.mount().fstype().clone(),
+            mounts.mount().flags().join(","),
+            mounts.mount().device().clone(),
+            homedir,
+        )) {
             Ok(mount) => {
                 println!(
-                    "Mounted device {} into {} for user '{username}'",
-                    m.2.as_str(),
-                    m.3.as_str(),
+                    "🟢 Mounted device {} on home directory for user '{username}'",
+                    mounts.mount().device().as_str(),
                 );
 
                 // Make the mount temporary, so that it will be unmounted on drop.
                 mounted_devices.push(mount.into_unmount_drop(UnmountFlags::DETACH));
             }
             Err(err) => {
-                eprintln!(
-                    "failed to mount device {} into {}: {}",
-                    m.2.as_str(),
-                    m.3.as_str(),
-                    err
-                );
-
+                eprintln!("❌ Error mounting user directory: {err}");
                 return vec![];
             }
-        }
-    }
-
-    match mount((
-        mounts.mount().fstype().clone(),
-        mounts.mount().flags().join(","),
-        mounts.mount().device().clone(),
-        homedir,
-    )) {
-        Ok(mount) => {
-            println!(
-                "Mounted device {} on home directory for user '{username}'",
-                mounts.mount().device().as_str(),
-            );
-
-            // Make the mount temporary, so that it will be unmounted on drop.
-            mounted_devices.push(mount.into_unmount_drop(UnmountFlags::DETACH));
-        }
-        Err(err) => {
-            eprintln!("failed to mount user directory: {err}");
-            return vec![];
         }
     }
 
