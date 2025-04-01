@@ -83,6 +83,8 @@ impl Sessions {
 )]
 impl Sessions {
     async fn initiate_session(&mut self) -> String {
+        println!("🔓 Requested initialization of a new session");
+
         let pub_pkcs1_pem = match self.pub_key.to_pkcs1_pem(LineEnding::CRLF) {
             Ok(key) => key,
             Err(err) => {
@@ -99,9 +101,19 @@ impl Sessions {
         otp.hash(&mut hasher);
         let key = hasher.finish();
 
+        let serialized = match serde_json::to_string(&session) {
+            Ok(serialized) => serialized,
+            Err(err) => {
+                println!("❌ Error serializing the session one time token: {err}");
+                return String::new();
+            }
+        };
+
         self.one_time_tokens.insert(key, otp);
 
-        session.to_string()
+        println!("✅ Created one time token {key}");
+
+        serialized
     }
 
     async fn open_user_session(
@@ -135,10 +147,14 @@ impl Sessions {
         match self.one_time_tokens.remove(&hasher.finish()) {
             Some(stored) => {
                 if stored != otp {
+                    eprintln!("🚫 The provided temporary OTP key couldn't be verified");
                     return (ServiceOperationResult::EncryptionError.into(), 0, 0);
                 }
             }
-            None => return (ServiceOperationResult::EncryptionError.into(), 0, 0),
+            None => {
+                println!("❌ Error in finding the provided temporary OTP key");
+                return (ServiceOperationResult::EncryptionError.into(), 0, 0);
+            }
         }
 
         let user_mounts = match load_user_mountpoints(&source) {

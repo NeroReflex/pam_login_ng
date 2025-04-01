@@ -85,10 +85,26 @@ impl PamQuickEmbedded {
             return Ok((ServiceOperationResult::EmptyPubKey, 0, 0));
         }
 
-        let session_prelude = SessionPrelude::from_string(pk.as_str());
+        let session_prelude: SessionPrelude = match pam_login_ng_common::serde_json::from_str(
+            pk.as_str(),
+        ) {
+            Ok(res) => res,
+            Err(err) => {
+                eprintln!("login_ng: open_session: open_session_for_user: deserialization error of the session prelude {err}");
+                std::thread::sleep(std::time::Duration::new(5, 0));
 
-        let Ok(encrypted_password) = session_prelude.encrypt(plain_main_password) else {
-            return Ok((ServiceOperationResult::EncryptionError, 0, 0));
+                return Ok((ServiceOperationResult::SerializationError, 0, 0));
+            }
+        };
+
+        let encrypted_password = match session_prelude.encrypt(plain_main_password) {
+            Ok(encrypted_password) => encrypted_password,
+            Err(err) => {
+                eprintln!("login_ng: open_session: open_session_for_user: encryption error {err}");
+                std::thread::sleep(std::time::Duration::new(5, 0));
+
+                return Ok((ServiceOperationResult::EncryptionError, 0, 0));
+            }
         };
 
         let reply = proxy
@@ -310,7 +326,7 @@ impl PamHooks for PamQuickEmbedded {
                         Err(err) => {
                             eprintln!("login_ng: open_session: pam_login_ng-service dbus error: {err}");
                             std::thread::sleep(std::time::Duration::new(5, 0));
-                            
+
                             pamh.log(
                                 pam::module::LogLevel::Error,
                                 format!(

@@ -4,7 +4,6 @@ use rsa::{
     pkcs1::DecodeRsaPublicKey, Error as RSAError, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey,
 };
 use serde::{Deserialize, Serialize};
-use serde_json;
 
 use thiserror::Error;
 
@@ -77,22 +76,16 @@ fn split(combined: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
 
 impl SessionPrelude {
     pub fn new(pub_pkcs1_pem: String) -> Self {
-        let one_time_token = vec![];
+        let mut one_time_token = vec![];
+
+        for _ in 0..255 {
+            one_time_token.push(crate::rand::random())
+        }
 
         Self {
             one_time_token,
             pub_pkcs1_pem,
         }
-    }
-
-    // Serialize the struct to a JSON string
-    pub fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
-    }
-
-    // Deserialize a JSON string to the struct
-    pub fn from_string(s: &str) -> Self {
-        serde_json::from_str(s).unwrap()
     }
 
     pub fn one_time_token(&self) -> Vec<u8> {

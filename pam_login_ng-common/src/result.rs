@@ -33,6 +33,7 @@ pub enum ServiceOperationResult {
     EmptyPubKey = 8,
     EncryptionError = 9,
     UnauthorizedMount = 10,
+    SerializationError = 11,
     Unknown,
 }
 
@@ -50,6 +51,7 @@ impl fmt::Display for ServiceOperationResult {
             ServiceOperationResult::EmptyPubKey => "Empty Public Key",
             ServiceOperationResult::EncryptionError => "Encryption error",
             ServiceOperationResult::UnauthorizedMount => "Unauthorized mount attempted",
+            ServiceOperationResult::SerializationError => "(De)Serialization error",
             ServiceOperationResult::Unknown => "Unknown Error",
         };
         write!(f, "{}", result_str)
@@ -76,6 +78,7 @@ impl From<u32> for ServiceOperationResult {
             8 => ServiceOperationResult::EmptyPubKey,
             9 => ServiceOperationResult::EncryptionError,
             10 => ServiceOperationResult::UnauthorizedMount,
+            11 => ServiceOperationResult::SerializationError,
             _ => ServiceOperationResult::Unknown,
         }
     }
