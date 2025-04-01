@@ -88,10 +88,12 @@ jobs:
         with:
           name: bookworm-package
           path: ${{ env.PKGDEST }}
+      - name: Set env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
       - name: Make release
         uses: softprops/action-gh-release@v2
         with:
-          name: login-ng v${GITHUB_REF#refs/tags/}
+          name: login-ng v${{ env.RELEASE_VERSION }}
           token: ${{ secrets.GITHUB_TOKEN }}
           draft: false
           prerelease: true
