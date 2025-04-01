@@ -136,6 +136,7 @@ pub(crate) fn mount_xdg(
 
 pub(crate) fn mount_all(
     mounts: Option<MountPoints>,
+    password: Vec<u8>,
     uid: users::uid_t,
     gid: users::gid_t,
     username: String,

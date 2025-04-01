@@ -420,7 +420,7 @@ pub fn store_user_auth_data(
     Ok(())
 }
 
-pub fn load_user_mountpoints(source: &StorageSource, password: Vec<u8>) -> Result<Option<MountPoints>, StorageError> {
+pub fn load_user_mountpoints(source: &StorageSource) -> Result<Option<MountPoints>, StorageError> {
     let home_dir_path = match source {
         StorageSource::Username(username) => homedir_by_username(username)?,
         StorageSource::Path(pathbuf) => pathbuf.as_os_str().to_os_string(),

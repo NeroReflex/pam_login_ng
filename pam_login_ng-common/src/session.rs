@@ -141,7 +141,7 @@ impl Sessions {
             None => return (ServiceOperationResult::EncryptionError.into(), 0, 0),
         }
 
-        let user_mounts = match load_user_mountpoints(&source, password) {
+        let user_mounts = match load_user_mountpoints(&source) {
             Ok(user_cfg) => user_cfg,
             Err(err) => {
                 eprintln!("❌ Error loading user mount data: {err}");
@@ -171,6 +171,7 @@ impl Sessions {
 
         let mounted_devices = mount_all(
             user_mounts,
+            password,
             user.uid(),
             user.primary_group_id(),
             user.name().to_string_lossy().to_string(),
