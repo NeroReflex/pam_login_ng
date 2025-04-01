@@ -109,7 +109,7 @@ impl Sessions {
         username: &str,
         password: Vec<u8>,
     ) -> (u32, uid_t, gid_t) {
-        println!("Requested session for user '{username}' to be opened");
+        println!("👤 Requested session for user '{username}' to be opened");
 
         let source = login_ng::storage::StorageSource::Username(String::from(username));
 
@@ -124,7 +124,7 @@ impl Sessions {
         let (otp, password) = match SessionPrelude::decrypt(self.priv_key.clone(), password) {
             Ok(result) => result,
             Err(err) => {
-                eprintln!("Failed to decrypt data: {err}");
+                eprintln!("❌ Error in decrypting data: {err}");
                 return (ServiceOperationResult::DataDecryptionFailed.into(), 0, 0);
             }
         };
@@ -141,7 +141,7 @@ impl Sessions {
             None => return (ServiceOperationResult::EncryptionError.into(), 0, 0),
         }
 
-        let user_mounts = match load_user_mountpoints(&source) {
+        let user_mounts = match load_user_mountpoints(&source, password) {
             Ok(user_cfg) => user_cfg,
             Err(err) => {
                 eprintln!("❌ Error loading user mount data: {err}");
@@ -200,7 +200,7 @@ impl Sessions {
     }
 
     async fn close_user_session(&mut self, user: &str) -> u32 {
-        println!("Requested session for user '{user}' to be closed");
+        println!("👤 Requested session for user '{user}' to be closed");
 
         let Some(user) = get_user_by_name(user) else {
             return ServiceOperationResult::CannotIdentifyUser.into();
