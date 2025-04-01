@@ -174,6 +174,9 @@ impl PamHooks for PamQuickEmbedded {
             "login_ng: open_session: enter".to_string(),
         );
 
+        eprintln!("login_ng: open_session: enter");
+        std::thread::sleep(std::time::Duration::new(5, 0));
+
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
             Ok(value) => pamh.log(
                 pam::module::LogLevel::Info,
@@ -219,6 +222,9 @@ impl PamHooks for PamQuickEmbedded {
             }
         };
 
+        eprintln!("login_ng: open_session: user {username}");
+        std::thread::sleep(std::time::Duration::new(5, 0));
+
         pamh.log(
             pam::module::LogLevel::Debug,
             format!("login_ng: open_session: user {username}"),
@@ -230,6 +236,9 @@ impl PamHooks for PamQuickEmbedded {
                 Ok(user_cfg) => user_cfg,
                 Err(pam_err_code) => return pam_err_code,
             };
+
+        eprintln!("login_ng: open_session: loaded data for user {username}");
+        std::thread::sleep(std::time::Duration::new(5, 0));
 
         pamh.log(
             pam::module::LogLevel::Debug,
@@ -251,6 +260,7 @@ impl PamHooks for PamQuickEmbedded {
                             match result.0 {
                                 ServiceOperationResult::Ok => {
                                     eprintln!("login_ng: open_session: pam_login_ng-service was successful");
+                                    std::thread::sleep(std::time::Duration::new(5, 0));
 
                                     pamh.log(
                                         pam::module::LogLevel::Info,
@@ -264,6 +274,9 @@ impl PamHooks for PamQuickEmbedded {
 
                                     match pamh.env_set(Cow::from("XDG_RUNTIME_DIR"), xdg_user_path.to_string_lossy()) {
                                         Ok(_) => {
+                                            eprintln!("login_ng: open_session: session opened and XDG_RUNTIME_DIR set");
+                                            std::thread::sleep(std::time::Duration::new(5, 0));
+
                                             pamh.log(
                                                 pam::module::LogLevel::Info,
                                                 "login_ng: open_session: session opened and XDG_RUNTIME_DIR set".to_string(),
@@ -280,7 +293,8 @@ impl PamHooks for PamQuickEmbedded {
                                     PamResultCode::PAM_SUCCESS
                                 },
                                 err => {
-                                    eprintln!("login_ng: open_session: pam_login_ng-service errored: {err}");
+                                    eprintln!("login_ng: open_session: pam_login_ng-service dbus error: {err}");
+                                    std::thread::sleep(std::time::Duration::new(5, 0));
 
                                     pamh.log(
                                         pam::module::LogLevel::Error,
@@ -295,7 +309,8 @@ impl PamHooks for PamQuickEmbedded {
                         }
                         Err(err) => {
                             eprintln!("login_ng: open_session: pam_login_ng-service dbus error: {err}");
-
+                            std::thread::sleep(std::time::Duration::new(5, 0));
+                            
                             pamh.log(
                                 pam::module::LogLevel::Error,
                                 format!(
