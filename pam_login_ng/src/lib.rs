@@ -236,6 +236,8 @@ impl PamHooks for PamQuickEmbedded {
             format!("login_ng: open_session: loaded data for user {username}"),
         );
 
+        eprintln!("login_ng: open_session: DEBUG FOR CRITICAL SECTION");
+
         unsafe {
             match &RUNTIME {
                 Some(runtime) => runtime.block_on(async {
@@ -248,6 +250,8 @@ impl PamHooks for PamQuickEmbedded {
                         Ok(result) => {
                             match result.0 {
                                 ServiceOperationResult::Ok => {
+                                    eprintln!("login_ng: open_session: pam_login_ng-service was successful");
+
                                     pamh.log(
                                         pam::module::LogLevel::Info,
                                         "login_ng: open_session: pam_login_ng-service was successful".to_string(),
@@ -276,6 +280,8 @@ impl PamHooks for PamQuickEmbedded {
                                     PamResultCode::PAM_SUCCESS
                                 },
                                 err => {
+                                    eprintln!("login_ng: open_session: pam_login_ng-service errored: {err}");
+
                                     pamh.log(
                                         pam::module::LogLevel::Error,
                                         format!(
@@ -288,6 +294,8 @@ impl PamHooks for PamQuickEmbedded {
                             }
                         }
                         Err(err) => {
+                            eprintln!("login_ng: open_session: pam_login_ng-service dbus error: {err}");
+
                             pamh.log(
                                 pam::module::LogLevel::Error,
                                 format!(
