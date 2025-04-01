@@ -106,8 +106,6 @@ impl PamQuickEmbedded {
 
         Ok(reply)
     }
-
-    pub(crate) async fn handle_env(pamh: &mut PamHandle) {}
 }
 
 impl PamHooks for PamQuickEmbedded {
