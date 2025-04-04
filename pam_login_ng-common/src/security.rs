@@ -12,7 +12,7 @@ use login_ng::aes_gcm::{
     Aes256Gcm, Key, Nonce,
 };
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub enum SessionPreludeError {
     #[error("Error importing the pem public key")]
     PubKeyImportError,
@@ -89,7 +89,7 @@ fn split(combined: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
 }
 
 const NONCE_LEN: usize = 12;
-const ENCRYPTED_KEY_LEN = 8;
+const ENCRYPTED_KEY_LEN: usize = 8;
 
 impl SessionPrelude {
     pub fn new(pub_pkcs1_pem: String) -> Self {
@@ -149,15 +149,14 @@ impl SessionPrelude {
 
         let mut rsa_encrypted_key_len = Vec::with_capacity(ENCRYPTED_KEY_LEN);
         for i in 0..ENCRYPTED_KEY_LEN {
-            rsa_encrypted_key_len.push(((rsa_encrypted_key.len() as u64) >> ((i as u64) * (ENCRYPTED_KEY_LEN as u64))) as u8);
+            rsa_encrypted_key_len.push(
+                ((rsa_encrypted_key.len() as u64) >> ((i as u64) * (ENCRYPTED_KEY_LEN as u64)))
+                    as u8,
+            );
         }
 
         if nonce_slice.len() != NONCE_LEN as usize {
             return Err(SessionPreludeError::WrongNonceSize);
-        }
-
-        if rsa_encrypted_key.len() > u8::MAX as usize {
-            return Err(SessionPreludeError::KeyTooLong);
         }
 
         let mut result = vec![];
@@ -193,8 +192,8 @@ impl SessionPrelude {
         let nonce = Nonce::from_slice(&ciphertext[HEADER_SIZE..(HEADER_SIZE + NONCE_LEN)]);
 
         // Extract the RSA-encrypted key (next 256 bytes)
-        let rsa_encrypted_key =
-            &ciphertext[(HEADER_SIZE + NONCE_LEN)..(HEADER_SIZE + NONCE_LEN + rsa_encrypted_key_len)];
+        let rsa_encrypted_key = &ciphertext
+            [(HEADER_SIZE + NONCE_LEN)..(HEADER_SIZE + NONCE_LEN + rsa_encrypted_key_len)];
 
         // Extract the encrypted message (remaining bytes)
         let encrypted_message = &ciphertext[(HEADER_SIZE + NONCE_LEN + rsa_encrypted_key_len)..];
