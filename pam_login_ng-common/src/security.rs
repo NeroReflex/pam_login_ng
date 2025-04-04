@@ -26,8 +26,8 @@ pub enum SessionPreludeError {
     #[error("Invalid ciphertext")]
     InvalidCiphertext,
 
-    #[error("Nonce too long")]
-    NonceTooLong,
+    #[error("Wrong Nonce size")]
+    WrongNonceSize,
 
     #[error("Key too long")]
     KeyTooLong,
@@ -88,6 +88,9 @@ fn split(combined: Vec<u8>) -> (Vec<u8>, Vec<u8>) {
     (otp, data)
 }
 
+const NONCE_LEN: usize = 12;
+const ENCRYPTED_KEY_LEN = 8;
+
 impl SessionPrelude {
     pub fn new(pub_pkcs1_pem: String) -> Self {
         let mut one_time_token = vec![];
@@ -144,15 +147,21 @@ impl SessionPrelude {
 
         let nonce_slice = nonce.as_slice();
 
-        if nonce_slice.len() > u8::MAX as usize {
-            return Err(SessionPreludeError::NonceTooLong);
+        let mut rsa_encrypted_key_len = Vec::with_capacity(ENCRYPTED_KEY_LEN);
+        for i in 0..ENCRYPTED_KEY_LEN {
+            rsa_encrypted_key_len.push(((rsa_encrypted_key.len() as u64) >> ((i as u64) * (ENCRYPTED_KEY_LEN as u64))) as u8);
+        }
+
+        if nonce_slice.len() != NONCE_LEN as usize {
+            return Err(SessionPreludeError::WrongNonceSize);
         }
 
         if rsa_encrypted_key.len() > u8::MAX as usize {
             return Err(SessionPreludeError::KeyTooLong);
         }
 
-        let mut result = vec![nonce_slice.len() as u8, rsa_encrypted_key.len() as u8];
+        let mut result = vec![];
+        result.extend(rsa_encrypted_key_len);
         result.extend_from_slice(nonce_slice);
         result.extend(rsa_encrypted_key);
         result.extend(encrypted_message);
@@ -164,26 +173,31 @@ impl SessionPrelude {
         priv_key: Arc<RsaPrivateKey>,
         ciphertext: Vec<u8>,
     ) -> Result<(Vec<u8>, Vec<u8>), SessionPreludeError> {
-        if ciphertext.len() < 3 {
+        const HEADER_SIZE: usize = ENCRYPTED_KEY_LEN;
+
+        if ciphertext.len() < HEADER_SIZE {
             return Err(SessionPreludeError::InvalidCiphertext);
         }
 
-        // Ensure the encrypted data is long enough to contain the nonce, encrypted key, and message
-        let nonce_len = ciphertext[0] as usize;
-        let rsa_encrypted_key_len = ciphertext[1] as usize;
-        if ciphertext.len() < nonce_len + rsa_encrypted_key_len + 510 {
+        let mut value: u64 = 0;
+        for (i, &byte) in ciphertext[1..(HEADER_SIZE - 1)].iter().enumerate() {
+            value |= (byte as u64) << (i * ENCRYPTED_KEY_LEN);
+        }
+
+        let rsa_encrypted_key_len = value as usize;
+        if ciphertext.len() < HEADER_SIZE + NONCE_LEN + rsa_encrypted_key_len + 510 {
             return Err(SessionPreludeError::InvalidCiphertext);
         }
 
         // Extract the nonce (first 12 bytes for AES-GCM)
-        let nonce = Nonce::from_slice(&ciphertext[2..(2 + nonce_len)]);
+        let nonce = Nonce::from_slice(&ciphertext[HEADER_SIZE..(HEADER_SIZE + NONCE_LEN)]);
 
         // Extract the RSA-encrypted key (next 256 bytes)
         let rsa_encrypted_key =
-            &ciphertext[(2 + nonce_len)..(2 + nonce_len + rsa_encrypted_key_len)];
+            &ciphertext[(HEADER_SIZE + NONCE_LEN)..(HEADER_SIZE + NONCE_LEN + rsa_encrypted_key_len)];
 
         // Extract the encrypted message (remaining bytes)
-        let encrypted_message = &ciphertext[(2 + nonce_len + rsa_encrypted_key_len)..];
+        let encrypted_message = &ciphertext[(HEADER_SIZE + NONCE_LEN + rsa_encrypted_key_len)..];
 
         let serialized_key = priv_key
             .decrypt(Pkcs1v15Encrypt, rsa_encrypted_key)
