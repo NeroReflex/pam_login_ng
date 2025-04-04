@@ -7,6 +7,11 @@ use serde::{Deserialize, Serialize};
 
 use thiserror::Error;
 
+use login_ng::aes_gcm::{
+    aead::{Aead, AeadCore, KeyInit, OsRng},
+    Aes256Gcm, Key, Nonce,
+};
+
 #[derive(Debug, Error)]
 pub enum SessionPreludeError {
     #[error("Error importing the pem public key")]
@@ -15,8 +20,17 @@ pub enum SessionPreludeError {
     #[error("RSA error: {0}")]
     RSAError(#[from] RSAError),
 
+    #[error("AES error")]
+    AESError,
+
     #[error("Invalid ciphertext")]
     InvalidCiphertext,
+
+    #[error("Nonce too long")]
+    NonceTooLong,
+
+    #[error("Key too long")]
+    KeyTooLong,
 
     #[error("Plaintext too long")]
     PlaintextTooLong,
@@ -93,6 +107,12 @@ impl SessionPrelude {
     }
 
     pub fn encrypt(&self, plaintext: String) -> Result<Vec<u8>, SessionPreludeError> {
+        let key = Aes256Gcm::generate_key(&mut OsRng);
+        let serialized_key = <[u8; 32]>::try_from(key.as_slice()).unwrap();
+        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+
+        let cipher = Aes256Gcm::new(&key);
+
         if plaintext.len() > 255 {
             return Err(SessionPreludeError::PlaintextTooLong);
         }
@@ -110,24 +130,72 @@ impl SessionPrelude {
             return Err(SessionPreludeError::InternalError);
         }
 
-        let mut rng = rand::thread_rng();
-
-        pubkey
+        let encrypted_message = cipher
             .encrypt(
-                &mut rng,
-                Pkcs1v15Encrypt,
+                &nonce,
                 combine(self.one_time_token.clone(), plain_vec).as_slice(),
             )
-            .map_err(SessionPreludeError::RSAError)
+            .unwrap();
+
+        let mut rng = rand::thread_rng();
+        let rsa_encrypted_key = pubkey
+            .encrypt(&mut rng, Pkcs1v15Encrypt, serialized_key.as_slice())
+            .map_err(SessionPreludeError::RSAError)?;
+
+        let nonce_slice = nonce.as_slice();
+
+        if nonce_slice.len() > u8::MAX as usize {
+            return Err(SessionPreludeError::NonceTooLong);
+        }
+
+        if rsa_encrypted_key.len() > u8::MAX as usize {
+            return Err(SessionPreludeError::KeyTooLong);
+        }
+
+        let mut result = vec![nonce_slice.len() as u8, rsa_encrypted_key.len() as u8];
+        result.extend_from_slice(nonce_slice);
+        result.extend(rsa_encrypted_key);
+        result.extend(encrypted_message);
+
+        Ok(result)
     }
 
     pub fn decrypt(
         priv_key: Arc<RsaPrivateKey>,
         ciphertext: Vec<u8>,
     ) -> Result<(Vec<u8>, Vec<u8>), SessionPreludeError> {
-        let plaintext_mixed = priv_key
-            .decrypt(Pkcs1v15Encrypt, ciphertext.as_slice())
+        if ciphertext.len() < 3 {
+            return Err(SessionPreludeError::InvalidCiphertext);
+        }
+
+        // Ensure the encrypted data is long enough to contain the nonce, encrypted key, and message
+        let nonce_len = ciphertext[0] as usize;
+        let rsa_encrypted_key_len = ciphertext[1] as usize;
+        if ciphertext.len() < nonce_len + rsa_encrypted_key_len + 510 {
+            return Err(SessionPreludeError::InvalidCiphertext);
+        }
+
+        // Extract the nonce (first 12 bytes for AES-GCM)
+        let nonce = Nonce::from_slice(&ciphertext[2..(2 + nonce_len)]);
+
+        // Extract the RSA-encrypted key (next 256 bytes)
+        let rsa_encrypted_key =
+            &ciphertext[(2 + nonce_len)..(2 + nonce_len + rsa_encrypted_key_len)];
+
+        // Extract the encrypted message (remaining bytes)
+        let encrypted_message = &ciphertext[(2 + nonce_len + rsa_encrypted_key_len)..];
+
+        let serialized_key = priv_key
+            .decrypt(Pkcs1v15Encrypt, rsa_encrypted_key)
             .map_err(SessionPreludeError::RSAError)?;
+
+        let key = Key::<Aes256Gcm>::from_slice(&serialized_key);
+
+        let cipher = Aes256Gcm::new(key);
+
+        let plaintext_mixed = cipher
+            .decrypt(nonce, encrypted_message)
+            .map_err(|_| SessionPreludeError::AESError)?;
 
         if plaintext_mixed.len() != 510 {
             return Err(SessionPreludeError::InvalidCiphertext);

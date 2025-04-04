@@ -25,9 +25,9 @@ pub mod mount;
 pub mod storage;
 pub mod user;
 
-pub extern crate users;
-
+pub extern crate aes_gcm;
 pub extern crate rs_sha512;
+pub extern crate users;
 
 #[cfg(test)]
 pub(crate) mod tests;
