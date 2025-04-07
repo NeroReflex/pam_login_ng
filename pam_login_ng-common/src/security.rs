@@ -174,17 +174,19 @@ impl SessionPrelude {
     ) -> Result<(Vec<u8>, Vec<u8>), SessionPreludeError> {
         const HEADER_SIZE: usize = ENCRYPTED_KEY_LEN;
 
-        if ciphertext.len() < HEADER_SIZE {
+        let ciphertext_len = ciphertext.len();
+
+        if ciphertext_len < HEADER_SIZE {
             return Err(SessionPreludeError::InvalidCiphertext);
         }
 
         let mut value: u64 = 0;
-        for (i, &byte) in ciphertext[1..(HEADER_SIZE - 1)].iter().enumerate() {
+        for (i, &byte) in ciphertext[0..HEADER_SIZE].iter().enumerate() {
             value |= (byte as u64) << (i * ENCRYPTED_KEY_LEN);
         }
 
         let rsa_encrypted_key_len = value as usize;
-        if ciphertext.len() < HEADER_SIZE + NONCE_LEN + rsa_encrypted_key_len + 510 {
+        if ciphertext_len < HEADER_SIZE + NONCE_LEN + rsa_encrypted_key_len + 510 {
             return Err(SessionPreludeError::InvalidCiphertext);
         }
 
