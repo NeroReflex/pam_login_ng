@@ -174,13 +174,14 @@ impl Sessions {
         // with every dmask, potentially compromising the
         // security and integrity of the whole system.
         if let Some(mounts) = user_mounts.clone() {
+            let hash_to_check = mounts.hash();
             if !self
                 .mounts_auth
                 .read()
                 .await
-                .authorized(username, mounts.hash())
+                .authorized(username, hash_to_check)
             {
-                eprintln!("🚫 User {username} attempted an unauthorized mount.");
+                eprintln!("🚫 User {username} attempted an unauthorized mount {hash_to_check}.");
                 return (ServiceOperationResult::UnauthorizedMount.into(), 0, 0);
             }
         };

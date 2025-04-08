@@ -231,11 +231,10 @@ impl MountAuth {
     }
 
     pub fn authorized(&self, username: &str, hash: u64) -> bool {
-        let Some(values) = self.authorizations.get(&String::from(username)) else {
-            return false;
-        };
-
-        values.contains(&hash)
+        match self.authorizations.get(&String::from(username)) {
+            Some(values) => values.contains(&hash),
+            None => false,
+        }
     }
 }
 
