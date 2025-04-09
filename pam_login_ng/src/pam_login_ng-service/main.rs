@@ -19,17 +19,15 @@
 
 extern crate tokio;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use pam_login_ng_common::disk::create_directory;
 use pam_login_ng_common::mount::{MountAuth, MountAuthDBus};
-use pam_login_ng_common::disk::{create_directory, read_file_or_create_default};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::RwLock;
 
-use pam_login_ng_common::{
-    login_ng::users, ServiceError, session::Sessions, zbus::connection,
-};
+use pam_login_ng_common::{login_ng::users, session::Sessions, zbus::connection, ServiceError};
 
 #[tokio::main]
 async fn main() -> Result<(), ServiceError> {
@@ -41,10 +39,8 @@ async fn main() -> Result<(), ServiceError> {
     let private_key_file_name_str = "private_key_pkcs1.pem";
     let authorization_file_name_str = "authorized_mounts.json";
     let dir_path_str = "/etc/login_ng/";
-    
-    create_directory(dir_path_str).await?;
 
-    let private_key = read_file_or_create_default(dir_path_str, private_key_file_name_str).await?;
+    create_directory(PathBuf::from(dir_path_str)).await?;
 
     match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
         Ok(value) => println!("Starting dbus service on socket {value}"),
@@ -69,7 +65,10 @@ async fn main() -> Result<(), ServiceError> {
         .map_err(ServiceError::ZbusError)?
         .serve_at(
             "/org/zbus/login_ng_mount",
-            MountAuthDBus::new(Path::new(dir_path_str).join(authorization_file_name_str), mounts_auth.clone()),
+            MountAuthDBus::new(
+                Path::new(dir_path_str).join(authorization_file_name_str),
+                mounts_auth.clone(),
+            ),
         )
         .map_err(ServiceError::ZbusError)?
         .build()
@@ -82,7 +81,10 @@ async fn main() -> Result<(), ServiceError> {
         .map_err(ServiceError::ZbusError)?
         .serve_at(
             "/org/zbus/login_ng_session",
-            Sessions::new(mounts_auth, private_key.as_str()),
+            Sessions::new(
+                Path::new(dir_path_str).join(private_key_file_name_str),
+                mounts_auth,
+            ),
         )
         .map_err(ServiceError::ZbusError)?
         .build()

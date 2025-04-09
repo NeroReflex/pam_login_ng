@@ -17,7 +17,10 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use tokio::sync::RwLock;
+use tokio::{
+    sync::{Mutex, RwLock},
+    task::spawn,
+};
 use zbus::interface;
 
 use sys_mount::{Mount, UnmountDrop};
@@ -27,49 +30,93 @@ use login_ng::{
     users::{get_user_by_name, gid_t, os::unix::UserExt, uid_t},
 };
 
-use std::hash::{Hash, Hasher};
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
     ffi::OsString,
+    ops::DerefMut,
     sync::Arc,
+};
+use std::{
+    hash::{Hash, Hasher},
+    path::PathBuf,
 };
 
 use rsa::{
-    pkcs1::{DecodeRsaPrivateKey, EncodeRsaPublicKey, LineEnding},
+    pkcs1::{DecodeRsaPrivateKey, EncodeRsaPrivateKey, EncodeRsaPublicKey, LineEnding},
     RsaPrivateKey, RsaPublicKey,
 };
 
 use crate::{
+    disk::read_file_or_create_default,
     mount::{mount_all, MountAuth},
     result::*,
     security::*,
+    ServiceError,
 };
 
 struct UserSession {
     _mounts: Vec<UnmountDrop<Mount>>,
 }
 
+enum RsaPrivateKeyFetchOpStatus {
+    Ready(Arc<RsaPrivateKey>),
+    InProgress(tokio::task::JoinHandle<Result<RsaPrivateKey, ServiceError>>),
+}
+
 pub struct Sessions {
     mounts_auth: Arc<RwLock<MountAuth>>,
-    priv_key: Arc<RsaPrivateKey>,
-    pub_key: RsaPublicKey,
+    priv_key: Mutex<RsaPrivateKeyFetchOpStatus>,
     one_time_tokens: HashMap<u64, Vec<u8>>,
     sessions: HashMap<OsString, UserSession>,
 }
 
 impl Sessions {
-    pub fn new(mounts_auth: Arc<RwLock<MountAuth>>, key_string: &str) -> Self {
-        let priv_key = Arc::new(RsaPrivateKey::from_pkcs1_pem(key_string).unwrap());
-        let pub_key = RsaPublicKey::from(priv_key.as_ref());
+    pub fn new(private_key_file_path: PathBuf, mounts_auth: Arc<RwLock<MountAuth>>) -> Self {
+        let file_path = private_key_file_path;
+
+        let filepath = file_path.clone();
+
+        let priv_key = Mutex::new(RsaPrivateKeyFetchOpStatus::InProgress(spawn(async {
+            let default_key_gen_fn = || {
+                let mut rng = crate::rand::thread_rng();
+                let priv_key = crate::rsa::RsaPrivateKey::new(&mut rng, 4096)
+                    .expect("failed to generate a key");
+
+                Ok(priv_key.to_pkcs1_pem(LineEnding::CRLF).unwrap().to_string())
+            };
+
+            let key_as_str = read_file_or_create_default(filepath, default_key_gen_fn).await?;
+
+            RsaPrivateKey::from_pkcs1_pem(key_as_str.as_str())
+                .map_err(|err| ServiceError::PKCS1Error(err))
+        })));
+
         let one_time_tokens = HashMap::new();
         let sessions = HashMap::new();
 
         Self {
             mounts_auth,
             priv_key,
-            pub_key,
             one_time_tokens,
             sessions,
+        }
+    }
+
+    async fn fetch_priv_key(&mut self) -> Result<Arc<RsaPrivateKey>, ServiceError> {
+        let mut lck = self.priv_key.lock().await;
+        match lck.deref_mut() {
+            RsaPrivateKeyFetchOpStatus::Ready(rsa_private_key) => Ok(rsa_private_key.clone()),
+            RsaPrivateKeyFetchOpStatus::InProgress(join_handle) => match join_handle.await {
+                Ok(completed) => {
+                    let new_key = Arc::new(completed?);
+                    *lck = RsaPrivateKeyFetchOpStatus::Ready(new_key.clone());
+                    Ok(new_key)
+                }
+                Err(err) => {
+                    println!("❌ Error awaiting for private key fetch task: {err}");
+                    return Err(ServiceError::JoinError(err));
+                }
+            },
         }
     }
 }
@@ -85,13 +132,22 @@ impl Sessions {
     async fn initiate_session(&mut self) -> String {
         println!("🔓 Requested initialization of a new session");
 
-        let pub_pkcs1_pem = match self.pub_key.to_pkcs1_pem(LineEnding::CRLF) {
-            Ok(key) => key,
+        let priv_key = match self.fetch_priv_key().await {
+            Ok(priv_key) => priv_key,
             Err(err) => {
-                println!("❌ Error serializing the RSA key: {err}");
+                println!("❌ Error fetching the private RSA key: {err}");
                 return String::new();
             }
         };
+
+        let pub_pkcs1_pem =
+            match RsaPublicKey::from(priv_key.as_ref()).to_pkcs1_pem(LineEnding::CRLF) {
+                Ok(key) => key,
+                Err(err) => {
+                    println!("❌ Error serializing the RSA key: {err}");
+                    return String::new();
+                }
+            };
 
         let session = SessionPrelude::new(pub_pkcs1_pem);
 
@@ -133,7 +189,15 @@ impl Sessions {
             return (ServiceOperationResult::SessionAlreadyOpened.into(), 0, 0);
         }
 
-        let (otp, password) = match SessionPrelude::decrypt(self.priv_key.clone(), password) {
+        let priv_key = match self.fetch_priv_key().await {
+            Ok(priv_key) => priv_key,
+            Err(err) => {
+                println!("❌ Error fetching the private RSA key: {err}");
+                return (ServiceOperationResult::PubKeyError.into(), 0, 0);
+            }
+        };
+
+        let (otp, password) = match SessionPrelude::decrypt(priv_key.clone(), password) {
             Ok(result) => result,
             Err(err) => {
                 eprintln!("❌ Error in decrypting data: {err}");

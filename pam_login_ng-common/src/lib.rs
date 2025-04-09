@@ -55,4 +55,7 @@ pub enum ServiceError {
 
     #[error("Failed to deserialize JSON: {0}")]
     JsonError(#[from] serde_json::Error),
+
+    #[error("Join error: {0}")]
+    JoinError(#[from] tokio::task::JoinError),
 }
