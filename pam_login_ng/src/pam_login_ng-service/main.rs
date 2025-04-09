@@ -19,18 +19,13 @@
 
 extern crate tokio;
 
-use std::fs::{self, create_dir, File};
-use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::Arc;
 
 use pam_login_ng_common::mount::{MountAuth, MountAuthDBus};
-use pam_login_ng_common::rsa::pkcs1::EncodeRsaPrivateKey;
-use pam_login_ng_common::rsa::pkcs8::LineEnding;
+use pam_login_ng_common::disk::{create_directory, read_file_or_create_default};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::RwLock;
-
-use std::os::unix::fs::PermissionsExt;
 
 use pam_login_ng_common::{
     login_ng::users, service::ServiceError, session::Sessions, zbus::connection,
@@ -43,75 +38,13 @@ async fn main() -> Result<(), ServiceError> {
         return Err(ServiceError::MissingPrivilegesError);
     }
 
-    let file_name_str = "private_key_pkcs1.pem";
+    let private_key_file_name_str = "private_key_pkcs1.pem";
+    let authorization_file_name_str = "authorized_mounts.json";
     let dir_path_str = "/etc/login_ng/";
-    let dir_path = Path::new(dir_path_str);
+    
+    create_directory(dir_path_str).await?;
 
-    if !dir_path.exists() {
-        match create_dir(dir_path) {
-            Ok(_) => {
-                println!("📁 Directory {dir_path_str} created");
-
-                let mut permissions = fs::metadata(dir_path)?.permissions();
-                permissions.set_mode(0o700);
-
-                fs::set_permissions(dir_path, permissions)?;
-            }
-            Err(err) => {
-                eprintln!("❌ Could not create directory {dir_path_str}: {err}");
-            }
-        }
-    }
-
-    let file_path = dir_path.join(file_name_str);
-
-    let contents = match file_path.exists() {
-        true => {
-            let mut contents = String::new();
-
-            let mut file = File::open(file_path)?;
-            let read = file.read_to_string(&mut contents)?;
-            println!("📖 Read private key file of {read} bytes");
-
-            contents
-        }
-        false => {
-            eprintln!(
-                "🖊️ File {dir_path_str}/{file_name_str} not found: a new one will be generated..."
-            );
-
-            let mut rng = pam_login_ng_common::rand::thread_rng();
-            let priv_key = pam_login_ng_common::rsa::RsaPrivateKey::new(&mut rng, 4096)
-                .expect("failed to generate a key");
-
-            let contents = priv_key.to_pkcs1_pem(LineEnding::CRLF)?.to_string();
-
-            match File::create(&file_path) {
-                Ok(mut file) => {
-                    let metadata = file.metadata()?;
-                    let mut perm = metadata.permissions();
-                    perm.set_mode(0o700);
-
-                    fs::set_permissions(file_path, perm)?;
-                    match file.write_all(contents.to_string().as_bytes()) {
-                        Ok(_) => {
-                            println!(
-                                "✅ Generated key has been saved to {dir_path_str}/{file_name_str}"
-                            )
-                        }
-                        Err(err) => {
-                            eprintln!("❌ Failed to write the generated key to {dir_path_str}/{file_name_str}: {err}")
-                        }
-                    };
-                }
-                Err(err) => {
-                    eprintln!("Failed to create the file {dir_path_str}/{file_name_str}: {err}")
-                }
-            };
-
-            contents
-        }
-    };
+    let private_key = read_file_or_create_default(dir_path_str, private_key_file_name_str).await?;
 
     match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
         Ok(value) => println!("Starting dbus service on socket {value}"),
@@ -136,7 +69,7 @@ async fn main() -> Result<(), ServiceError> {
         .map_err(ServiceError::ZbusError)?
         .serve_at(
             "/org/zbus/login_ng_mount",
-            MountAuthDBus::new(dir_path.join("authorized_mounts.json"), mounts_auth.clone()),
+            MountAuthDBus::new(Path::new(dir_path_str).join(authorization_file_name_str), mounts_auth.clone()),
         )
         .map_err(ServiceError::ZbusError)?
         .build()
@@ -149,7 +82,7 @@ async fn main() -> Result<(), ServiceError> {
         .map_err(ServiceError::ZbusError)?
         .serve_at(
             "/org/zbus/login_ng_session",
-            Sessions::new(mounts_auth, contents.as_str()),
+            Sessions::new(mounts_auth, private_key.as_str()),
         )
         .map_err(ServiceError::ZbusError)?
         .build()

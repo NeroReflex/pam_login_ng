@@ -27,6 +27,7 @@ pub extern crate zbus;
 #[cfg(test)]
 pub(crate) mod tests;
 
+pub mod disk;
 pub mod mount;
 pub mod result;
 pub mod security;
