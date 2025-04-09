@@ -5,7 +5,7 @@ use std::path::Path;
 use rsa::pkcs1::EncodeRsaPrivateKey;
 use rsa::pkcs8::LineEnding;
 
-use crate::service::ServiceError;
+use crate::ServiceError;
 
 pub async fn create_directory(dir_path_str: &str) -> Result<(), ServiceError> {
     let dir_path = Path::new(dir_path_str);

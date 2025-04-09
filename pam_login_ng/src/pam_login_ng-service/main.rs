@@ -28,7 +28,7 @@ use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::RwLock;
 
 use pam_login_ng_common::{
-    login_ng::users, service::ServiceError, session::Sessions, zbus::connection,
+    login_ng::users, ServiceError, session::Sessions, zbus::connection,
 };
 
 #[tokio::main]

@@ -36,7 +36,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 
 use crate::result::ServiceOperationResult;
-use crate::service::ServiceError;
+use crate::ServiceError;
 
 use zbus::interface;
 

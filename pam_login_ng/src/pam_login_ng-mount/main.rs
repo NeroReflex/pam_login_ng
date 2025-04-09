@@ -26,7 +26,7 @@ use pam_login_ng_common::mount::MountAuthDBusProxy;
 use pam_login_ng_common::result::ServiceOperationResult;
 use pam_login_ng_common::zbus::Connection;
 
-use pam_login_ng_common::service::ServiceError;
+use pam_login_ng_common::ServiceError;
 
 use argh::FromArgs;
 

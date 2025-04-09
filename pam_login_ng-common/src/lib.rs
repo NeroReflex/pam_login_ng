@@ -31,7 +31,28 @@ pub mod disk;
 pub mod mount;
 pub mod result;
 pub mod security;
-pub mod service;
 pub mod session;
 
 pub const XDG_RUNTIME_DIR_PATH: &str = "/tmp/xdg/";
+
+use zbus::Error as ZError;
+
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum ServiceError {
+    #[error("Permission error: not running as the root user")]
+    MissingPrivilegesError,
+
+    #[error("DBus error: {0}")]
+    ZbusError(#[from] ZError),
+
+    #[error("I/O error: {0}")]
+    IOError(#[from] std::io::Error),
+
+    #[error("pkcs1 error: {0}")]
+    PKCS1Error(#[from] rsa::pkcs1::Error),
+
+    #[error("Failed to deserialize JSON: {0}")]
+    JsonError(#[from] serde_json::Error),
+}
