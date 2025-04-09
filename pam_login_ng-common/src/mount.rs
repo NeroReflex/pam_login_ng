@@ -254,10 +254,7 @@ impl MountAuthOperations {
         .await
         {
             Ok(auth_str) => MountAuth::new(auth_str.as_str()),
-            Err(err) => {
-                eprintln!("❌ Error opening mount authorizations file: {err}");
-                return Err(err);
-            }
+            Err(err) => return Err(err),
         }
     }
 
@@ -267,24 +264,16 @@ impl MountAuthOperations {
     ) -> Result<(), ServiceError> {
         let mut file = match File::create(self.file_path.as_path()) {
             Ok(file) => file,
-            Err(err) => {
-                eprintln!("❌ Error opening mount authorizations file: {err}");
-
-                return Err(ServiceError::IOError(err));
-            }
+            Err(err) => return Err(ServiceError::IOError(err)),
         };
 
-        match file.write((serde_json::to_string_pretty(authorizations).unwrap() + "\n").as_bytes())
+        if let Err(err) =
+            file.write((serde_json::to_string_pretty(authorizations).unwrap() + "\n").as_bytes())
         {
-            Ok(_written) => (),
-            Err(err) => {
-                eprintln!("❌ Error writing data to mount authorizations file: {err}");
-                return Err(ServiceError::IOError(err));
-            }
+            return Err(ServiceError::IOError(err));
         }
 
         if let Err(err) = file.flush() {
-            eprintln!("❌ Error finalizing the mount authorizations file: {err}");
             return Err(ServiceError::IOError(err));
         }
 
@@ -311,6 +300,8 @@ impl MountAuthDBus {
 )]
 impl MountAuthDBus {
     async fn authorize(&mut self, username: String, hash: u64) -> u32 {
+        println!("⚙️ Requested add authorization to mount {hash} for user {username}");
+
         {
             let mut lck = self.auth_mount_op.write().await;
             let mut authorizations = match lck.read_auth_file().await {
@@ -335,6 +326,8 @@ impl MountAuthDBus {
     }
 
     async fn check(&self, username: &str, hash: u64) -> bool {
+        println!("🔑 Requested check for authorization of mount for user {username}");
+
         // Defeat brute-force searches in an attempt to find an hash collision
         sleep(Duration::from_secs(1)).await;
 
