@@ -34,6 +34,7 @@ pub enum ServiceOperationResult {
     EncryptionError = 9,
     UnauthorizedMount = 10,
     SerializationError = 11,
+    IOError = 12,
     Unknown,
 }
 
@@ -52,6 +53,7 @@ impl fmt::Display for ServiceOperationResult {
             ServiceOperationResult::EncryptionError => "Encryption error",
             ServiceOperationResult::UnauthorizedMount => "Unauthorized mount attempted",
             ServiceOperationResult::SerializationError => "(De)Serialization error",
+            ServiceOperationResult::IOError => "I/O Error",
             ServiceOperationResult::Unknown => "Unknown Error",
         };
         write!(f, "{}", result_str)
@@ -79,6 +81,7 @@ impl From<u32> for ServiceOperationResult {
             9 => ServiceOperationResult::EncryptionError,
             10 => ServiceOperationResult::UnauthorizedMount,
             11 => ServiceOperationResult::SerializationError,
+            12 => ServiceOperationResult::IOError,
             _ => ServiceOperationResult::Unknown,
         }
     }

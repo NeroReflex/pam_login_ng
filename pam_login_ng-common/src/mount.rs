@@ -25,7 +25,6 @@ use tokio::sync::RwLock;
 
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::{fs::create_dir, path::Path};
@@ -36,7 +35,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 
 use crate::result::ServiceOperationResult;
-use crate::ServiceError;
+use crate::{disk, ServiceError};
 
 use zbus::interface;
 
@@ -238,17 +237,68 @@ impl MountAuth {
     }
 }
 
-pub struct MountAuthDBus {
+pub struct MountAuthOperations {
     file_path: PathBuf,
-    mounts_auth: Arc<RwLock<MountAuth>>,
+}
+
+impl MountAuthOperations {
+    pub fn new(file_path: PathBuf) -> Self {
+        Self { file_path }
+    }
+
+    pub(crate) async fn read_auth_file(&self) -> Result<MountAuth, ServiceError> {
+        match disk::read_file_or_create_default(self.file_path.clone(), || {
+            serde_json::to_string_pretty(&MountAuth::default())
+                .map_err(|err| ServiceError::JsonError(err))
+        })
+        .await
+        {
+            Ok(auth_str) => MountAuth::new(auth_str.as_str()),
+            Err(err) => {
+                eprintln!("❌ Error opening mount authorizations file: {err}");
+                return Err(err);
+            }
+        }
+    }
+
+    pub(crate) async fn write_auth_file(
+        &mut self,
+        authorizations: &MountAuth,
+    ) -> Result<(), ServiceError> {
+        let mut file = match File::create(self.file_path.as_path()) {
+            Ok(file) => file,
+            Err(err) => {
+                eprintln!("❌ Error opening mount authorizations file: {err}");
+
+                return Err(ServiceError::IOError(err));
+            }
+        };
+
+        match file.write((serde_json::to_string_pretty(authorizations).unwrap() + "\n").as_bytes())
+        {
+            Ok(_written) => (),
+            Err(err) => {
+                eprintln!("❌ Error writing data to mount authorizations file: {err}");
+                return Err(ServiceError::IOError(err));
+            }
+        }
+
+        if let Err(err) = file.flush() {
+            eprintln!("❌ Error finalizing the mount authorizations file: {err}");
+            return Err(ServiceError::IOError(err));
+        }
+
+        Ok(())
+    }
+}
+
+pub struct MountAuthDBus {
+    auth_mount_op: Arc<RwLock<MountAuthOperations>>,
 }
 
 impl MountAuthDBus {
-    pub fn new(file_path: PathBuf, mounts_auth: Arc<RwLock<MountAuth>>) -> Self {
-        Self {
-            file_path,
-            mounts_auth,
-        }
+    pub fn new(auth_mount_op: Arc<RwLock<MountAuthOperations>>) -> Self {
+        Self { auth_mount_op }
     }
 }
 
@@ -261,48 +311,25 @@ impl MountAuthDBus {
 )]
 impl MountAuthDBus {
     async fn authorize(&mut self, username: String, hash: u64) -> u32 {
-        let mut lock = self.mounts_auth.write().await;
+        {
+            let mut lck = self.auth_mount_op.write().await;
+            let mut authorizations = match lck.read_auth_file().await {
+                Ok(auth_str) => auth_str,
+                Err(err) => {
+                    eprintln!("❌ Error opening mount authorizations file: {err}");
+                    return ServiceOperationResult::IOError.into();
+                }
+            };
 
-        let prev = lock.clone();
+            authorizations.add_authorization(username.clone(), hash);
 
-        lock.add_authorization(username.clone(), hash);
-
-        let mut file = match File::create(self.file_path.as_path()) {
-            Ok(file) => file,
-            Err(err) => {
-                eprintln!("❌ Error opening mount authorizations file: {err}");
-
-                *lock = prev;
-
-                return ServiceOperationResult::CannotIdentifyUser.into();
-            }
-        };
-
-        match file.write((serde_json::to_string_pretty(lock.deref()).unwrap() + "\n").as_bytes()) {
-            Ok(_written) => (),
-            Err(err) => {
-                eprintln!("❌ Error writing data to mount authorizations file: {err}");
-
-                *lock = prev;
-
-                return ServiceOperationResult::CannotIdentifyUser.into();
-            }
-        }
-
-        match file.flush() {
-            Ok(res) => res,
-            Err(err) => {
-                eprintln!("❌ Error finalizing the mount authorizations file: {err}");
-
-                *lock = prev;
-
-                return ServiceOperationResult::CannotIdentifyUser.into();
+            if let Err(err) = lck.write_auth_file(&authorizations).await {
+                eprintln!("❌ Error writing the mount authorizations file: {err}");
+                return ServiceOperationResult::IOError.into();
             }
         }
 
         println!("✅ New mount authorized to user {username}");
-
-        drop(file);
 
         ServiceOperationResult::Ok.into()
     }
@@ -311,6 +338,14 @@ impl MountAuthDBus {
         // Defeat brute-force searches in an attempt to find an hash collision
         sleep(Duration::from_secs(1)).await;
 
-        self.mounts_auth.read().await.authorized(username, hash)
+        let authorizations = match self.auth_mount_op.read().await.read_auth_file().await {
+            Ok(auth_str) => auth_str,
+            Err(err) => {
+                eprintln!("❌ Error opening mount authorizations file: {err}");
+                return false;
+            }
+        };
+
+        authorizations.authorized(username, hash)
     }
 }

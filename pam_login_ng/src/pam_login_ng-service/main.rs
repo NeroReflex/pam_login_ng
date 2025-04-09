@@ -19,15 +19,20 @@
 
 extern crate tokio;
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use pam_login_ng_common::{
+    disk::create_directory,
+    login_ng::users,
+    mount::{MountAuthDBus, MountAuthOperations},
+    session::Sessions,
+    zbus::connection,
+    ServiceError,
+};
 
-use pam_login_ng_common::disk::create_directory;
-use pam_login_ng_common::mount::{MountAuth, MountAuthDBus};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::RwLock;
 
-use pam_login_ng_common::{login_ng::users, session::Sessions, zbus::connection, ServiceError};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<(), ServiceError> {
@@ -53,9 +58,9 @@ async fn main() -> Result<(), ServiceError> {
         }
     }
 
-    let mounts_auth = Arc::new(RwLock::new(
-        MountAuth::default(), /*load_from_file("").unwrap()*/
-    ));
+    let mounts_auth = Arc::new(RwLock::new(MountAuthOperations::new(
+        Path::new(dir_path_str).join(authorization_file_name_str),
+    )));
 
     println!("🔧 Building the dbus object...");
 
@@ -65,10 +70,7 @@ async fn main() -> Result<(), ServiceError> {
         .map_err(ServiceError::ZbusError)?
         .serve_at(
             "/org/zbus/login_ng_mount",
-            MountAuthDBus::new(
-                Path::new(dir_path_str).join(authorization_file_name_str),
-                mounts_auth.clone(),
-            ),
+            MountAuthDBus::new(mounts_auth.clone()),
         )
         .map_err(ServiceError::ZbusError)?
         .build()

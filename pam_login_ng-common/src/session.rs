@@ -48,7 +48,7 @@ use rsa::{
 
 use crate::{
     disk::read_file_or_create_default,
-    mount::{mount_all, MountAuth},
+    mount::{mount_all, MountAuthOperations},
     result::*,
     security::*,
     ServiceError,
@@ -64,14 +64,17 @@ enum RsaPrivateKeyFetchOpStatus {
 }
 
 pub struct Sessions {
-    mounts_auth: Arc<RwLock<MountAuth>>,
+    mounts_auth: Arc<RwLock<MountAuthOperations>>,
     priv_key: Mutex<RsaPrivateKeyFetchOpStatus>,
     one_time_tokens: HashMap<u64, Vec<u8>>,
     sessions: HashMap<OsString, UserSession>,
 }
 
 impl Sessions {
-    pub fn new(private_key_file_path: PathBuf, mounts_auth: Arc<RwLock<MountAuth>>) -> Self {
+    pub fn new(
+        private_key_file_path: PathBuf,
+        mounts_auth: Arc<RwLock<MountAuthOperations>>,
+    ) -> Self {
         let file_path = private_key_file_path;
 
         let filepath = file_path.clone();
@@ -239,15 +242,20 @@ impl Sessions {
         // security and integrity of the whole system.
         if let Some(mounts) = user_mounts.clone() {
             let hash_to_check = mounts.hash();
-            if !self
-                .mounts_auth
-                .read()
-                .await
-                .authorized(username, hash_to_check)
-            {
-                eprintln!("🚫 User {username} attempted an unauthorized mount {hash_to_check}.");
-                return (ServiceOperationResult::UnauthorizedMount.into(), 0, 0);
-            }
+            match self.mounts_auth.read().await.read_auth_file().await {
+                Ok(mounts_auth) => {
+                    if !mounts_auth.authorized(username, hash_to_check) {
+                        eprintln!(
+                            "🚫 User {username} attempted an unauthorized mount {hash_to_check}."
+                        );
+                        return (ServiceOperationResult::UnauthorizedMount.into(), 0, 0);
+                    }
+                }
+                Err(err) => {
+                    eprintln!("❌ Error reading mount authorizations file: {err}");
+                    return (ServiceOperationResult::UnauthorizedMount.into(), 0, 0);
+                }
+            };
         };
 
         let mounted_devices = mount_all(
@@ -261,7 +269,6 @@ impl Sessions {
 
         if mounted_devices.is_empty() {
             eprintln!("❌ Error mounting one or more devices for user {username}");
-
             return (ServiceOperationResult::MountError.into(), 0, 0);
         }
 
