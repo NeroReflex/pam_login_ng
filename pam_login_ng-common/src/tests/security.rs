@@ -1,5 +1,3 @@
-use crate::security::{SessionPrelude, SessionPreludeError};
-
 /*
     login-ng A greeter written in rust that also supports autologin with systemd-homed
     Copyright (C) 2024  Denis Benato
@@ -20,6 +18,7 @@ use crate::security::{SessionPrelude, SessionPreludeError};
 */
 
 use crate::rsa::pkcs1::EncodeRsaPublicKey;
+use crate::security::{SessionPrelude, SessionPreludeError};
 use rand::rngs::OsRng;
 use rsa::{pkcs1::DecodeRsaPrivateKey, pkcs8::LineEnding, RsaPrivateKey, RsaPublicKey};
 use std::sync::Arc;

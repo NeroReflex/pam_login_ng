@@ -225,8 +225,8 @@ impl MountAuth {
         Self::new(&json_str)
     }
 
-    pub fn add_authorization(&mut self, username: String, hash: u64) {
-        self.authorizations.entry(username).or_default().push(hash);
+    pub fn add_authorization(&mut self, username: &str, hash: u64) {
+        self.authorizations.entry(String::from(username)).or_default().push(hash);
     }
 
     pub fn authorized(&self, username: &str, hash: u64) -> bool {
@@ -299,7 +299,7 @@ impl MountAuthDBus {
     )
 )]
 impl MountAuthDBus {
-    async fn authorize(&mut self, username: String, hash: u64) -> u32 {
+    pub async fn authorize(&mut self, username: &str, hash: u64) -> u32 {
         println!("⚙️ Requested add authorization to mount {hash} for user {username}");
 
         {
@@ -312,7 +312,7 @@ impl MountAuthDBus {
                 }
             };
 
-            authorizations.add_authorization(username.clone(), hash);
+            authorizations.add_authorization(username, hash);
 
             if let Err(err) = lck.write_auth_file(&authorizations).await {
                 eprintln!("❌ Error writing the mount authorizations file: {err}");
@@ -325,7 +325,7 @@ impl MountAuthDBus {
         ServiceOperationResult::Ok.into()
     }
 
-    async fn check(&self, username: &str, hash: u64) -> bool {
+    pub async fn check(&self, username: &str, hash: u64) -> bool {
         println!("🔑 Requested check for authorization of mount for user {username}");
 
         // Defeat brute-force searches in an attempt to find an hash collision

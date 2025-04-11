@@ -111,7 +111,7 @@ async fn main() -> Result<(), ServiceError> {
             };
 
             let reply = proxy
-                .authorize(auth_data.username.clone(), loaded_mounts.hash())
+                .authorize(auth_data.username.as_str(), loaded_mounts.hash())
                 .await?;
 
             let result = ServiceOperationResult::from(reply);
