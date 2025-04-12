@@ -30,7 +30,7 @@ use login_ng::command::SessionCommand;
 use crate::errors::SessionManagerError;
 
 #[derive(Debug)]
-pub enum SessionStatus {
+pub enum ServiceStatus {
     Ready(Command),
     Running(Child),
     StoppedSuccessfully(ExitStatus),
@@ -40,7 +40,17 @@ pub enum SessionStatus {
 
 #[derive(Debug, Default)]
 pub struct SessionManager {
-    services: HashMap<String, SessionStatus>,
+    services: HashMap<String, ServiceStatus>,
+}
+
+pub struct ManagerStatus {
+    running: Vec<String>
+}
+
+impl ManagerStatus {
+    pub fn is_idle(&self) -> bool {
+        self.running.is_empty()
+    }
 }
 
 impl SessionManager {
@@ -51,10 +61,10 @@ impl SessionManager {
                 (name.clone(), {
                     let mut ready_cmd = Command::new(cmd.command());
                     ready_cmd.args(cmd.args().as_slice());
-                    SessionStatus::Ready(ready_cmd)
+                    ServiceStatus::Ready(ready_cmd)
                 })
             })
-            .collect::<HashMap<String, SessionStatus>>();
+            .collect::<HashMap<String, ServiceStatus>>();
 
         Self { services }
     }
@@ -63,21 +73,35 @@ impl SessionManager {
         let target_string = String::from(target);
         match self.services.get(&target_string) {
             Some(status) => match status {
-                SessionStatus::Running(_) => Ok(true),
+                ServiceStatus::Running(_) => Ok(true),
                 _ => Ok(false),
             },
             None => Err(SessionManagerError::NotFound(target_string)),
         }
     }
 
-    pub async fn load(&mut self) -> Result<(), SessionManagerError> {
-        todo!()
+    pub async fn load(&mut self, target: &String, cmd: &String, args: &[String]) -> Result<(), SessionManagerError> {
+        let mut command = Command::new(cmd);
+        command.args(args);
+
+        match self.services.get(target) {
+            Some(status) => match status {
+                _ => {
+                    eprintln!("");
+                    todo!()
+                }
+            },
+            None => {
+                let _ = self.services.insert(target.clone(), ServiceStatus::Ready(command));
+                Ok(())
+            },
+        }
     }
 
     pub async fn wait_idle(&mut self) -> Result<(), SessionManagerError> {
         // await until everything goes idle
         loop {
-            if self.step(Duration::from_secs(30)).await? == 0 {
+            if self.step(Duration::from_secs(30)).await?.is_idle() {
                 break;
             }
         }
@@ -88,38 +112,38 @@ impl SessionManager {
     pub async fn step(
         &mut self,
         process_await_delay: Duration,
-    ) -> Result<usize, SessionManagerError> {
-        let mut still_running = 0;
+    ) -> Result<ManagerStatus, SessionManagerError> {
+        let mut running = Vec::new();
 
         for task in self.services.iter_mut() {
             let tast_status = task.1;
-            let target = task.0.as_str();
+            let target = task.0;
             match tast_status {
-                SessionStatus::Ready(proc) => {
+                ServiceStatus::Ready(proc) => {
                     *tast_status = {
                         match proc.spawn() {
-                            Ok(child) => SessionStatus::Running(child),
+                            Ok(child) => ServiceStatus::Running(child),
                             Err(err) => {
-                                eprintln!("Error starting {target}: {err}");
-                                SessionStatus::Errored(err)
+                                eprintln!("Service errored starting {target}: {err}");
+                                ServiceStatus::Errored(err)
                             }
                         }
                     }
                 }
-                SessionStatus::Running(proc) => select! {
+                ServiceStatus::Running(proc) => select! {
                     wait_proc_res = timeout(process_await_delay, proc.wait()) => {
                         if let Ok(proc_res) = wait_proc_res {
                             match proc_res {
                                 Ok(exit_status) => {
-                                    *tast_status = SessionStatus::StoppedSuccessfully(exit_status)
+                                    *tast_status = ServiceStatus::StoppedSuccessfully(exit_status)
                                 },
                                 Err(exit_err) => {
-                                    eprintln!("Service errored {target}: {exit_err}");
-                                    *tast_status = SessionStatus::StoppedErrored(exit_err)
+                                    eprintln!("Service errored awaiting termination {target}: {exit_err}");
+                                    *tast_status = ServiceStatus::StoppedErrored(exit_err)
                                 },
                             }
                         } else {
-                            still_running += 1;
+                            running.push(target.clone());
                         }
                     },
                 },
@@ -127,6 +151,8 @@ impl SessionManager {
             }
         }
 
-        Ok(still_running)
+        Ok(ManagerStatus {
+            running
+        })
     }
 }
