@@ -226,7 +226,10 @@ impl MountAuth {
     }
 
     pub fn add_authorization(&mut self, username: &str, hash: u64) {
-        self.authorizations.entry(String::from(username)).or_default().push(hash);
+        self.authorizations
+            .entry(String::from(username))
+            .or_default()
+            .push(hash);
     }
 
     pub fn authorized(&self, username: &str, hash: u64) -> bool {
