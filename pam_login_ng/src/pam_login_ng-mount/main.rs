@@ -1,6 +1,6 @@
 /*
     login-ng A greeter written in rust that also supports autologin with systemd-homed
-    Copyright (C) 2024  Denis Benato
+    Copyright (C) 2024-2025  Denis Benato
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

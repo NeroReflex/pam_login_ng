@@ -17,7 +17,14 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-pub mod manager;
-pub mod errors;
+use thiserror::Error;
+use zbus::Error as ZError;
 
-pub extern crate login_ng;
+#[derive(Debug, Error)]
+pub enum SessionManagerError {
+    #[error("DBus error: {0}")]
+    ZbusError(#[from] ZError),
+
+    #[error("Service name not found: {0}")]
+    NotFound(String)
+}

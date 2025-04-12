@@ -1,6 +1,6 @@
 /*
     login-ng A greeter written in rust that also supports autologin with systemd-homed
-    Copyright (C) 2024  Denis Benato
+    Copyright (C) 2024-2025  Denis Benato
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -23,11 +23,9 @@ use tokio::{process::Command, sync::RwLock};
 
 use zbus::interface;
 
-#[derive(Debug, Clone)]
-pub struct SessionCommand {
-    cmd: String,
-    args: Vec<String>,
-}
+use login_ng::command::SessionCommand;
+
+use crate::errors::SessionManagerError;
 
 #[derive(Debug)]
 pub enum SessionStatus {
@@ -62,16 +60,20 @@ impl SessionManager {
         }
     }
 
-    pub fn is_running(&self, target: &str) -> Result<bool, i32> {
+    pub async fn is_running(&self, target: &str) -> Result<bool, SessionManagerError> {
         todo!()
     }
 
-    pub fn load(&self) -> Result<(), i32> {
+    pub async fn load(&mut self) -> Result<(), SessionManagerError> {
+        todo!()
+    }
+
+    pub async fn terminate(&mut self) -> Result<(), SessionManagerError> {
         todo!()
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SessionManagerDBus {
     manager: Arc<RwLock<SessionManager>>,
 }
@@ -83,10 +85,10 @@ impl SessionManagerDBus {
 }
 
 #[interface(
-    name = "org.neroreflex.login_ng_mount1",
+    name = "org.neroreflex.login_ng_service1",
     proxy(
-        default_service = "org.neroreflex.login_ng_mount",
-        default_path = "/org/zbus/login_ng_mount"
+        default_service = "org.neroreflex.login_ng_service",
+        default_path = "/org/zbus/login_ng_service"
     )
 )]
 impl SessionManagerDBus {
@@ -99,6 +101,10 @@ impl SessionManagerDBus {
     }
 
     pub async fn change(&self, target: &str, cmd: String, args: Vec<String>) -> u32 {
+        todo!()
+    }
+
+    pub async fn terminate(&self) -> u32 {
         todo!()
     }
 }
