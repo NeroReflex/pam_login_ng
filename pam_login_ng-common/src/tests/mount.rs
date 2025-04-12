@@ -37,7 +37,6 @@ async fn test_new() {
     let mounts_auth = MountAuthDBus::new(mounts_auth_op.clone());
 
     assert_eq!(mounts_auth.check("username", 0x4E421u64).await, false);
-    
 }
 
 #[tokio::test]
@@ -81,4 +80,3 @@ async fn test_authorize_different_users() {
     assert_eq!(mounts_auth.check("test", NUM1).await, false);
     assert_eq!(mounts_auth.check("username", NUM2).await, false);
 }
-
