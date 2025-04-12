@@ -17,9 +17,14 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, process::ExitStatus, sync::Arc, time::Duration};
 
-use tokio::{process::Command, sync::RwLock};
+use tokio::{
+    process::{Child, Command},
+    select,
+    sync::RwLock,
+    time::timeout,
+};
 
 use zbus::interface;
 
@@ -29,47 +34,103 @@ use crate::errors::SessionManagerError;
 
 #[derive(Debug)]
 pub enum SessionStatus {
-    Running(Command),
-    Stopped,
-}
-
-impl Default for SessionStatus {
-    fn default() -> Self {
-        Self::Stopped
-    }
+    Ready(Command),
+    Running(Child),
+    StoppedSuccessfully(ExitStatus),
+    StoppedErrored(std::io::Error),
+    Errored(std::io::Error),
 }
 
 #[derive(Debug, Default)]
 pub struct SessionManager {
-    services_cmd: HashMap<String, SessionCommand>,
-    services_status: HashMap<String, SessionStatus>,
+    services: HashMap<String, SessionStatus>,
 }
 
 impl SessionManager {
     pub fn new(map: HashMap<String, SessionCommand>) -> Self {
-        let services_status = map
-            .keys()
-            .map(|name| (name.clone(), SessionStatus::Stopped))
+        let services = map
+            .into_iter()
+            .map(|(name, cmd)| {
+                (name.clone(), {
+                    let mut ready_cmd = Command::new(cmd.command());
+                    ready_cmd.args(cmd.args().as_slice());
+                    SessionStatus::Ready(ready_cmd)
+                })
+            })
             .collect::<HashMap<String, SessionStatus>>();
 
-        let services_cmd = map.clone();
-
-        Self {
-            services_cmd,
-            services_status,
-        }
+        Self { services }
     }
 
-    pub async fn is_running(&self, target: &str) -> Result<bool, SessionManagerError> {
-        todo!()
+    pub async fn is_running(&self, target: &String) -> Result<bool, SessionManagerError> {
+        let target_string = String::from(target);
+        match self.services.get(&target_string) {
+            Some(status) => match status {
+                SessionStatus::Running(_) => Ok(true),
+                _ => Ok(false),
+            },
+            None => Err(SessionManagerError::NotFound(target_string)),
+        }
     }
 
     pub async fn load(&mut self) -> Result<(), SessionManagerError> {
         todo!()
     }
 
-    pub async fn terminate(&mut self) -> Result<(), SessionManagerError> {
-        todo!()
+    pub async fn wait_idle(&mut self) -> Result<(), SessionManagerError> {
+        // await until everything goes idle
+        loop {
+            if self.step(Duration::from_secs(30)).await? == 0 {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn step(
+        &mut self,
+        process_await_delay: Duration,
+    ) -> Result<usize, SessionManagerError> {
+        let mut still_running = 0;
+
+        for task in self.services.iter_mut() {
+            let tast_status = task.1;
+            let target = task.0.as_str();
+            match tast_status {
+                SessionStatus::Ready(proc) => {
+                    *tast_status = {
+                        match proc.spawn() {
+                            Ok(child) => SessionStatus::Running(child),
+                            Err(err) => {
+                                eprintln!("Error starting {target}: {err}");
+                                SessionStatus::Errored(err)
+                            }
+                        }
+                    }
+                }
+                SessionStatus::Running(proc) => select! {
+                    wait_proc_res = timeout(process_await_delay, proc.wait()) => {
+                        if let Ok(proc_res) = wait_proc_res {
+                            match proc_res {
+                                Ok(exit_status) => {
+                                    *tast_status = SessionStatus::StoppedSuccessfully(exit_status)
+                                },
+                                Err(exit_err) => {
+                                    eprintln!("Service errored {target}: {exit_err}");
+                                    *tast_status = SessionStatus::StoppedErrored(exit_err)
+                                },
+                            }
+                        } else {
+                            still_running += 1;
+                        }
+                    },
+                },
+                _ => {}
+            }
+        }
+
+        Ok(still_running)
     }
 }
 
@@ -92,15 +153,27 @@ impl SessionManagerDBus {
     )
 )]
 impl SessionManagerDBus {
-    pub async fn start(&self, target: &str) -> u32 {
+    pub async fn start(&self, target: String) -> u32 {
         todo!()
     }
 
-    pub async fn stop(&self, target: &str) -> u32 {
+    pub async fn stop(&self, target: String) -> u32 {
         todo!()
     }
 
-    pub async fn change(&self, target: &str, cmd: String, args: Vec<String>) -> u32 {
+    pub async fn is_running(&self, target: String) -> (u32, bool) {
+        let guard = self.manager.read().await;
+
+        match guard.is_running(&target).await {
+            Ok(response) => (0, response),
+            Err(err) => {
+                eprintln!("Error in fetching the running status of {target}: {err}");
+                (1, false)
+            }
+        }
+    }
+
+    pub async fn change(&self, target: String, cmd: String, args: Vec<String>) -> u32 {
         todo!()
     }
 

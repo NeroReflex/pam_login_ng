@@ -29,19 +29,29 @@ use zbus::connection;
 
 #[tokio::main]
 async fn main() -> Result<(), SessionManagerError> {
+    // This is the default user dbus address
+    // DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+    // where /run/user/1000 is XDG_RUNTIME_DIR
     match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
         Ok(value) => println!("Starting dbus service on socket {value}"),
         Err(err) => {
-            eprintln!("🟠 Couldn't read dbus socket address: {err} - using default...");
-            std::env::set_var(
-                "DBUS_SESSION_BUS_ADDRESS",
-                "unix:path=/run/dbus/system_bus_socket",
-            );
+            eprintln!("Couldn't read dbus socket address: {err} - using default...");
+            match std::env::var("XDG_RUNTIME_DIR") {
+                Ok(xdg_runtime_dir) => std::env::set_var(
+                    "DBUS_SESSION_BUS_ADDRESS",
+                    format!("unix:path={xdg_runtime_dir}/bus").as_str(),
+                ),
+                Err(err) => {
+                    eprintln!("Unable to generate the default dbus address {err}")
+                }
+            }
         }
     }
 
+    let default_service_name = String::from("default");
+
     let preloaded = HashMap::from([(
-        String::from("desktop"),
+        default_service_name.clone(),
         SessionCommand::new(String::from("Hyprland"), vec![]),
     )]);
 
@@ -62,15 +72,19 @@ async fn main() -> Result<(), SessionManagerError> {
 
     let mut main_service_exited = false;
     while !main_service_exited {
-        let guard = manager.write().await;
+        let mut guard = manager.write().await;
 
         // here collect info on running stuff
+        let _ = tokio::join!(
+            guard.step(tokio::time::Duration::from_millis(1)),
+            tokio::time::sleep(tokio::time::Duration::from_millis(250))
+        );
 
-        main_service_exited = guard.is_running("desktop").await?;
+        main_service_exited = guard.is_running(&default_service_name).await?;
     }
 
     let mut guard = manager.write().await;
-    guard.terminate().await?;
+    guard.wait_idle().await?;
 
     drop(dbus_manager);
 
