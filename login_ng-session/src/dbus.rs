@@ -17,20 +17,13 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{collections::HashMap, process::ExitStatus, sync::Arc, time::Duration};
+use std::sync::Arc;
 
-use tokio::{
-    process::{Child, Command},
-    select,
-    sync::RwLock,
-    time::timeout,
-};
+use tokio::sync::RwLock;
 
 use zbus::interface;
 
-use login_ng::command::SessionCommand;
-
-use crate::{errors::SessionManagerError, manager::SessionManager};
+use crate::manager::SessionManager;
 
 #[derive(Debug, Clone)]
 pub struct SessionManagerDBus {

@@ -17,16 +17,13 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{collections::HashMap, process::ExitStatus, sync::Arc, time::Duration};
+use std::{collections::HashMap, process::ExitStatus, time::Duration};
 
 use tokio::{
     process::{Child, Command},
     select,
-    sync::RwLock,
     time::timeout,
 };
-
-use zbus::interface;
 
 use login_ng::command::SessionCommand;
 
