@@ -1,0 +1,23 @@
+[package]
+name = "login_ng-session"
+authors = ["Denis Benato <benato.denis96@gmail.com>"]
+edition = "2021"
+license = "GPL-2.0-or-later"
+
+[dependencies]
+argh = "^0.1"
+login_ng = { path = "../login_ng" }
+tokio = { version = "^1.43", features = ["macros", "rt-multi-thread", "sync", "signal", "process"] }
+thiserror = "2.0.11"
+zbus = "5.5.0"
+
+[package.metadata.deb]
+license-file = ["../LICENSE.md", "4"]
+extended-description = """\
+A manager for user sessions."""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/login_ng-session", "usr/bin/", "755"],
+]
