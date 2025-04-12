@@ -26,5 +26,5 @@ pub enum SessionManagerError {
     ZbusError(#[from] ZError),
 
     #[error("Service name not found: {0}")]
-    NotFound(String)
+    NotFound(String),
 }

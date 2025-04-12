@@ -36,7 +36,7 @@ async fn test_new() {
 
     let mounts_auth = MountAuthDBus::new(mounts_auth_op.clone());
 
-    assert_eq!(mounts_auth.check("username", 0x4E421u64).await, false);
+    assert!(!(mounts_auth.check("username", 0x4E421u64).await));
 }
 
 #[tokio::test]
@@ -51,9 +51,9 @@ async fn test_authorize() {
 
     let mut mounts_auth = MountAuthDBus::new(mounts_auth_op.clone());
 
-    assert_eq!(mounts_auth.check("username", 0x4E421u64).await, false);
+    assert!(!(mounts_auth.check("username", 0x4E421u64).await));
     assert_eq!(mounts_auth.authorize("username", 0x4E421u64).await, 0u32);
-    assert_eq!(mounts_auth.check("username", 0x4E421u64).await, true);
+    assert!(mounts_auth.check("username", 0x4E421u64).await);
 }
 
 #[tokio::test]
@@ -71,12 +71,12 @@ async fn test_authorize_different_users() {
     const NUM1: u64 = 0x2913787u64;
     const NUM2: u64 = 0x4E42142u64;
 
-    assert_eq!(mounts_auth.check("username", NUM1).await, false);
-    assert_eq!(mounts_auth.check("test", NUM2).await, false);
+    assert!(!(mounts_auth.check("username", NUM1).await));
+    assert!(!(mounts_auth.check("test", NUM2).await));
     assert_eq!(mounts_auth.authorize("test", NUM2).await, 0u32);
     assert_eq!(mounts_auth.authorize("username", NUM1).await, 0u32);
-    assert_eq!(mounts_auth.check("username", NUM1).await, true);
-    assert_eq!(mounts_auth.check("test", NUM2).await, true);
-    assert_eq!(mounts_auth.check("test", NUM1).await, false);
-    assert_eq!(mounts_auth.check("username", NUM2).await, false);
+    assert!(mounts_auth.check("username", NUM1).await);
+    assert!(mounts_auth.check("test", NUM2).await);
+    assert!(!(mounts_auth.check("test", NUM1).await));
+    assert!(!(mounts_auth.check("username", NUM2).await));
 }

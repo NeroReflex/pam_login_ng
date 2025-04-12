@@ -48,11 +48,11 @@ pub struct SessionManager {
 impl SessionManager {
     pub fn new(map: HashMap<String, SessionCommand>) -> Self {
         let services_status = map
-            .iter()
-            .map(|(name, _)| (name.clone(), SessionStatus::Stopped))
+            .keys()
+            .map(|name| (name.clone(), SessionStatus::Stopped))
             .collect::<HashMap<String, SessionStatus>>();
 
-        let services_cmd = map.clone();        
+        let services_cmd = map.clone();
 
         Self {
             services_cmd,

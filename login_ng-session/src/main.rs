@@ -29,7 +29,6 @@ use zbus::connection;
 
 #[tokio::main]
 async fn main() -> Result<(), SessionManagerError> {
-
     match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
         Ok(value) => println!("Starting dbus service on socket {value}"),
         Err(err) => {
@@ -41,9 +40,10 @@ async fn main() -> Result<(), SessionManagerError> {
         }
     }
 
-    let preloaded = HashMap::from([
-        (String::from("desktop"), SessionCommand::new(String::from("Hyprland"), vec![]))
-    ]);
+    let preloaded = HashMap::from([(
+        String::from("desktop"),
+        SessionCommand::new(String::from("Hyprland"), vec![]),
+    )]);
 
     let manager = Arc::new(RwLock::new(SessionManager::new(preloaded)));
 
@@ -62,7 +62,7 @@ async fn main() -> Result<(), SessionManagerError> {
 
     let mut main_service_exited = false;
     while !main_service_exited {
-        let mut guard = manager.write().await;
+        let guard = manager.write().await;
 
         // here collect info on running stuff
 

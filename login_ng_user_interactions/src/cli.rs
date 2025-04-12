@@ -237,10 +237,7 @@ impl LoginUserInteractionHandler for CommandLineLoginUserInteractionHandler {
     fn prompt_plain(&mut self, msg: &String) -> Option<String> {
         match &self.maybe_username {
             Some(username) => Some(username.clone()),
-            None => match prompt_plain(msg.as_str()) {
-                Ok(response) => Some(response),
-                Err(_) => None,
-            },
+            None => prompt_plain(msg.as_str()).ok(),
         }
     }
 

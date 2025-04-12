@@ -17,7 +17,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-pub mod manager;
 pub mod errors;
+pub mod manager;
 
 pub extern crate login_ng;

@@ -90,8 +90,7 @@ impl Sessions {
 
             let key_as_str = read_file_or_create_default(filepath, default_key_gen_fn).await?;
 
-            RsaPrivateKey::from_pkcs1_pem(key_as_str.as_str())
-                .map_err(|err| ServiceError::PKCS1Error(err))
+            RsaPrivateKey::from_pkcs1_pem(key_as_str.as_str()).map_err(ServiceError::PKCS1Error)
         })));
 
         let one_time_tokens = HashMap::new();
@@ -117,7 +116,7 @@ impl Sessions {
                 }
                 Err(err) => {
                     println!("❌ Error awaiting for private key fetch task: {err}");
-                    return Err(ServiceError::JoinError(err));
+                    Err(ServiceError::JoinError(err))
                 }
             },
         }

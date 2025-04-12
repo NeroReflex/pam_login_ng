@@ -251,13 +251,12 @@ impl MountAuthOperations {
 
     pub(crate) async fn read_auth_file(&self) -> Result<MountAuth, ServiceError> {
         match disk::read_file_or_create_default(self.file_path.clone(), || {
-            serde_json::to_string_pretty(&MountAuth::default())
-                .map_err(|err| ServiceError::JsonError(err))
+            serde_json::to_string_pretty(&MountAuth::default()).map_err(ServiceError::JsonError)
         })
         .await
         {
             Ok(auth_str) => MountAuth::new(auth_str.as_str()),
-            Err(err) => return Err(err),
+            Err(err) => Err(err),
         }
     }
 

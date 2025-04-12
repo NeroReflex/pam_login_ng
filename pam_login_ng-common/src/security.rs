@@ -155,7 +155,7 @@ impl SessionPrelude {
             );
         }
 
-        if nonce_slice.len() != NONCE_LEN as usize {
+        if nonce_slice.len() != NONCE_LEN {
             return Err(SessionPreludeError::WrongNonceSize);
         }
 

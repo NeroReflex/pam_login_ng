@@ -54,7 +54,7 @@ where
 
             let contents = default()?;
 
-            match File::create(&file_path) {
+            match File::create(file_path) {
                 Ok(mut file) => {
                     let metadata = file.metadata()?;
                     let mut perm = metadata.permissions();
