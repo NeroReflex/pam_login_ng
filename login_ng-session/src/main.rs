@@ -20,10 +20,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use login_ng_session::dbus::SessionManagerDBus;
 use login_ng_session::errors::SessionManagerError;
 use login_ng_session::login_ng::command::SessionCommand;
 use login_ng_session::manager::SessionManager;
-use login_ng_session::manager::SessionManagerDBus;
 use tokio::sync::RwLock;
 use zbus::connection;
 

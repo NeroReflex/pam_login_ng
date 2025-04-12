@@ -17,6 +17,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
+pub mod dbus;
 pub mod errors;
 pub mod manager;
 
