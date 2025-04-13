@@ -32,18 +32,18 @@ use tokio::{
 
 #[derive(Debug)]
 pub struct SessionNodeRestart {
-    times: u64,
+    max_times: u64,
     delay: Duration,
 }
 
 impl SessionNodeRestart {
-    pub fn new(times: u64, delay: Duration) -> Self {
-        Self { times, delay }
+    pub fn new(max_times: u64, delay: Duration) -> Self {
+        Self { max_times, delay }
     }
 
     pub fn no_restart() -> Self {
         Self {
-            times: u64::MIN,
+            max_times: u64::MIN,
             delay: Duration::from_secs(5),
         }
     }
@@ -52,7 +52,7 @@ impl SessionNodeRestart {
 impl Default for SessionNodeRestart {
     fn default() -> Self {
         Self {
-            times: u64::MAX,
+            max_times: u64::MAX,
             delay: Duration::from_secs(5),
         }
     }
@@ -60,9 +60,8 @@ impl Default for SessionNodeRestart {
 
 #[derive(Debug)]
 pub enum SessionNodeStopReason {
-    StartError(std::io::Error),
     Completed(ExitStatus),
-    Stopped(std::io::Error),
+    Errored(std::io::Error),
     Manual,
 }
 
@@ -74,6 +73,12 @@ pub enum SessionNodeStatus {
         time: time::Instant,
         reason: Arc<SessionNodeStopReason>,
     },
+}
+
+pub enum SessionStalledReason {
+    RestartedTooManyTimes,
+    TerminatedSuccessfully,
+    UserRequested,
 }
 
 #[derive(Debug)]
@@ -148,15 +153,15 @@ impl SessionNode {
         todo!()
     }
 
-    pub async fn poll(&mut self) -> bool {
-        let mut stalled = false;
+    pub async fn poll(&mut self) -> Option<SessionStalledReason> {
+        let mut stall_reason = None;
 
         self.status = match &self.status {
             SessionNodeStatus::Ready => match self.command.spawn() {
                 Ok(child) => SessionNodeStatus::Running(Arc::new(RwLock::new(child))),
                 Err(err) => SessionNodeStatus::Stopped {
                     time: time::Instant::now(),
-                    reason: Arc::new(SessionNodeStopReason::StartError(err)),
+                    reason: Arc::new(SessionNodeStopReason::Errored(err)),
                 },
             },
             SessionNodeStatus::Running(proc) => match proc.write().await.try_wait() {
@@ -169,23 +174,34 @@ impl SessionNode {
                 },
                 Err(err) => SessionNodeStatus::Stopped {
                     time: time::Instant::now(),
-                    reason: Arc::new(SessionNodeStopReason::Stopped(err)),
+                    reason: Arc::new(SessionNodeStopReason::Errored(err)),
                 },
             },
             SessionNodeStatus::Stopped { time, reason } => {
-                stalled = match reason.deref() {
-                    SessionNodeStopReason::StartError(_) => self.restart.times < self.restarted,
+                stall_reason = match reason.deref() {
+                    SessionNodeStopReason::Errored(_) => {
+                        if self.restarted >= self.restart.max_times {
+                            Some(SessionStalledReason::RestartedTooManyTimes)
+                        } else {
+                            None
+                        }
+                    },
                     SessionNodeStopReason::Completed(exit_status) => {
-                        exit_status.success() || self.restart.times < self.restarted
-                    }
-                    SessionNodeStopReason::Stopped(_) => self.restart.times < self.restarted,
-                    SessionNodeStopReason::Manual => true,
+                        if exit_status.success() {
+                            Some(SessionStalledReason::TerminatedSuccessfully)
+                        } else if self.restarted >= self.restart.max_times {
+                            Some(SessionStalledReason::RestartedTooManyTimes)
+                        } else {
+                            None
+                        }
+                    },
+                    SessionNodeStopReason::Manual => Some(SessionStalledReason::UserRequested),
                 };
 
                 match time.checked_add(self.restart.delay) {
                     Some(restart_time) => match Instant::now() >= restart_time {
                         true => {
-                            if !stalled {
+                            if stall_reason.is_none() {
                                 SessionNodeStatus::Ready
                             } else {
                                 self.status.clone()
@@ -198,6 +214,6 @@ impl SessionNode {
             }
         };
 
-        stalled
+        stall_reason
     }
 }

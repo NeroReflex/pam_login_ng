@@ -21,12 +21,10 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use tokio::sync::RwLock;
 
-use crate::{errors::SessionManagerError, node::SessionNode};
-
-#[derive(Debug, Default)]
-pub struct SessionManager {
-    services: HashMap<String, Arc<RwLock<SessionNode>>>,
-}
+use crate::{
+    errors::SessionManagerError,
+    node::{SessionNode, SessionStalledReason},
+};
 
 pub struct ManagerStatus {
     running: Vec<String>,
@@ -36,6 +34,11 @@ impl ManagerStatus {
     pub fn is_idle(&self) -> bool {
         self.running.is_empty()
     }
+}
+
+#[derive(Debug, Default)]
+pub struct SessionManager {
+    services: HashMap<String, Arc<RwLock<SessionNode>>>,
 }
 
 impl SessionManager {
@@ -60,8 +63,8 @@ impl SessionManager {
         target: &String,
         minimum_step_delay: Duration,
     ) -> Result<(), SessionManagerError> {
-        // await until everything goes idle
-        while !self.step(target, minimum_step_delay).await? {}
+        // await until the target goes stalled (loop while it is NOT stalled)
+        while self.step(target, minimum_step_delay).await?.is_none() {}
 
         Ok(())
     }
@@ -70,7 +73,7 @@ impl SessionManager {
         &mut self,
         target: &String,
         minimum_step_delay: Duration,
-    ) -> Result<bool, SessionManagerError> {
+    ) -> Result<Option<SessionStalledReason>, SessionManagerError> {
         let mut guard = self.services.get(target).unwrap().write().await;
 
         let (_sleep_res, stalled) =

@@ -88,8 +88,8 @@ async fn main() -> Result<(), SessionManagerError> {
             .await
         {
             Ok(is_stalled) => match is_stalled {
-                true => break,
-                false => continue,
+                Some(_) => break,
+                None => { /* NOT stalled */ }
             },
             Err(err) => return Err(err),
         }
