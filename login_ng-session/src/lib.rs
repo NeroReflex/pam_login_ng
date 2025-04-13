@@ -20,5 +20,6 @@
 pub mod dbus;
 pub mod errors;
 pub mod manager;
+pub mod node;
 
 pub extern crate login_ng;

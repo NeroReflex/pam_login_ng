@@ -17,34 +17,19 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{collections::HashMap, process::ExitStatus, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use tokio::{
-    process::{Child, Command},
-    select,
-    time::timeout,
-};
+use tokio::sync::RwLock;
 
-use login_ng::command::SessionCommand;
-
-use crate::errors::SessionManagerError;
-
-#[derive(Debug)]
-pub enum ServiceStatus {
-    Ready(Command),
-    Running(Child),
-    StoppedSuccessfully(ExitStatus),
-    StoppedErrored(std::io::Error),
-    Errored(std::io::Error),
-}
+use crate::{errors::SessionManagerError, node::SessionNode};
 
 #[derive(Debug, Default)]
 pub struct SessionManager {
-    services: HashMap<String, ServiceStatus>,
+    services: HashMap<String, Arc<RwLock<SessionNode>>>,
 }
 
 pub struct ManagerStatus {
-    running: Vec<String>
+    running: Vec<String>,
 }
 
 impl ManagerStatus {
@@ -54,105 +39,43 @@ impl ManagerStatus {
 }
 
 impl SessionManager {
-    pub fn new(map: HashMap<String, SessionCommand>) -> Self {
+    pub fn new(map: HashMap<String, Arc<RwLock<SessionNode>>>) -> Self {
         let services = map
             .into_iter()
-            .map(|(name, cmd)| {
-                (name.clone(), {
-                    let mut ready_cmd = Command::new(cmd.command());
-                    ready_cmd.args(cmd.args().as_slice());
-                    ServiceStatus::Ready(ready_cmd)
-                })
-            })
-            .collect::<HashMap<String, ServiceStatus>>();
+            .map(|(name, node)| (name.clone(), node.clone()))
+            .collect::<HashMap<String, Arc<RwLock<SessionNode>>>>();
 
         Self { services }
     }
 
     pub async fn is_running(&self, target: &String) -> Result<bool, SessionManagerError> {
-        let target_string = String::from(target);
-        match self.services.get(&target_string) {
-            Some(status) => match status {
-                ServiceStatus::Running(_) => Ok(true),
-                _ => Ok(false),
-            },
-            None => Err(SessionManagerError::NotFound(target_string)),
-        }
-    }
-
-    pub async fn load(&mut self, target: &String, cmd: &String, args: &[String]) -> Result<(), SessionManagerError> {
-        let mut command = Command::new(cmd);
-        command.args(args);
-
         match self.services.get(target) {
-            Some(status) => match status {
-                _ => {
-                    eprintln!("");
-                    todo!()
-                }
-            },
-            None => {
-                let _ = self.services.insert(target.clone(), ServiceStatus::Ready(command));
-                Ok(())
-            },
+            Some(node) => Ok(node.read().await.is_running().await),
+            None => Err(SessionManagerError::NotFound(target.clone())),
         }
     }
 
-    pub async fn wait_idle(&mut self) -> Result<(), SessionManagerError> {
+    pub async fn wait_idle(
+        &mut self,
+        target: &String,
+        minimum_step_delay: Duration,
+    ) -> Result<(), SessionManagerError> {
         // await until everything goes idle
-        loop {
-            if self.step(Duration::from_secs(30)).await?.is_idle() {
-                break;
-            }
-        }
+        while !self.step(target, minimum_step_delay).await? {}
 
         Ok(())
     }
 
     pub async fn step(
         &mut self,
-        process_await_delay: Duration,
-    ) -> Result<ManagerStatus, SessionManagerError> {
-        let mut running = Vec::new();
+        target: &String,
+        minimum_step_delay: Duration,
+    ) -> Result<bool, SessionManagerError> {
+        let mut guard = self.services.get(target).unwrap().write().await;
 
-        for task in self.services.iter_mut() {
-            let tast_status = task.1;
-            let target = task.0;
-            match tast_status {
-                ServiceStatus::Ready(proc) => {
-                    *tast_status = {
-                        match proc.spawn() {
-                            Ok(child) => ServiceStatus::Running(child),
-                            Err(err) => {
-                                eprintln!("Service errored starting {target}: {err}");
-                                ServiceStatus::Errored(err)
-                            }
-                        }
-                    }
-                }
-                ServiceStatus::Running(proc) => select! {
-                    wait_proc_res = timeout(process_await_delay, proc.wait()) => {
-                        if let Ok(proc_res) = wait_proc_res {
-                            match proc_res {
-                                Ok(exit_status) => {
-                                    *tast_status = ServiceStatus::StoppedSuccessfully(exit_status)
-                                },
-                                Err(exit_err) => {
-                                    eprintln!("Service errored awaiting termination {target}: {exit_err}");
-                                    *tast_status = ServiceStatus::StoppedErrored(exit_err)
-                                },
-                            }
-                        } else {
-                            running.push(target.clone());
-                        }
-                    },
-                },
-                _ => {}
-            }
-        }
+        let (_sleep_res, stalled) =
+            tokio::join!(tokio::time::sleep(minimum_step_delay), guard.poll());
 
-        Ok(ManagerStatus {
-            running
-        })
+        Ok(stalled)
     }
 }

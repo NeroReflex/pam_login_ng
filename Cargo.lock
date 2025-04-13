@@ -910,6 +910,7 @@ version = "0.0.0"
 dependencies = [
  "argh",
  "login_ng",
+ "nix",
  "thiserror 2.0.12",
  "tokio",
  "zbus",

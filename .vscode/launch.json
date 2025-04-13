@@ -45,15 +45,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'login-ng_cli'",
+            "name": "Debug executable 'login_ng-cli'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=login-ng_cli",
+                    "--bin=login_ng-cli",
                     "--package=login_ng"
                 ],
                 "filter": {
-                    "name": "login-ng_cli",
+                    "name": "login_ng-cli",
                     "kind": "bin"
                 }
             },
@@ -63,16 +63,34 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'login-ng_cli'",
+            "name": "Debug executable 'login_ng-session'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=login_ng-session",
+                    "--package=login_ng-session"
+                ],
+                "filter": {
+                    "name": "login_ng-session",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'login_ng-cli'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=login-ng_cli",
+                    "--bin=login_ng-cli",
                     "--package=login_ng"
                 ],
                 "filter": {
-                    "name": "login-ng_cli",
+                    "name": "login_ng-cli",
                     "kind": "bin"
                 }
             },
@@ -119,15 +137,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'login-ng_ctl'",
+            "name": "Debug executable 'login_ng-ctl'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=login-ng_ctl",
+                    "--bin=login_ng-ctl",
                     "--package=login_ng"
                 ],
                 "filter": {
-                    "name": "login-ng_ctl",
+                    "name": "login_ng-ctl",
                     "kind": "bin"
                 }
             },
@@ -137,16 +155,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in executable 'login-ng_ctl'",
+            "name": "Debug unit tests in executable 'login_ng-ctl'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
-                    "--bin=login-ng_ctl",
+                    "--bin=login_ng-ctl",
                     "--package=login_ng"
                 ],
                 "filter": {
-                    "name": "login-ng_ctl",
+                    "name": "login_ng-ctl",
                     "kind": "bin"
                 }
             },

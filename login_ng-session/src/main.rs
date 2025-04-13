@@ -19,16 +19,32 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use login_ng_session::dbus::SessionManagerDBus;
 use login_ng_session::errors::SessionManagerError;
-use login_ng_session::login_ng::command::SessionCommand;
 use login_ng_session::manager::SessionManager;
+use login_ng_session::node::{SessionNode, SessionNodeRestart};
 use tokio::sync::RwLock;
 use zbus::connection;
 
 #[tokio::main]
 async fn main() -> Result<(), SessionManagerError> {
+    let default_service_name = String::from("default");
+
+    let preloaded = HashMap::from([(
+        default_service_name.clone(),
+        Arc::new(RwLock::new(SessionNode::new(
+            String::from("Hyprland"),
+            &vec![],
+            nix::sys::signal::Signal::SIGINT,
+            SessionNodeRestart::no_restart(),
+            vec![],
+        ))),
+    )]);
+
+    let manager = Arc::new(RwLock::new(SessionManager::new(preloaded)));
+
     // This is the default user dbus address
     // DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
     // where /run/user/1000 is XDG_RUNTIME_DIR
@@ -48,15 +64,6 @@ async fn main() -> Result<(), SessionManagerError> {
         }
     }
 
-    let default_service_name = String::from("default");
-
-    let preloaded = HashMap::from([(
-        default_service_name.clone(),
-        SessionCommand::new(String::from("Hyprland"), vec![]),
-    )]);
-
-    let manager = Arc::new(RwLock::new(SessionManager::new(preloaded)));
-
     let dbus_manager = connection::Builder::session()
         .map_err(SessionManagerError::ZbusError)?
         .name("org.neroreflex.login_ng_service")
@@ -70,23 +77,31 @@ async fn main() -> Result<(), SessionManagerError> {
         .await
         .map_err(SessionManagerError::ZbusError)?;
 
-    let mut main_service_exited = false;
-    while !main_service_exited {
+    println!("Running the session manager");
+
+    loop {
         let mut guard = manager.write().await;
 
         // here collect info on running stuff
-        let _ = tokio::join!(
-            guard.step(tokio::time::Duration::from_millis(1)),
-            tokio::time::sleep(tokio::time::Duration::from_millis(250))
-        );
-
-        main_service_exited = guard.is_running(&default_service_name).await?;
+        match guard
+            .step(&default_service_name, Duration::from_millis(250))
+            .await
+        {
+            Ok(is_stalled) => match is_stalled {
+                true => break,
+                false => continue,
+            },
+            Err(err) => return Err(err),
+        }
     }
 
-    let mut guard = manager.write().await;
-    guard.wait_idle().await?;
-
     drop(dbus_manager);
+
+    manager
+        .write()
+        .await
+        .wait_idle(&default_service_name, Duration::from_millis(250))
+        .await?;
 
     Ok(())
 }

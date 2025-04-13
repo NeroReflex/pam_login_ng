@@ -10,6 +10,7 @@ login_ng = { path = "../login_ng" }
 tokio = { version = "^1.43", features = ["macros", "rt-multi-thread", "sync", "signal", "process", "time"] }
 thiserror = "2.0.11"
 zbus = "5.5.0"
+nix = { version = "^0.29", features = [ "signal" ] }
 
 [package.metadata.deb]
 license-file = ["../LICENSE.md", "4"]
