@@ -880,7 +880,7 @@ dependencies = [
  "hkdf",
  "rs_sha512",
  "sha2",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "users",
  "xattr",
 ]
@@ -928,7 +928,7 @@ dependencies = [
  "nix",
  "pam-client2",
  "rpassword",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
