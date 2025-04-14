@@ -64,7 +64,9 @@ impl SessionManager {
         minimum_step_delay: Duration,
     ) -> Result<(), SessionManagerError> {
         // await until the target goes stalled (loop while it is NOT stalled)
-        while self.step(target, minimum_step_delay).await?.is_none() {}
+        while self.step(target, minimum_step_delay).await?.is_none() {
+            tokio::time::sleep(Duration::from_nanos(100)).await
+        }
 
         Ok(())
     }
