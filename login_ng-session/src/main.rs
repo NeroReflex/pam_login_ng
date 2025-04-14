@@ -66,8 +66,10 @@ async fn main() -> Result<(), SessionManagerError> {
                 // if the default target is missing use the default user shell
                 if filename == default_service_name {
                     let shell = user.clone().shell.to_string_lossy().into_owned();
-                    
-                    eprintln!("Definition for {default_service_name} not found: using shell {shell}");
+
+                    eprintln!(
+                        "Definition for {default_service_name} not found: using shell {shell}"
+                    );
 
                     nodes = HashMap::from([(
                         default_service_name.clone(),

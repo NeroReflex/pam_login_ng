@@ -164,25 +164,27 @@ impl SessionNode {
         self.status = match &self.status {
             SessionNodeStatus::Ready => {
                 // Check for each dependency to be NOT stalled
+                let mut stalled = false;
                 for dep in self.dependencies.iter() {
                     let mut guard = dep.write().await;
 
-                    let stalled = match Box::pin(guard.poll()).await {
-                        Some(_) => true,
-                        None => false,
-                    };
-
-                    // here dependency node is either stalled or running.
-                    // if it is running it might NOT have completed what this node requires
-                    // I do not give any fuck (yet?) because programs can wait for what they
-                    // need, or fail and will be restarted.
+                    if Box::pin(guard.poll()).await.is_some() {
+                        stalled = true;
+                    }
                 }
 
-                match self.command.spawn() {
-                    Ok(child) => SessionNodeStatus::Running(Arc::new(RwLock::new(child))),
-                    Err(err) => SessionNodeStatus::Stopped {
-                        time: time::Instant::now(),
-                        reason: Arc::new(SessionNodeStopReason::Errored(err)),
+                // here dependency node is either stalled or running.
+                // if it is running it might NOT have completed what this node requires
+                // I do not give any fuck (yet?) because programs can wait for what they
+                // need, or fail and will be restarted.
+                match stalled {
+                    true => SessionNodeStatus::Ready,
+                    false => match self.command.spawn() {
+                        Ok(child) => SessionNodeStatus::Running(Arc::new(RwLock::new(child))),
+                        Err(err) => SessionNodeStatus::Stopped {
+                            time: time::Instant::now(),
+                            reason: Arc::new(SessionNodeStopReason::Errored(err)),
+                        },
                     },
                 }
             }
