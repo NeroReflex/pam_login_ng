@@ -42,13 +42,15 @@ async fn main() -> Result<(), SessionManagerError> {
         &default_service_name,
         load_directoried.as_slice(),
         &mut currently_loading,
-    ).await {
-        Ok(_) => {},
+    )
+    .await
+    {
+        Ok(_) => {}
         Err(err) => match err {
             login_ng_session::errors::NodeLoadingError::IOError(err) => {
                 eprintln!("File error: {err}");
                 std::process::exit(-1)
-            },
+            }
             login_ng_session::errors::NodeLoadingError::FileNotFound(filename) => {
                 // if the default target is missing use the default user shell
                 if filename == default_service_name {
@@ -56,7 +58,7 @@ async fn main() -> Result<(), SessionManagerError> {
                         default_service_name.clone(),
                         Arc::new(RwLock::new(SessionNode::new(
                             String::from("Hyprland"),
-                            &vec![],
+                            &[],
                             nix::sys::signal::Signal::SIGINT,
                             SessionNodeRestart::no_restart(),
                             vec![],
@@ -66,16 +68,16 @@ async fn main() -> Result<(), SessionManagerError> {
                     eprintln!("Dependency not found: {filename}");
                     std::process::exit(-1)
                 }
-            },
+            }
             login_ng_session::errors::NodeLoadingError::CyclicDependency(filename) => {
                 eprintln!("Cycle for target: {filename}");
                 std::process::exit(-1)
-            },
+            }
             login_ng_session::errors::NodeLoadingError::JSONError(err) => {
                 eprintln!("JSON deserialization error: {err}");
                 std::process::exit(-1)
-            },
-        }
+            }
+        },
     };
 
     let manager = Arc::new(RwLock::new(SessionManager::new(nodes)));

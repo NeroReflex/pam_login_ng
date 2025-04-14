@@ -150,7 +150,13 @@ impl NodeServiceDescriptor {
 
         // Parse all dependencies and then register those as part of node
         for dep in main.dependencies().iter() {
-            let _ = Box::pin(Self::find_and_load(hashmap, dep, directories, currently_loading)).await?;
+            Box::pin(Self::find_and_load(
+                hashmap,
+                dep,
+                directories,
+                currently_loading,
+            ))
+            .await?;
 
             let just_loaded = hashmap.get(dep).unwrap();
             node.write().await.add_dependency(just_loaded.clone()).await;
