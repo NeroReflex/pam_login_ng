@@ -133,7 +133,7 @@ async fn main() -> Result<(), SessionManagerError> {
         {
             Ok(is_stalled) => match is_stalled {
                 Some(_) => break,
-                None => { /* NOT stalled */ }
+                None => tokio::time::sleep(Duration::from_nanos(100)).await
             },
             Err(err) => return Err(err),
         }
