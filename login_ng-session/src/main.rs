@@ -27,13 +27,20 @@ use login_ng_session::desc::NodeServiceDescriptor;
 use login_ng_session::errors::SessionManagerError;
 use login_ng_session::manager::SessionManager;
 use login_ng_session::node::{SessionNode, SessionNodeRestart};
+use nix::unistd::{getuid, User};
 use tokio::sync::RwLock;
 use zbus::connection;
 
 #[tokio::main]
 async fn main() -> Result<(), SessionManagerError> {
-    let default_service_name = String::from("default");
-    let load_directoried = vec![PathBuf::from("")];
+    let uid = getuid();
+    let user = User::from_uid(uid).expect("Failed to get user information").unwrap();
+    let load_directoried = vec![
+        PathBuf::from(user.clone().dir).join(".config").join("login_ng-session"),
+        PathBuf::from("/etc/login_ng-session/")
+    ];
+
+    let default_service_name = String::from("default.service");
 
     let mut nodes = HashMap::new();
     let mut currently_loading = HashSet::new();
@@ -57,7 +64,7 @@ async fn main() -> Result<(), SessionManagerError> {
                     nodes = HashMap::from([(
                         default_service_name.clone(),
                         Arc::new(RwLock::new(SessionNode::new(
-                            String::from("Hyprland"),
+                            user.clone().shell.to_string_lossy().into_owned(),
                             &[],
                             nix::sys::signal::Signal::SIGINT,
                             SessionNodeRestart::no_restart(),
