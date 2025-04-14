@@ -37,6 +37,8 @@ async fn test_new() {
     let mounts_auth = MountAuthDBus::new(mounts_auth_op.clone());
 
     assert!(!(mounts_auth.check("username", 0x4E421u64).await));
+
+    std::fs::remove_file(filepath.clone()).unwrap();
 }
 
 #[tokio::test]
@@ -54,6 +56,8 @@ async fn test_authorize() {
     assert!(!(mounts_auth.check("username", 0x4E421u64).await));
     assert_eq!(mounts_auth.authorize("username", 0x4E421u64).await, 0u32);
     assert!(mounts_auth.check("username", 0x4E421u64).await);
+
+    std::fs::remove_file(filepath.clone()).unwrap();
 }
 
 #[tokio::test]
@@ -79,4 +83,38 @@ async fn test_authorize_different_users() {
     assert!(mounts_auth.check("test", NUM2).await);
     assert!(!(mounts_auth.check("test", NUM1).await));
     assert!(!(mounts_auth.check("username", NUM2).await));
+
+    std::fs::remove_file(filepath.clone()).unwrap();
+}
+
+#[tokio::test]
+async fn test_authorization_file() {
+    let filepath = Path::new("./").join(AUTHORIZATION_TESTFILE);
+
+    if std::fs::exists(filepath.clone()).unwrap() {
+        std::fs::remove_file(filepath.clone()).unwrap();
+    }
+
+    // write file
+    let content = 
+    "{
+        \"authorizations\": {
+            \"username\": [
+                3ED66D06576D7F05
+            ]
+        }
+    }";
+
+    std::fs::write(filepath.clone(), content).unwrap();
+
+    let mounts_auth_op = Arc::new(RwLock::new(MountAuthOperations::new(filepath.clone())));
+
+    let mounts_auth = MountAuthDBus::new(mounts_auth_op.clone());
+
+    const AUTH_TO_TEST: u64 = 0x3ED66D06576D7F05;
+
+    assert!(mounts_auth.check("username", AUTH_TO_TEST).await);
+    assert!(!(mounts_auth.check("test", AUTH_TO_TEST).await));
+
+    std::fs::remove_file(filepath.clone()).unwrap();
 }
