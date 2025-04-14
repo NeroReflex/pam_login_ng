@@ -17,6 +17,8 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
+use serde_json::error::Error as JSONError;
+use std::io::Error as IOError;
 use thiserror::Error;
 use zbus::Error as ZError;
 
@@ -28,3 +30,20 @@ pub enum SessionManagerError {
     #[error("Service name not found: {0}")]
     NotFound(String),
 }
+
+#[derive(Debug, Error)]
+pub enum NodeLoadingError {
+    #[error("I/O error: {0}")]
+    IOError(#[from] IOError),
+
+    #[error("File not found: {0}")]
+    FileNotFound(String),
+
+    #[error("Cyclic dependency found: {0}")]
+    CyclicDependency(String),
+
+    #[error("JSON error: {0}")]
+    JSONError(#[from] JSONError),
+}
+
+pub type NodeLoadingResult<T> = Result<T, NodeLoadingError>;

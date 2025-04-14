@@ -18,6 +18,7 @@
 */
 
 pub mod dbus;
+pub mod desc;
 pub mod errors;
 pub mod manager;
 pub mod node;

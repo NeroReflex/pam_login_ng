@@ -30,6 +30,8 @@ use tokio::{
     time::{self, Instant},
 };
 
+use crate::{desc::NodeServiceDescriptor, errors::NodeLoadingResult};
+
 #[derive(Debug)]
 pub struct SessionNodeRestart {
     max_times: u64,
@@ -114,6 +116,10 @@ impl SessionNode {
         }
     }
 
+    pub async fn add_dependency(&mut self, dep: Arc<RwLock<SessionNode>>) {
+        self.dependencies.push(dep);
+    }
+
     pub async fn is_running(&self) -> bool {
         if let SessionNodeStatus::Running(_) = self.status {
             return true;
@@ -185,7 +191,7 @@ impl SessionNode {
                         } else {
                             None
                         }
-                    },
+                    }
                     SessionNodeStopReason::Completed(exit_status) => {
                         if exit_status.success() {
                             Some(SessionStalledReason::TerminatedSuccessfully)
@@ -194,7 +200,7 @@ impl SessionNode {
                         } else {
                             None
                         }
-                    },
+                    }
                     SessionNodeStopReason::Manual => Some(SessionStalledReason::UserRequested),
                 };
 

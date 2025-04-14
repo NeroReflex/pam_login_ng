@@ -17,11 +17,13 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
 use login_ng_session::dbus::SessionManagerDBus;
+use login_ng_session::desc::NodeServiceDescriptor;
 use login_ng_session::errors::SessionManagerError;
 use login_ng_session::manager::SessionManager;
 use login_ng_session::node::{SessionNode, SessionNodeRestart};
@@ -31,19 +33,52 @@ use zbus::connection;
 #[tokio::main]
 async fn main() -> Result<(), SessionManagerError> {
     let default_service_name = String::from("default");
+    let load_directoried = vec![PathBuf::from("")];
 
-    let preloaded = HashMap::from([(
-        default_service_name.clone(),
-        Arc::new(RwLock::new(SessionNode::new(
-            String::from("Hyprland"),
-            &vec![],
-            nix::sys::signal::Signal::SIGINT,
-            SessionNodeRestart::no_restart(),
-            vec![],
-        ))),
-    )]);
+    let mut nodes = HashMap::new();
+    let mut currently_loading = HashSet::new();
+    match NodeServiceDescriptor::find_and_load(
+        &mut nodes,
+        &default_service_name,
+        load_directoried.as_slice(),
+        &mut currently_loading,
+    ).await {
+        Ok(_) => {},
+        Err(err) => match err {
+            login_ng_session::errors::NodeLoadingError::IOError(err) => {
+                eprintln!("File error: {err}");
+                std::process::exit(-1)
+            },
+            login_ng_session::errors::NodeLoadingError::FileNotFound(filename) => {
+                // if the default target is missing use the default user shell
+                if filename == default_service_name {
+                    nodes = HashMap::from([(
+                        default_service_name.clone(),
+                        Arc::new(RwLock::new(SessionNode::new(
+                            String::from("Hyprland"),
+                            &vec![],
+                            nix::sys::signal::Signal::SIGINT,
+                            SessionNodeRestart::no_restart(),
+                            vec![],
+                        ))),
+                    )])
+                } else {
+                    eprintln!("Dependency not found: {filename}");
+                    std::process::exit(-1)
+                }
+            },
+            login_ng_session::errors::NodeLoadingError::CyclicDependency(filename) => {
+                eprintln!("Cycle for target: {filename}");
+                std::process::exit(-1)
+            },
+            login_ng_session::errors::NodeLoadingError::JSONError(err) => {
+                eprintln!("JSON deserialization error: {err}");
+                std::process::exit(-1)
+            },
+        }
+    };
 
-    let manager = Arc::new(RwLock::new(SessionManager::new(preloaded)));
+    let manager = Arc::new(RwLock::new(SessionManager::new(nodes)));
 
     // This is the default user dbus address
     // DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
