@@ -111,7 +111,7 @@ impl MountPoints {
         self.home = mnt.clone();
     }
 
-    pub fn hash(&self) -> u64 {
+    pub fn hash(&self) -> String {
         let mut hasher = Sha512State::default().build_hasher();
 
         hasher.write(self.home.device().as_bytes());
@@ -133,6 +133,8 @@ impl MountPoints {
             }
         }
 
-        hasher.finish()
+        let numeric_hash: u64 = hasher.finish();
+
+        format!("{:X}", numeric_hash)
     }
 }

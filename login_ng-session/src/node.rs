@@ -185,7 +185,7 @@ impl SessionNode {
                         reason: Arc::new(SessionNodeStopReason::Errored(err)),
                     },
                 }
-            },
+            }
             SessionNodeStatus::Running(proc) => match proc.write().await.try_wait() {
                 Ok(possible_exit_status) => match possible_exit_status {
                     Some(exit_status) => SessionNodeStatus::Stopped {

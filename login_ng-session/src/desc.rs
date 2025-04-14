@@ -73,20 +73,6 @@ impl NodeServiceDescriptor {
     /// - `IOError`: If an I/O error occurs while opening or reading the file.
     /// - `JSONError`: If the file contents cannot be deserialized into a `NodeServiceDescriptor`.
     ///
-    /// # Example
-    ///
-    /// ```rust
-    /// let mut hashmap: HashMap<String, Arc<RwLock<SessionNode>>> = HashMap::new();
-    /// let filename = "example.json".to_string();
-    /// let directories = vec![PathBuf::from("/path/to/directory")];
-    /// let mut currently_loading = HashSet::new();
-    ///
-    /// match find_and_load(&mut hashmap, &filename, &directories, &mut currently_loading) {
-    ///     Ok(()) => println!("Node loaded successfully!"),
-    ///     Err(e) => eprintln!("Error loading node: {:?}", e),
-    /// }
-    /// ```
-    ///
     /// # Safety
     ///
     /// This function is not `unsafe`, but care should be taken to ensure that the `currently_loading`

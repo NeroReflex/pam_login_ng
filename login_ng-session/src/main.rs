@@ -34,10 +34,14 @@ use zbus::connection;
 #[tokio::main]
 async fn main() -> Result<(), SessionManagerError> {
     let uid = getuid();
-    let user = User::from_uid(uid).expect("Failed to get user information").unwrap();
+    let user = User::from_uid(uid)
+        .expect("Failed to get user information")
+        .unwrap();
     let load_directoried = vec![
-        PathBuf::from(user.clone().dir).join(".config").join("login_ng-session"),
-        PathBuf::from("/etc/login_ng-session/")
+        PathBuf::from(user.clone().dir)
+            .join(".config")
+            .join("login_ng-session"),
+        PathBuf::from("/etc/login_ng-session/"),
     ];
 
     let default_service_name = String::from("default.service");
@@ -133,7 +137,7 @@ async fn main() -> Result<(), SessionManagerError> {
         {
             Ok(is_stalled) => match is_stalled {
                 Some(_) => break,
-                None => tokio::time::sleep(Duration::from_nanos(100)).await
+                None => tokio::time::sleep(Duration::from_nanos(100)).await,
             },
             Err(err) => return Err(err),
         }

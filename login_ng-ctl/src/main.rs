@@ -395,7 +395,7 @@ fn main() {
             match user_mounts {
                 Some(ref mount_info) => {
                     let hash = mount_info.hash();
-                    println!("hash: {hash:02X}");
+                    println!("hash: {hash}");
 
                     let primary_mount = mount_info.mount();
                     println!("device: {}", primary_mount.device());

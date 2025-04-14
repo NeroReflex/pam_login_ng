@@ -211,7 +211,7 @@ pub(crate) fn mount_all(
 
 #[derive(Serialize, Deserialize, Default, Clone, PartialEq, Debug)]
 pub struct MountAuth {
-    authorizations: HashMap<String, Vec<u64>>,
+    authorizations: HashMap<String, Vec<String>>,
 }
 
 impl MountAuth {
@@ -225,14 +225,14 @@ impl MountAuth {
         Self::new(&json_str)
     }
 
-    pub fn add_authorization(&mut self, username: &str, hash: u64) {
+    pub fn add_authorization(&mut self, username: &str, hash: String) {
         self.authorizations
             .entry(String::from(username))
             .or_default()
             .push(hash);
     }
 
-    pub fn authorized(&self, username: &str, hash: u64) -> bool {
+    pub fn authorized(&self, username: &str, hash: String) -> bool {
         match self.authorizations.get(&String::from(username)) {
             Some(values) => values.contains(&hash),
             None => false,
@@ -301,7 +301,7 @@ impl MountAuthDBus {
     )
 )]
 impl MountAuthDBus {
-    pub async fn authorize(&mut self, username: &str, hash: u64) -> u32 {
+    pub async fn authorize(&mut self, username: &str, hash: String) -> u32 {
         println!("⚙️ Requested add authorization to mount {hash} for user {username}");
 
         {
@@ -327,7 +327,7 @@ impl MountAuthDBus {
         ServiceOperationResult::Ok.into()
     }
 
-    pub async fn check(&self, username: &str, hash: u64) -> bool {
+    pub async fn check(&self, username: &str, hash: String) -> bool {
         println!("🔑 Requested check for authorization of mount for user {username}");
 
         // Defeat brute-force searches in an attempt to find an hash collision

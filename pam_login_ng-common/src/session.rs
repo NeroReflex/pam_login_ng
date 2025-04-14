@@ -243,7 +243,7 @@ impl Sessions {
             let hash_to_check = mounts.hash();
             match self.mounts_auth.read().await.read_auth_file().await {
                 Ok(mounts_auth) => {
-                    if !mounts_auth.authorized(username, hash_to_check) {
+                    if !mounts_auth.authorized(username, hash_to_check.clone()) {
                         eprintln!(
                             "🚫 User {username} attempted an unauthorized mount {hash_to_check}."
                         );
