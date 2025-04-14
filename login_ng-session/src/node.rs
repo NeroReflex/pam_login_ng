@@ -78,6 +78,7 @@ pub enum SessionNodeStatus {
 pub enum SessionStalledReason {
     RestartedTooManyTimes,
     TerminatedSuccessfully,
+    StalledDependency,
     UserRequested,
 }
 
@@ -161,12 +162,29 @@ impl SessionNode {
         let mut stall_reason = None;
 
         self.status = match &self.status {
-            SessionNodeStatus::Ready => match self.command.spawn() {
-                Ok(child) => SessionNodeStatus::Running(Arc::new(RwLock::new(child))),
-                Err(err) => SessionNodeStatus::Stopped {
-                    time: time::Instant::now(),
-                    reason: Arc::new(SessionNodeStopReason::Errored(err)),
-                },
+            SessionNodeStatus::Ready => {
+                // Check for each dependency to be NOT stalled
+                for dep in self.dependencies.iter() {
+                    let mut guard = dep.write().await;
+
+                    let stalled = match Box::pin(guard.poll()).await {
+                        Some(_) => true,
+                        None => false,
+                    };
+
+                    // here dependency node is either stalled or running.
+                    // if it is running it might NOT have completed what this node requires
+                    // I do not give any fuck (yet?) because programs can wait for what they
+                    // need, or fail and will be restarted.
+                }
+
+                match self.command.spawn() {
+                    Ok(child) => SessionNodeStatus::Running(Arc::new(RwLock::new(child))),
+                    Err(err) => SessionNodeStatus::Stopped {
+                        time: time::Instant::now(),
+                        reason: Arc::new(SessionNodeStopReason::Errored(err)),
+                    },
+                }
             },
             SessionNodeStatus::Running(proc) => match proc.write().await.try_wait() {
                 Ok(possible_exit_status) => match possible_exit_status {
