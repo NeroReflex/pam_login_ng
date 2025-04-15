@@ -35,7 +35,11 @@ async fn test_new() {
 
     let mounts_auth = MountAuthDBus::new(mounts_auth_op.clone());
 
-    assert!(!(mounts_auth.check("username", format!("{:X}", 0x63DE253AAu64)).await));
+    assert!(
+        !(mounts_auth
+            .check("username", format!("{:X}", 0x63DE253AAu64))
+            .await)
+    );
 
     std::fs::remove_file(filepath.clone()).unwrap();
 }
@@ -56,7 +60,12 @@ async fn test_authorize() {
     const NUM: u64 = 0x4E421u64;
 
     assert!(!(mounts_auth.check("username", format!("{:X}", NUM)).await));
-    assert_eq!(mounts_auth.authorize("username", format!("{:X}", NUM)).await, 0u32);
+    assert_eq!(
+        mounts_auth
+            .authorize("username", format!("{:X}", NUM))
+            .await,
+        0u32
+    );
     assert!(mounts_auth.check("username", format!("{:X}", NUM)).await);
 
     std::fs::remove_file(filepath.clone()).unwrap();
@@ -80,8 +89,16 @@ async fn test_authorize_different_users() {
 
     assert!(!(mounts_auth.check("username", format!("{:X}", NUM1)).await));
     assert!(!(mounts_auth.check("test", format!("{:X}", NUM2)).await));
-    assert_eq!(mounts_auth.authorize("test", format!("{:X}", NUM2)).await, 0u32);
-    assert_eq!(mounts_auth.authorize("username", format!("{:X}", NUM1)).await, 0u32);
+    assert_eq!(
+        mounts_auth.authorize("test", format!("{:X}", NUM2)).await,
+        0u32
+    );
+    assert_eq!(
+        mounts_auth
+            .authorize("username", format!("{:X}", NUM1))
+            .await,
+        0u32
+    );
     assert!(mounts_auth.check("username", format!("{:X}", NUM1)).await);
     assert!(mounts_auth.check("test", format!("{:X}", NUM2)).await);
     assert!(!(mounts_auth.check("test", format!("{:X}", NUM1)).await));
@@ -117,8 +134,16 @@ async fn test_authorization_file() {
 
     const AUTH_TO_TEST: u64 = 0x3ED66D06576D7F05;
 
-    assert!(mounts_auth.check("username", format!("{:X}", AUTH_TO_TEST)).await);
-    assert!(!(mounts_auth.check("test", format!("{:X}", AUTH_TO_TEST)).await));
+    assert!(
+        mounts_auth
+            .check("username", format!("{:X}", AUTH_TO_TEST))
+            .await
+    );
+    assert!(
+        !(mounts_auth
+            .check("test", format!("{:X}", AUTH_TO_TEST))
+            .await)
+    );
 
     std::fs::remove_file(filepath.clone()).unwrap();
 }
