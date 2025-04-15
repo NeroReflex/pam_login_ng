@@ -117,23 +117,21 @@ impl From<&MountPointSerialized> for (String, MountParams) {
 bytevec_decl! {
     #[derive(PartialEq, Eq, Debug, Clone)]
     struct SessionCommandSerialized {
-        command: String,
-        args: Vec<String>
+        command: String
     }
 }
 
 impl From<&SessionCommand> for SessionCommandSerialized {
     fn from(value: &SessionCommand) -> Self {
         let command = value.command();
-        let args = value.args();
 
-        Self { command, args }
+        Self { command }
     }
 }
 
 impl From<SessionCommandSerialized> for SessionCommand {
     fn from(val: SessionCommandSerialized) -> Self {
-        SessionCommand::new(val.command.clone(), val.args.clone())
+        SessionCommand::new(val.command.clone())
     }
 }
 

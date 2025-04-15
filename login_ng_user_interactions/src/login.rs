@@ -85,13 +85,7 @@ pub(crate) fn load_session_from_conf(content: String) -> SessionCommand {
     let mut config = Ini::new();
     match config.read(content) {
         Ok(_) => match config.get("Session", "command") {
-            Some(value) => SessionCommand::new(
-                value.clone(),
-                match config.get("Session", "arguments") {
-                    Some(args) => args.split(" ").map(String::from).collect(),
-                    None => vec![],
-                },
-            ),
+            Some(value) => SessionCommand::new(value.clone()),
             None => system_defined_with_crate_fallback(),
         },
         Err(_) => system_defined_with_crate_fallback(),
@@ -101,14 +95,14 @@ pub(crate) fn load_session_from_conf(content: String) -> SessionCommand {
 pub(crate) fn system_defined_with_crate_fallback() -> SessionCommand {
     match std::fs::read_to_string(Path::new("/etc/login_ng/default_session.conf")) {
         Ok(content) => load_session_from_conf(content),
-        Err(_) => SessionCommand::new(String::from(crate::DEFAULT_CMD), vec![]),
+        Err(_) => SessionCommand::new(String::from(crate::DEFAULT_CMD)),
     }
 }
 
 pub(crate) fn user_default_command_with_system_fallback(username: &String) -> SessionCommand {
     match login_ng::users::get_user_by_name(username) {
         Some(logged_user) => match logged_user.shell().to_str() {
-            Some(path_str) => SessionCommand::new(String::from(path_str), vec![]),
+            Some(path_str) => SessionCommand::new(String::from(path_str)),
             None => match logged_user.name().to_str() {
                 Some(username_str) => match std::fs::read_to_string(Path::new(
                     format!("/etc/login_ng/{}.conf", username_str).as_str(),

@@ -318,7 +318,7 @@ fn main() {
             write_file = Some(true)
         }
         Command::SetSession(session_data) => {
-            let command = SessionCommand::new(session_data.cmd, session_data.args);
+            let command = SessionCommand::new(session_data.cmd);
 
             match store_user_session_command(&command, &storage_source) {
                 Ok(_) => {}
@@ -420,11 +420,10 @@ fn main() {
 
             match load_user_session_command(&storage_source) {
                 Ok(maybe_data) => match maybe_data {
-                    Some(data) => println!(
-                        "Default session command: {} {}",
-                        data.command(),
-                        data.args().join(" ")
-                    ),
+                    Some(data) => {
+                        let cmd = data.command();
+                        println!("Default session command: {cmd}")
+                    }
                     None => println!("No default session set."),
                 },
                 Err(err) => {

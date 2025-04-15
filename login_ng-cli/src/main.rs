@@ -107,7 +107,7 @@ fn main() {
     )));
 
     let command_retrieval = match args.cmd {
-        Some(command) => SessionCommandRetrival::Defined(SessionCommand::new(command, vec![])),
+        Some(command) => SessionCommandRetrival::Defined(SessionCommand::new(command)),
         _ => SessionCommandRetrival::AutodetectFromUserHome,
     };
 
