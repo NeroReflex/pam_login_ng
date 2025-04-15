@@ -34,6 +34,10 @@ use argh::FromArgs;
 #[derive(FromArgs, PartialEq, Debug)]
 /// Command line tool for managing login-ng authentication methods
 struct Args {
+    #[argh(option, short = 'b')]
+    /// display the copyright banner
+    banner: Option<bool>,
+
     #[argh(option, short = 'u')]
     /// username to authenticate
     user: Option<String>,
@@ -88,13 +92,16 @@ fn login_pam(
 
 fn main() {
     let version = login_ng::LIBRARY_VERSION;
-    println!("login-ng version {version}, Copyright (C) 2024 Denis Benato");
-    println!("login-ng comes with ABSOLUTELY NO WARRANTY;");
-    println!("This is free software, and you are welcome to redistribute it");
-    println!("under certain conditions.");
-    println!("\n");
 
     let args: Args = argh::from_env();
+
+    if args.banner.unwrap_or_default() {
+        println!("login-ng version {version}, Copyright (C) 2024 Denis Benato");
+        println!("login-ng comes with ABSOLUTELY NO WARRANTY;");
+        println!("This is free software, and you are welcome to redistribute it");
+        println!("under certain conditions.");
+        println!("\n");
+    }
 
     let allow_autologin = args.autologin.unwrap_or(false);
 
