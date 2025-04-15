@@ -115,7 +115,6 @@ impl LoginExecutor for PamLoginExecutor {
 
         // Run a process in the PAM environment
         let _result = Command::new(command.command())
-            .args(command.args())
             .env_clear()
             .envs(session.envlist().iter_tuples())
             .uid(logged_user.uid())
