@@ -181,8 +181,6 @@ impl PamHooks for PamQuickEmbedded {
             "login_ng: open_session: enter".to_string(),
         );
 
-        std::thread::sleep(std::time::Duration::new(5, 0));
-
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
             Ok(value) => pamh.log(
                 pam::module::LogLevel::Info,
