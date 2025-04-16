@@ -204,10 +204,9 @@ impl SessionNode {
             SessionNodeStatus::Stopped { time, reason } => {
                 stall_reason = match reason.deref() {
                     SessionNodeStopReason::Errored(_) => {
-                        if self.restarted >= self.restart.max_times {
-                            Some(SessionStalledReason::RestartedTooManyTimes)
-                        } else {
-                            None
+                        match self.restarted >= self.restart.max_times {
+                            true => Some(SessionStalledReason::RestartedTooManyTimes),
+                            false => None,
                         }
                     }
                     SessionNodeStopReason::Completed(exit_status) => {
@@ -223,17 +222,14 @@ impl SessionNode {
                 };
 
                 match time.checked_add(self.restart.delay) {
-                    Some(restart_time) => match Instant::now() >= restart_time {
-                        true => {
-                            if stall_reason.is_none() {
-                                SessionNodeStatus::Ready
-                            } else {
-                                self.status.clone()
-                            }
-                        }
-                        false => self.status.clone(),
-                    },
                     None => self.status.clone(),
+                    Some(restart_time) => match Instant::now() >= restart_time {
+                        false => self.status.clone(),
+                        true => match stall_reason.is_none() {
+                            true => SessionNodeStatus::Ready,
+                            false => self.status.clone(),
+                        },
+                    },
                 }
             }
         };
