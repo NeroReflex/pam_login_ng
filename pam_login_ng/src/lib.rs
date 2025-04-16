@@ -34,8 +34,7 @@ use pam_login_ng_common::{
     },
     result::ServiceOperationResult,
     security::SessionPrelude,
-};
-use pam_login_ng_common::{
+    serde_json,
     session::SessionsProxy,
     zbus::{Connection, Result as ZResult},
 };
@@ -85,9 +84,7 @@ impl PamQuickEmbedded {
             return Ok((ServiceOperationResult::EmptyPubKey, 0, 0));
         }
 
-        let Ok(session_prelude) =
-            pam_login_ng_common::serde_json::from_str::<SessionPrelude>(pk.as_str())
-        else {
+        let Ok(session_prelude) = serde_json::from_str::<SessionPrelude>(pk.as_str()) else {
             return Ok((ServiceOperationResult::SerializationError, 0, 0));
         };
 
@@ -264,7 +261,6 @@ impl PamHooks for PamQuickEmbedded {
                                     let _gid = result.2;
 
                                     let xdg_user_path = PathBuf::from(pam_login_ng_common::XDG_RUNTIME_DIR_PATH).join(format!("{uid}"));
-
                                     match pamh.env_set(Cow::from("XDG_RUNTIME_DIR"), xdg_user_path.to_string_lossy()) {
                                         Ok(_) => {
                                             pamh.log(
@@ -335,8 +331,6 @@ impl PamHooks for PamQuickEmbedded {
                 Ok(user_cfg) => user_cfg,
                 Err(pam_err_code) => return pam_err_code,
             };
-
-        // TODO: set environment variables
 
         PamResultCode::PAM_SUCCESS
     }
