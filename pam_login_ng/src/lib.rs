@@ -228,13 +228,6 @@ impl PamHooks for PamQuickEmbedded {
             format!("login_ng: open_session: user {username}"),
         );
 
-        // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
-        let user_cfg =
-            match PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string()) {
-                Ok(user_cfg) => user_cfg,
-                Err(pam_err_code) => return pam_err_code,
-            };
-
         pamh.log(
             pam::module::LogLevel::Debug,
             format!("login_ng: open_session: loaded data for user {username}"),
@@ -243,9 +236,15 @@ impl PamHooks for PamQuickEmbedded {
         unsafe {
             match &RUNTIME {
                 Some(runtime) => runtime.block_on(async {
+                    let cred_data = format!("{}-login_ng", username);
+                    let main_password = match pamh.get_data::<String>(cred_data.as_str()) {
+                        Ok(main_password) => main_password.clone(),
+                        Err(err) => return err,
+                    };
+
                     match PamQuickEmbedded::open_session_for_user(
                         &String::from(username),
-                        String::from(""), // TODO: fetch the real passowrd
+                        main_password,
                     )
                     .await
                     {
@@ -262,18 +261,14 @@ impl PamHooks for PamQuickEmbedded {
 
                                     let xdg_user_path = PathBuf::from(pam_login_ng_common::XDG_RUNTIME_DIR_PATH).join(format!("{uid}"));
                                     match pamh.env_set(Cow::from("XDG_RUNTIME_DIR"), xdg_user_path.to_string_lossy()) {
-                                        Ok(_) => {
-                                            pamh.log(
+                                        Ok(_) => pamh.log(
                                                 pam::module::LogLevel::Info,
                                                 "login_ng: open_session: session opened and XDG_RUNTIME_DIR set".to_string(),
-                                            );
-                                        },
-                                        Err(err) => {
-                                            pamh.log(
+                                            ),
+                                        Err(err) => pamh.log(
                                                 pam::module::LogLevel::Warning,
                                                 format!("login_ng: open_session: could not set XDG_RUNTIME_DIR: {err}"),
-                                            );
-                                        }
+                                            ),
                                     }
 
                                     PamResultCode::PAM_SUCCESS
@@ -366,13 +361,16 @@ impl PamHooks for PamQuickEmbedded {
                 Err(pam_err_code) => return pam_err_code,
             };
 
-        // first of all check if the empty password is valid
+        // NOTE: if main_by_auth returns a main password the authentication was successful:
+        // there is no need to check if the returned main password is the same as the stored one.
+        // This will also used below for the user-provided string.
         if let Ok(main_password) = user_cfg.main_by_auth(&Some(String::new())) {
-            if let Ok(password_matches) = user_cfg.check_main(&main_password) {
-                if password_matches {
-                    return PamResultCode::PAM_SUCCESS;
-                }
+            let cred_data = format!("{}-login_ng", username);
+            if let Err(err) = pamh.set_data(cred_data.as_str(), Box::new(main_password)) {
+                return err;
             }
+
+            return PamResultCode::PAM_SUCCESS;
         }
 
         // if the empty password was not valid then continue and ask for a password
@@ -396,13 +394,15 @@ impl PamHooks for PamQuickEmbedded {
             }
         };
 
-        // NOTE: if main_by_auth returns a main passowrd the authentication was successful:
-        // there is no need to check if the returned main password is the same as the stored one.
         match pam_try!(conv.send(PAM_PROMPT_ECHO_OFF, "Password: "))
             .map(|cstr| cstr.to_str().map(|s| s.to_string()))
         {
             Some(Ok(password)) => user_cfg
                 .main_by_auth(&Some(password))
+                .map(|main_password| {
+                    let cred_data = format!("{}-login_ng", username);
+                    pamh.set_data(cred_data.as_str(), Box::new(main_password))
+                })
                 .map(|_| PamResultCode::PAM_SUCCESS)
                 .unwrap_or(PamResultCode::PAM_AUTH_ERR),
             Some(Err(_err)) => PamResultCode::PAM_CRED_INSUFFICIENT,
