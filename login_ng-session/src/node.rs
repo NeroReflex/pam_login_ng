@@ -134,7 +134,7 @@ impl SessionNode {
                 .map(|a| {
                     let dep = a.clone();
                     let runtime_dir = runtime_dir.clone();
-                    tokio::spawn(async move { Self::wait_for_dependency(runtime_dir, dep).await })
+                    tokio::spawn(async move { Self::wait_for_dependency_satisfied(runtime_dir, dep).await })
                 })
                 .collect::<JoinSet<_>>().join_all().await;
     
@@ -142,6 +142,9 @@ impl SessionNode {
             command.args(node.args.as_slice());
             match command.spawn() {
                 Ok(mut child) => {
+                    // here wait for child to exit or for the command to kill the process
+                    // in the case user has requested program to exit use wait_for_dependency_stopped
+                    // to wait until all dependencies are stopped
                     child.wait().await.unwrap();
                 },
                 Err(err) => {
@@ -164,14 +167,16 @@ impl SessionNode {
         //node.poll().await
     }
     
-    pub async fn wait_for_dependency(runtime_dir: PathBuf, dependency: Arc<SessionNode>) {
+    pub(crate) async fn wait_for_dependency_satisfied(runtime_dir: PathBuf, dependency: Arc<SessionNode>) {
         assert_send_sync::<Arc<SessionNode>>();
 
         // TODO: wait for the dependency to be present
     }
 
-    pub async fn add_dependency(&mut self, dep: Arc<SessionNode>) {
-        self.dependencies.push(dep);
+    pub(crate) async fn wait_for_dependency_stopped(runtime_dir: PathBuf, dependency: Arc<SessionNode>) {
+        assert_send_sync::<Arc<SessionNode>>();
+
+        // TODO: wait for the dependency to be stopped in order to exit cleanly
     }
 
     pub async fn is_running(&self) -> bool {
