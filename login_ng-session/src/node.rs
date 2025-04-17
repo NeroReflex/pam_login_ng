@@ -17,7 +17,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{ops::Deref, process::ExitStatus, sync::Arc, time::Duration, u64};
+use std::{ops::Deref, path::PathBuf, process::ExitStatus, sync::Arc, time::Duration, u64};
 
 use nix::{
     sys::signal::{self, Signal},
@@ -27,7 +27,8 @@ use nix::{
 use tokio::{
     process::{Child, Command},
     sync::RwLock,
-    time::{self, Instant},
+    task::JoinSet,
+    time::{self, sleep, Instant},
 };
 
 #[derive(Debug)]
@@ -46,6 +47,14 @@ impl SessionNodeRestart {
             max_times: u64::MIN,
             delay: Duration::from_secs(5),
         }
+    }
+
+    pub fn max_times(&self) -> u64 {
+        self.max_times
+    }
+
+    pub fn delay(&self) -> Duration {
+        self.delay
     }
 }
 
@@ -86,40 +95,87 @@ pub enum SessionStalledReason {
 pub struct SessionNode {
     stop_signal: Signal,
     restart: SessionNodeRestart,
-    restarted: u64,
-    command: Command,
-    status: SessionNodeStatus,
-    dependencies: Vec<Arc<RwLock<SessionNode>>>,
+    cmd: String,
+    args: Vec<String>,
+    dependencies: Vec<Arc<SessionNode>>,
 }
+
+fn assert_send_sync<T: Send + Sync>() {}
+
+
 
 impl SessionNode {
     pub fn new(
         cmd: String,
-        args: &[String],
+        args: Vec<String>,
         stop_signal: Signal,
         restart: SessionNodeRestart,
-        dependencies: Vec<Arc<RwLock<SessionNode>>>,
+        dependencies: Vec<Arc<SessionNode>>,
     ) -> Self {
-        let mut command = Command::new(cmd);
-        command.args(args);
-        let restarted = 0u64;
-        let status = SessionNodeStatus::Ready;
-
         Self {
-            restarted,
-            command,
-            status,
+            cmd,
+            args,
             restart,
             stop_signal,
             dependencies,
         }
     }
 
-    pub async fn add_dependency(&mut self, dep: Arc<RwLock<SessionNode>>) {
+    pub async fn run(runtime_dir: PathBuf, node: Arc<SessionNode>) -> () {
+        assert_send_sync::<Arc<SessionNode>>();
+    
+        let mut restarted: u64 = 0;
+    
+        loop {
+            // wait for dependencies to be up and running
+            let dependencies = node
+                .dependencies
+                .iter()
+                .map(|a| {
+                    let dep = a.clone();
+                    let runtime_dir = runtime_dir.clone();
+                    tokio::spawn(async move { Self::wait_for_dependency(runtime_dir, dep).await })
+                })
+                .collect::<JoinSet<_>>().join_all().await;
+    
+            let mut command = Command::new(node.cmd.as_str());
+            command.args(node.args.as_slice());
+            match command.spawn() {
+                Ok(mut child) => {
+                    child.wait().await.unwrap();
+                },
+                Err(err) => {
+                    eprintln!("Error spawning the child process: {}", err);
+                },
+            }
+    
+            // node exited (either successfully or with an error)
+            // attempt to sleep before restarting it
+            restarted += 1;
+            if restarted <= node.restart.max_times() {
+                sleep(node.restart.delay()).await;
+                continue;
+            } else {
+                // TODO: here return the run result
+                break;
+            }
+        }
+    
+        //node.poll().await
+    }
+    
+    pub async fn wait_for_dependency(runtime_dir: PathBuf, dependency: Arc<SessionNode>) {
+        assert_send_sync::<Arc<SessionNode>>();
+
+        // TODO: wait for the dependency to be present
+    }
+
+    pub async fn add_dependency(&mut self, dep: Arc<SessionNode>) {
         self.dependencies.push(dep);
     }
 
     pub async fn is_running(&self) -> bool {
+        /*
         if let SessionNodeStatus::Running(_) = self.status {
             return true;
         }
@@ -132,9 +188,13 @@ impl SessionNode {
         }
 
         false
+        */
+
+        todo!()
     }
 
     pub async fn issue_manual_stop(&mut self) {
+        /*
         if let SessionNodeStatus::Running(proc) = &self.status {
             let mut proc_guard = proc.write().await;
 
@@ -154,11 +214,12 @@ impl SessionNode {
                 },
             }
         }
-
+        */
         todo!()
     }
 
-    pub async fn poll(&mut self) -> Option<SessionStalledReason> {
+    pub async fn poll(&self) -> Option<SessionStalledReason> {
+        /*
         let mut stall_reason = None;
 
         self.status = match &self.status {
@@ -235,5 +296,7 @@ impl SessionNode {
         };
 
         stall_reason
+        */
+        todo!()
     }
 }

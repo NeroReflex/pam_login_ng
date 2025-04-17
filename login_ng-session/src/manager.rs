@@ -17,9 +17,9 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
-use tokio::sync::RwLock;
+use tokio::task::{self, JoinSet};
 
 use crate::{
     errors::SessionManagerError,
@@ -38,35 +38,60 @@ impl ManagerStatus {
 
 #[derive(Debug, Default)]
 pub struct SessionManager {
-    services: HashMap<String, Arc<RwLock<SessionNode>>>,
+    runtime_dir: PathBuf,
+    services: HashMap<String, Arc<SessionNode>>,
 }
 
 impl SessionManager {
-    pub fn new(map: HashMap<String, Arc<RwLock<SessionNode>>>) -> Self {
+    pub fn new(runtime_dir: PathBuf, map: HashMap<String, Arc<SessionNode>>) -> Self {
         let services = map
             .into_iter()
             .map(|(name, node)| (name.clone(), node.clone()))
-            .collect::<HashMap<String, Arc<RwLock<SessionNode>>>>();
+            .collect::<HashMap<String, Arc<SessionNode>>>();
 
-        Self { services }
+        Self {
+            runtime_dir,
+            services,
+        }
     }
 
     pub async fn is_running(&self, target: &String) -> Result<bool, SessionManagerError> {
         match self.services.get(target) {
-            Some(node) => Ok(node.read().await.is_running().await),
+            Some(node) => Ok(node.is_running().await),
             None => Err(SessionManagerError::NotFound(target.clone())),
         }
     }
 
-    pub async fn wait_idle(
-        &mut self,
-        target: &String,
-        minimum_step_delay: Duration,
-    ) -> Result<(), SessionManagerError> {
-        // await until the target goes stalled (loop while it is NOT stalled)
-        while self.step(target, minimum_step_delay).await?.is_none() {
-            tokio::time::sleep(Duration::from_nanos(100)).await
+    pub async fn run(&self, target: &String) -> Result<(), SessionManagerError> {
+        let mut other_nodes = vec![];
+        let mut main_node = None;
+
+        for (node_name, node_value) in self.services.iter() {
+            if *target == *node_name {
+                main_node = Some(node_value.clone())
+            } else {
+                other_nodes.push(node_value.clone());
+            }
         }
+
+        let Some(main_node) = main_node else {
+            return Err(SessionManagerError::NotFound(target.clone()))
+        };
+
+        // start all services and let those sync themselves
+        let node_run_tasks = other_nodes.iter().map(|node| {
+            let n = node.clone();
+            let runtime_dir = self.runtime_dir.clone();
+            async move {
+                SessionNode::run(runtime_dir, n).await
+            }
+        }).collect::<JoinSet<_>>();
+
+        // wait for the target run to exit
+        let runtime_dir = self.runtime_dir.clone();
+        let (main_node_res, other_nodes_res) = tokio::join!(task::spawn(async move {
+            SessionNode::run(runtime_dir, main_node).await
+        }), node_run_tasks.join_all());
 
         Ok(())
     }
@@ -76,10 +101,10 @@ impl SessionManager {
         target: &String,
         minimum_step_delay: Duration,
     ) -> Result<Option<SessionStalledReason>, SessionManagerError> {
-        let mut guard = self.services.get(target).unwrap().write().await;
+        let node = self.services.get(target).unwrap();
 
         let (_sleep_res, stalled) =
-            tokio::join!(tokio::time::sleep(minimum_step_delay), guard.poll());
+            tokio::join!(tokio::time::sleep(minimum_step_delay), node.poll());
 
         Ok(stalled)
     }

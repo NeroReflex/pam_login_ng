@@ -17,7 +17,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -28,6 +28,7 @@ use login_ng_session::errors::SessionManagerError;
 use login_ng_session::manager::SessionManager;
 use login_ng_session::node::{SessionNode, SessionNodeRestart};
 use nix::unistd::{getuid, User};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 use zbus::connection;
 
@@ -47,12 +48,10 @@ async fn main() -> Result<(), SessionManagerError> {
     let default_service_name = String::from("default.service");
 
     let mut nodes = HashMap::new();
-    let mut currently_loading = HashSet::new();
-    match NodeServiceDescriptor::find_and_load(
+    match NodeServiceDescriptor::load_tree(
         &mut nodes,
         &default_service_name,
         load_directoried.as_slice(),
-        &mut currently_loading,
     )
     .await
     {
@@ -73,13 +72,13 @@ async fn main() -> Result<(), SessionManagerError> {
 
                     nodes = HashMap::from([(
                         default_service_name.clone(),
-                        Arc::new(RwLock::new(SessionNode::new(
+                        Arc::new(SessionNode::new(
                             shell.clone(),
-                            &[],
+                            vec![],
                             nix::sys::signal::Signal::SIGINT,
                             SessionNodeRestart::no_restart(),
                             vec![],
-                        ))),
+                        )),
                     )])
                 } else {
                     eprintln!("Dependency not found: {filename}");
@@ -97,7 +96,21 @@ async fn main() -> Result<(), SessionManagerError> {
         },
     };
 
-    let manager = Arc::new(RwLock::new(SessionManager::new(nodes)));
+    // the XDG_RUNTIME_DIR is required for generating the default dbus socket path
+    // and also the runtime directory (hopefully /tmp mounted) to keep track of services
+    let xdg_runtime_dir = PathBuf::from(std::env::var("XDG_RUNTIME_DIR").unwrap());
+
+    let manager_runtime_path = xdg_runtime_dir.join(format!(
+        "{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs()
+    ));
+
+    std::fs::create_dir(manager_runtime_path.clone()).unwrap();
+
+    let manager = Arc::new(SessionManager::new(manager_runtime_path, nodes));
 
     // This is the default user dbus address
     // DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
@@ -106,15 +119,14 @@ async fn main() -> Result<(), SessionManagerError> {
         Ok(value) => println!("Starting dbus service on socket {value}"),
         Err(err) => {
             eprintln!("Couldn't read dbus socket address: {err} - using default...");
-            match std::env::var("XDG_RUNTIME_DIR") {
-                Ok(xdg_runtime_dir) => std::env::set_var(
-                    "DBUS_SESSION_BUS_ADDRESS",
-                    format!("unix:path={xdg_runtime_dir}/bus").as_str(),
-                ),
-                Err(err) => {
-                    eprintln!("Unable to generate the default dbus address {err}")
-                }
-            }
+            std::env::set_var(
+                "DBUS_SESSION_BUS_ADDRESS",
+                format!(
+                    "unix:path={}/bus",
+                    xdg_runtime_dir.as_os_str().to_string_lossy()
+                )
+                .as_str(),
+            )
         }
     }
 
@@ -133,29 +145,9 @@ async fn main() -> Result<(), SessionManagerError> {
 
     println!("Running the session manager");
 
-    loop {
-        let mut guard = manager.write().await;
-
-        // here collect info on running stuff
-        match guard
-            .step(&default_service_name, Duration::from_millis(250))
-            .await
-        {
-            Ok(is_stalled) => match is_stalled {
-                Some(_) => break,
-                None => tokio::time::sleep(Duration::from_nanos(100)).await,
-            },
-            Err(err) => return Err(err),
-        }
-    }
+    manager.run(&default_service_name).await?;
 
     drop(dbus_manager);
-
-    manager
-        .write()
-        .await
-        .wait_idle(&default_service_name, Duration::from_millis(250))
-        .await?;
 
     Ok(())
 }

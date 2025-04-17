@@ -19,19 +19,17 @@
 
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
-
 use zbus::interface;
 
 use crate::manager::SessionManager;
 
 #[derive(Debug, Clone)]
 pub struct SessionManagerDBus {
-    manager: Arc<RwLock<SessionManager>>,
+    manager: Arc<SessionManager>,
 }
 
 impl SessionManagerDBus {
-    pub fn new(manager: Arc<RwLock<SessionManager>>) -> Self {
+    pub fn new(manager: Arc<SessionManager>) -> Self {
         Self { manager }
     }
 }
@@ -53,9 +51,7 @@ impl SessionManagerDBus {
     }
 
     pub async fn is_running(&self, target: String) -> (u32, bool) {
-        let guard = self.manager.read().await;
-
-        match guard.is_running(&target).await {
+        match self.manager.is_running(&target).await {
             Ok(response) => (0, response),
             Err(err) => {
                 eprintln!("Error in fetching the running status of {target}: {err}");

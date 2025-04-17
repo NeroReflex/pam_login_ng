@@ -46,6 +46,16 @@ pub struct NodeServiceDescriptor {
 }
 
 impl NodeServiceDescriptor {
+    pub async fn load_tree(
+        hashmap: &mut HashMap<String, Arc<SessionNode>>,
+        filename: &String,
+        directories: &[PathBuf],
+    ) -> NodeLoadingResult<()> {
+        let mut currently_loading = HashSet::new();
+
+        Self::find_and_load(hashmap, filename, directories, &mut currently_loading).await
+    }
+
     /// Attempts to find and load a session node from a specified file, checking for cyclic dependencies.
     ///
     /// This function searches for a file with the given `filename` in the provided `directories`.
@@ -77,8 +87,8 @@ impl NodeServiceDescriptor {
     ///
     /// This function is not `unsafe`, but care should be taken to ensure that the `currently_loading`
     /// set is properly managed to avoid memory leaks or deadlocks in a multi-threaded context.
-    pub async fn find_and_load(
-        hashmap: &mut HashMap<String, Arc<RwLock<SessionNode>>>,
+    async fn find_and_load(
+        hashmap: &mut HashMap<String, Arc<SessionNode>>,
         filename: &String,
         directories: &[PathBuf],
         currently_loading: &mut HashSet<String>,
@@ -124,15 +134,7 @@ impl NodeServiceDescriptor {
         let main = serde_json::from_str::<NodeServiceDescriptor>(value.as_str())
             .map_err(NodeLoadingError::JSONError)?;
 
-        let node = Arc::new(RwLock::new(SessionNode::new(
-            main.cmd(),
-            main.args(),
-            Signal::SIGABRT,
-            SessionNodeRestart::new(main.max_restarts(), main.delay()),
-            vec![],
-        )));
-
-        hashmap.insert(filename.clone(), node.clone());
+        let mut dependencies = vec![];
 
         // Parse all dependencies and then register those as part of node
         for dep in main.dependencies().iter() {
@@ -145,8 +147,18 @@ impl NodeServiceDescriptor {
             .await?;
 
             let just_loaded = hashmap.get(dep).unwrap();
-            node.write().await.add_dependency(just_loaded.clone()).await;
+            dependencies.push(just_loaded.clone());
         }
+
+        let node = SessionNode::new(
+            main.cmd(),
+            main.args(),
+            Signal::SIGABRT,
+            SessionNodeRestart::new(main.max_restarts(), main.delay()),
+            dependencies,
+        );
+
+        hashmap.insert(filename.clone(), Arc::new(node));
 
         // Remove the filename from the loading set after processing
         currently_loading.remove(filename);
@@ -158,8 +170,8 @@ impl NodeServiceDescriptor {
         self.cmd.clone()
     }
 
-    pub fn args(&self) -> &[String] {
-        self.args.as_slice()
+    pub fn args(&self) -> Vec<String> {
+        self.args.clone()
     }
 
     pub fn max_restarts(&self) -> u64 {
