@@ -55,6 +55,9 @@ pub type NodeLoadingResult<T> = Result<T, NodeLoadingError>;
 pub(crate) enum NodeDependencyError {
     #[error("I/O error: {0}")]
     IOError(#[from] IOError),
+
+    #[error("Terminated with failure and won't restart")]
+    ServiceWontRestart,
 }
 
-pub(crate) type NodeDependencyResult<T> = Result<T, NodeLoadingError>;
+pub(crate) type NodeDependencyResult<T> = Result<T, NodeDependencyError>;

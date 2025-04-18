@@ -17,20 +17,20 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{path::PathBuf, process::ExitStatus, sync::Arc, time::Duration, u64};
+use std::{io::Error as IOError, ops::Deref, path::PathBuf, process::ExitStatus, sync::Arc, time::Duration, u64};
 
 use nix::sys::signal::Signal;
 
 use tokio::{
     fs::File,
     io::AsyncWriteExt,
-    process::{Child, Command},
-    sync::RwLock,
+    process::Command,
+    sync::{Notify, RwLock},
     task::JoinSet,
-    time::{self, sleep},
+    time::{self, sleep, Instant},
 };
 
-use crate::errors::NodeDependencyResult;
+use crate::errors::{NodeDependencyError, NodeDependencyResult};
 
 #[derive(Debug)]
 pub struct SessionNodeRestart {
@@ -71,16 +71,17 @@ impl Default for SessionNodeRestart {
 #[derive(Debug)]
 pub enum SessionNodeStopReason {
     Completed(ExitStatus),
-    Errored(std::io::Error),
+    Errored(IOError),
     Manual,
 }
 
 #[derive(Debug, Clone)]
 pub enum SessionNodeStatus {
     Ready,
-    Running(Arc<RwLock<Child>>),
+    Running,
     Stopped {
         time: time::Instant,
+        restart: bool,
         reason: Arc<SessionNodeStopReason>,
     },
 }
@@ -107,6 +108,8 @@ pub struct SessionNode {
     cmd: String,
     args: Vec<String>,
     dependencies: Vec<Arc<SessionNode>>,
+    status: Arc<RwLock<SessionNodeStatus>>,
+    status_notify: Arc<Notify>,
 }
 
 fn assert_send_sync<T: Send + Sync>() {}
@@ -121,6 +124,9 @@ impl SessionNode {
         restart: SessionNodeRestart,
         dependencies: Vec<Arc<SessionNode>>,
     ) -> Self {
+        let status = Arc::new(RwLock::new(SessionNodeStatus::Ready));
+        let status_notify = Arc::new(Notify::new());
+
         Self {
             name,
             kind,
@@ -129,6 +135,8 @@ impl SessionNode {
             restart,
             stop_signal,
             dependencies,
+            status,
+            status_notify,
         }
     }
 
@@ -157,6 +165,10 @@ impl SessionNode {
 
             let mut command = Command::new(node.cmd.as_str());
             command.args(node.args.as_slice());
+            
+            restarted += 1;
+            let will_restart_if_failed = restarted <= node.restart.max_times();
+
             match command.spawn() {
                 Ok(mut child) => {
                     if node.kind == SessionNodeType::Service {
@@ -186,20 +198,36 @@ impl SessionNode {
                         }
                     }
 
+                    // the process is now runnig: update the status and notify waiters
+                    *node.status.write().await = SessionNodeStatus::Running;
+                    node.status_notify.notify_waiters();
+
                     // here wait for child to exit or for the command to kill the process
                     // in the case user has requested program to exit use wait_for_dependency_stopped
                     // to wait until all dependencies are stopped
-                    child.wait().await.unwrap();
+                    tokio::select! {
+                        result = child.wait() => 
+                            match result {
+                                Ok(result) => SessionNodeStatus::Stopped { time: Instant::now(), restart: !result.success() && will_restart_if_failed, reason: Arc::new(SessionNodeStopReason::Completed(result)) },
+                                Err(err) => SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: Arc::new(SessionNodeStopReason::Errored(err)) }
+                            },
+                        // TODO: here await for the termination signal
+                    };
+
+                    // the status has been changed: notify waiters
+                    node.status_notify.notify_waiters();
                 }
                 Err(err) => {
                     eprintln!("Error spawning the child process: {}", err);
+
+                    *node.status.write().await = SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: Arc::new(SessionNodeStopReason::Errored(err)) };
+                    node.status_notify.notify_waiters();
                 }
-            }
+            };
 
             // node exited (either successfully or with an error)
             // attempt to sleep before restarting it
-            restarted += 1;
-            if restarted <= node.restart.max_times() {
+            if will_restart_if_failed {
                 sleep(node.restart.delay()).await;
                 continue;
             } else {
@@ -219,17 +247,30 @@ impl SessionNode {
 
         loop {
             match dependency.kind {
-                SessionNodeType::OneShot => todo!(),
+                SessionNodeType::OneShot => {
+                    // TODO: here wait for it to be stopped
+                    // return OK(()) on success, Err() otherwise.
+                },
                 SessionNodeType::Service => {
-                    // check if pidfile exists
-                    let pidfile_path = runtime_dir.join(format!("{}.pid", dependency.name));
-                    if tokio::fs::metadata(pidfile_path).await.is_ok() {
-                        return Ok(());
+                    match dependency.status.read().await.deref() {
+                        SessionNodeStatus::Ready => {},
+                        SessionNodeStatus::Running => return Ok(()),
+                        SessionNodeStatus::Stopped { time, restart, reason } => {
+                            if !*restart {
+                                return Err(NodeDependencyError::ServiceWontRestart)
+                            }
+                        },
                     }
                 }
             }
 
-            sleep(Duration::from_millis(250)).await;
+            // wait for a signal to arrive to re-check or wait the timeout:
+            // it is possible to lose a signal of status changed, so it is
+            // imperative to query it sporadically
+            tokio::select! {
+                _ = sleep(Duration::from_millis(250)) => {},
+                _ = dependency.status_notify.notified() => {},
+            };
         }
     }
 
