@@ -1,4 +1,5 @@
 {
+  "kind": "service",
   "cmd": "Hyprland",
   "args": [],
   "max_restarts": 0,

@@ -70,5 +70,6 @@ async fn test_new() {
         crate::errors::NodeLoadingError::IOError(_) => assert_eq!(1, 4),
         crate::errors::NodeLoadingError::FileNotFound(_) => assert_eq!(2, 4),
         crate::errors::NodeLoadingError::JSONError(_) => assert_eq!(3, 4),
+        crate::errors::NodeLoadingError::InvalidKind(_) => assert_eq!(4, 4),
     }
 }

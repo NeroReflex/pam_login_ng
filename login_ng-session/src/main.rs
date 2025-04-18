@@ -25,7 +25,7 @@ use login_ng_session::dbus::SessionManagerDBus;
 use login_ng_session::desc::NodeServiceDescriptor;
 use login_ng_session::errors::SessionManagerError;
 use login_ng_session::manager::SessionManager;
-use login_ng_session::node::{SessionNode, SessionNodeRestart};
+use login_ng_session::node::{SessionNode, SessionNodeRestart, SessionNodeType};
 use nix::unistd::{getuid, User};
 use std::time::{SystemTime, UNIX_EPOCH};
 use zbus::connection;
@@ -70,6 +70,7 @@ async fn main() -> Result<(), SessionManagerError> {
                         default_service_name.clone(),
                         Arc::new(SessionNode::new(
                             default_service_name.clone(),
+                            SessionNodeType::Service,
                             shell.clone(),
                             vec![],
                             nix::sys::signal::Signal::SIGINT,
@@ -88,6 +89,10 @@ async fn main() -> Result<(), SessionManagerError> {
             }
             login_ng_session::errors::NodeLoadingError::JSONError(err) => {
                 eprintln!("JSON deserialization error: {err}");
+                std::process::exit(-1)
+            }
+            login_ng_session::errors::NodeLoadingError::InvalidKind(err) => {
+                eprintln!("JSON syntax error: unrecognised kind value {err}");
                 std::process::exit(-1)
             }
         },

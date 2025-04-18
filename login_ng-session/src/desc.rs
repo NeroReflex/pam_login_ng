@@ -36,6 +36,7 @@ use crate::{
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NodeServiceDescriptor {
+    kind: String,
     cmd: String,
     args: Vec<String>,
     max_restarts: u64,
@@ -150,6 +151,11 @@ impl NodeServiceDescriptor {
 
         let node = SessionNode::new(
             filename.clone(),
+            match main.kind.as_str() {
+                "service" => crate::node::SessionNodeType::Service,
+                "oneshot" => crate::node::SessionNodeType::OneShot,
+                _ => return Err(NodeLoadingError::InvalidKind(main.kind.clone())),
+            },
             main.cmd(),
             main.args(),
             Signal::SIGABRT,
