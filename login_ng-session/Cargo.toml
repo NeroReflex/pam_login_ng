@@ -24,4 +24,5 @@ section = "utility"
 priority = "optional"
 assets = [
     ["target/release/login_ng-session", "usr/bin/", "755"],
+    ["rootfs/usr/bin/start-login_ng-session", "usr/bin/", "755"],
 ]
