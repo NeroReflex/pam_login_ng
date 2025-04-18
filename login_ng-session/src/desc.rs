@@ -26,8 +26,6 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::RwLock;
-
 use nix::sys::signal::Signal;
 use serde::{Deserialize, Serialize};
 

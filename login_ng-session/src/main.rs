@@ -20,7 +20,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 
 use login_ng_session::dbus::SessionManagerDBus;
 use login_ng_session::desc::NodeServiceDescriptor;
@@ -29,7 +28,6 @@ use login_ng_session::manager::SessionManager;
 use login_ng_session::node::{SessionNode, SessionNodeRestart};
 use nix::unistd::{getuid, User};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::sync::RwLock;
 use zbus::connection;
 
 #[tokio::main]
@@ -39,9 +37,7 @@ async fn main() -> Result<(), SessionManagerError> {
         .expect("Failed to get user information")
         .unwrap();
     let load_directoried = vec![
-        PathBuf::from(user.clone().dir)
-            .join(".config")
-            .join("login_ng-session"),
+        user.clone().dir.join(".config").join("login_ng-session"),
         PathBuf::from("/etc/login_ng-session/"),
     ];
 

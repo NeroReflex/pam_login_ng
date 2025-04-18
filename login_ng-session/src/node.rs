@@ -17,18 +17,15 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{ops::Deref, path::PathBuf, process::ExitStatus, sync::Arc, time::Duration, u64};
+use std::{path::PathBuf, process::ExitStatus, sync::Arc, time::Duration, u64};
 
-use nix::{
-    sys::signal::{self, Signal},
-    unistd::Pid,
-};
+use nix::sys::signal::Signal;
 
 use tokio::{
     process::{Child, Command},
     sync::RwLock,
     task::JoinSet,
-    time::{self, sleep, Instant},
+    time::{self, sleep},
 };
 
 #[derive(Debug)]
@@ -122,11 +119,11 @@ impl SessionNode {
         }
     }
 
-    pub async fn run(runtime_dir: PathBuf, node: Arc<SessionNode>) -> () {
+    pub async fn run(runtime_dir: PathBuf, node: Arc<SessionNode>) {
         assert_send_sync::<Arc<SessionNode>>();
-    
+
         let mut restarted: u64 = 0;
-    
+
         loop {
             // wait for dependencies to be up and running
             let dependencies = node
@@ -135,10 +132,14 @@ impl SessionNode {
                 .map(|a| {
                     let dep = a.clone();
                     let runtime_dir = runtime_dir.clone();
-                    tokio::spawn(async move { Self::wait_for_dependency_satisfied(runtime_dir, dep).await })
+                    tokio::spawn(async move {
+                        Self::wait_for_dependency_satisfied(runtime_dir, dep).await
+                    })
                 })
-                .collect::<JoinSet<_>>().join_all().await;
-    
+                .collect::<JoinSet<_>>()
+                .join_all()
+                .await;
+
             let mut command = Command::new(node.cmd.as_str());
             command.args(node.args.as_slice());
             match command.spawn() {
@@ -147,12 +148,12 @@ impl SessionNode {
                     // in the case user has requested program to exit use wait_for_dependency_stopped
                     // to wait until all dependencies are stopped
                     child.wait().await.unwrap();
-                },
+                }
                 Err(err) => {
                     eprintln!("Error spawning the child process: {}", err);
-                },
+                }
             }
-    
+
             // node exited (either successfully or with an error)
             // attempt to sleep before restarting it
             restarted += 1;
@@ -164,17 +165,23 @@ impl SessionNode {
                 break;
             }
         }
-    
+
         //node.poll().await
     }
-    
-    pub(crate) async fn wait_for_dependency_satisfied(runtime_dir: PathBuf, dependency: Arc<SessionNode>) {
+
+    pub(crate) async fn wait_for_dependency_satisfied(
+        runtime_dir: PathBuf,
+        dependency: Arc<SessionNode>,
+    ) {
         assert_send_sync::<Arc<SessionNode>>();
 
         // TODO: wait for the dependency to be present
     }
 
-    pub(crate) async fn wait_for_dependency_stopped(runtime_dir: PathBuf, dependency: Arc<SessionNode>) {
+    pub(crate) async fn wait_for_dependency_stopped(
+        runtime_dir: PathBuf,
+        dependency: Arc<SessionNode>,
+    ) {
         assert_send_sync::<Arc<SessionNode>>();
 
         // TODO: wait for the dependency to be stopped in order to exit cleanly

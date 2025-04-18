@@ -75,23 +75,25 @@ impl SessionManager {
         }
 
         let Some(main_node) = main_node else {
-            return Err(SessionManagerError::NotFound(target.clone()))
+            return Err(SessionManagerError::NotFound(target.clone()));
         };
 
         // start all services and let those sync themselves
-        let node_run_tasks = other_nodes.iter().map(|node| {
-            let n = node.clone();
-            let runtime_dir = self.runtime_dir.clone();
-            async move {
-                SessionNode::run(runtime_dir, n).await
-            }
-        }).collect::<JoinSet<_>>();
+        let node_run_tasks = other_nodes
+            .iter()
+            .map(|node| {
+                let n = node.clone();
+                let runtime_dir = self.runtime_dir.clone();
+                async move { SessionNode::run(runtime_dir, n).await }
+            })
+            .collect::<JoinSet<_>>();
 
         // wait for the target run to exit
         let runtime_dir = self.runtime_dir.clone();
-        let (main_node_res, other_nodes_res) = tokio::join!(task::spawn(async move {
-            SessionNode::run(runtime_dir, main_node).await
-        }), node_run_tasks.join_all());
+        let (main_node_res, other_nodes_res) = tokio::join!(
+            task::spawn(async move { SessionNode::run(runtime_dir, main_node).await }),
+            node_run_tasks.join_all()
+        );
 
         Ok(())
     }
