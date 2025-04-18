@@ -151,6 +151,7 @@ impl NodeServiceDescriptor {
         }
 
         let node = SessionNode::new(
+            filename.clone(),
             main.cmd(),
             main.args(),
             Signal::SIGABRT,

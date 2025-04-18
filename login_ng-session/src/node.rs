@@ -93,6 +93,7 @@ pub enum SessionStalledReason {
 
 #[derive(Debug)]
 pub struct SessionNode {
+    name: String,
     stop_signal: Signal,
     restart: SessionNodeRestart,
     cmd: String,
@@ -102,10 +103,9 @@ pub struct SessionNode {
 
 fn assert_send_sync<T: Send + Sync>() {}
 
-
-
 impl SessionNode {
     pub fn new(
+        name: String,
         cmd: String,
         args: Vec<String>,
         stop_signal: Signal,
@@ -113,6 +113,7 @@ impl SessionNode {
         dependencies: Vec<Arc<SessionNode>>,
     ) -> Self {
         Self {
+            name,
             cmd,
             args,
             restart,

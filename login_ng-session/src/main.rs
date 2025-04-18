@@ -73,6 +73,7 @@ async fn main() -> Result<(), SessionManagerError> {
                     nodes = HashMap::from([(
                         default_service_name.clone(),
                         Arc::new(SessionNode::new(
+                            default_service_name.clone(),
                             shell.clone(),
                             vec![],
                             nix::sys::signal::Signal::SIGINT,
