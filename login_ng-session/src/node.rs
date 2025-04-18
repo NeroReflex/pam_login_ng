@@ -17,17 +17,17 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{ffi::OsString, future::Future, path::{Path, PathBuf}, process::ExitStatus, sync::Arc, time::Duration, u64};
+use std::{path::PathBuf, process::ExitStatus, sync::Arc, time::Duration, u64};
 
 use nix::sys::signal::Signal;
 
 use tokio::{
+    fs::File,
+    io::AsyncWriteExt,
     process::{Child, Command},
     sync::RwLock,
     task::JoinSet,
     time::{self, sleep},
-    fs::File,
-    io::AsyncWriteExt
 };
 
 use crate::errors::NodeDependencyResult;
@@ -95,7 +95,7 @@ pub enum SessionStalledReason {
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum SessionNodeType {
     OneShot,
-    Service
+    Service,
 }
 
 #[derive(Debug)]
@@ -162,20 +162,24 @@ impl SessionNode {
                     if node.kind == SessionNodeType::Service {
                         match child.id() {
                             Some(id) => {
-                                match File::create(runtime_dir.join(format!("{}.pid", node.name))).await {
+                                match File::create(runtime_dir.join(format!("{}.pid", node.name)))
+                                    .await
+                                {
                                     Ok(mut pidfile) => {
                                         match pidfile.write_all(format!("{id}").as_bytes()).await {
-                                            Ok(_) => {},
+                                            Ok(_) => {}
                                             Err(err) => {
-                                                eprintln!("Error writing pidfile for {name}: {err}");
+                                                eprintln!(
+                                                    "Error writing pidfile for {name}: {err}"
+                                                );
                                             }
                                         }
-                                    },
+                                    }
                                     Err(err) => {
                                         eprintln!("Error creating pidfile for {name}: {err}");
                                     }
                                 }
-                            },
+                            }
                             None => {
                                 eprintln!("Error fetching pid for {name}");
                             }
@@ -220,9 +224,9 @@ impl SessionNode {
                     // check if pidfile exists
                     let pidfile_path = runtime_dir.join(format!("{}.pid", dependency.name));
                     if tokio::fs::metadata(pidfile_path).await.is_ok() {
-                        return Ok(())
+                        return Ok(());
                     }
-                },
+                }
             }
 
             sleep(Duration::from_millis(250)).await;

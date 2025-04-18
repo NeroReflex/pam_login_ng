@@ -41,7 +41,7 @@ async fn test_not_found() {
 
     match load_res {
         crate::errors::NodeLoadingError::FileNotFound(_) => (),
-        _ => assert!(false),
+        _ => panic!("wrong error type"),
     }
 }
 

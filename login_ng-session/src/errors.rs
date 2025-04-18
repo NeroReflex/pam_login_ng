@@ -55,8 +55,6 @@ pub type NodeLoadingResult<T> = Result<T, NodeLoadingError>;
 pub(crate) enum NodeDependencyError {
     #[error("I/O error: {0}")]
     IOError(#[from] IOError),
-
-
 }
 
 pub(crate) type NodeDependencyResult<T> = Result<T, NodeLoadingError>;
