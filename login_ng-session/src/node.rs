@@ -17,7 +17,10 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{io::Error as IOError, ops::Deref, path::PathBuf, process::ExitStatus, sync::Arc, time::Duration, u64};
+use std::{
+    io::Error as IOError, ops::Deref, path::PathBuf, process::ExitStatus, sync::Arc,
+    time::Duration, u64,
+};
 
 use nix::sys::signal::Signal;
 
@@ -148,8 +151,8 @@ impl SessionNode {
         let mut restarted: u64 = 0;
 
         loop {
-            // wait for dependencies to be up and running
-            let dependencies = node
+            // wait for dependencies to be up and running or failed for good
+            if node
                 .dependencies
                 .iter()
                 .map(|a| {
@@ -161,11 +164,13 @@ impl SessionNode {
                 })
                 .collect::<JoinSet<_>>()
                 .join_all()
-                .await;
+                .await
+                .iter()
+                .any(|dep_res| dep_res.is_err())
+            {}
 
             let mut command = Command::new(node.cmd.as_str());
             command.args(node.args.as_slice());
-            
             restarted += 1;
             let will_restart_if_failed = restarted <= node.restart.max_times();
 
@@ -206,7 +211,7 @@ impl SessionNode {
                     // in the case user has requested program to exit use wait_for_dependency_stopped
                     // to wait until all dependencies are stopped
                     tokio::select! {
-                        result = child.wait() => 
+                        result = child.wait() =>
                             match result {
                                 Ok(result) => SessionNodeStatus::Stopped { time: Instant::now(), restart: !result.success() && will_restart_if_failed, reason: Arc::new(SessionNodeStopReason::Completed(result)) },
                                 Err(err) => SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: Arc::new(SessionNodeStopReason::Errored(err)) }
@@ -220,7 +225,11 @@ impl SessionNode {
                 Err(err) => {
                     eprintln!("Error spawning the child process: {}", err);
 
-                    *node.status.write().await = SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: Arc::new(SessionNodeStopReason::Errored(err)) };
+                    *node.status.write().await = SessionNodeStatus::Stopped {
+                        time: Instant::now(),
+                        restart: will_restart_if_failed,
+                        reason: Arc::new(SessionNodeStopReason::Errored(err)),
+                    };
                     node.status_notify.notify_waiters();
                 }
             };
@@ -235,8 +244,6 @@ impl SessionNode {
                 break;
             }
         }
-
-        //node.poll().await
     }
 
     pub(crate) async fn wait_for_dependency_satisfied(
@@ -250,18 +257,20 @@ impl SessionNode {
                 SessionNodeType::OneShot => {
                     // TODO: here wait for it to be stopped
                     // return OK(()) on success, Err() otherwise.
-                },
-                SessionNodeType::Service => {
-                    match dependency.status.read().await.deref() {
-                        SessionNodeStatus::Ready => {},
-                        SessionNodeStatus::Running => return Ok(()),
-                        SessionNodeStatus::Stopped { time, restart, reason } => {
-                            if !*restart {
-                                return Err(NodeDependencyError::ServiceWontRestart)
-                            }
-                        },
-                    }
                 }
+                SessionNodeType::Service => match dependency.status.read().await.deref() {
+                    SessionNodeStatus::Ready => {}
+                    SessionNodeStatus::Running => return Ok(()),
+                    SessionNodeStatus::Stopped {
+                        time: _,
+                        restart,
+                        reason: _,
+                    } => {
+                        if !*restart {
+                            return Err(NodeDependencyError::ServiceWontRestart);
+                        }
+                    }
+                },
             }
 
             // wait for a signal to arrive to re-check or wait the timeout:
