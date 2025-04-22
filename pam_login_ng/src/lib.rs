@@ -239,7 +239,16 @@ impl PamHooks for PamQuickEmbedded {
                     let cred_data = format!("{}-login_ng", username);
                     let main_password = match pamh.get_data::<String>(cred_data.as_str()) {
                         Ok(main_password) => main_password.clone(),
-                        Err(err) => return err,
+                        Err(err) => {
+                            pamh.log(
+                                pam::module::LogLevel::Error,
+                                format!(
+                                    "login_ng: open_session: get_data error: {err}"
+                                ),
+                            );
+
+                            return err
+                        },
                     };
 
                     match PamQuickEmbedded::open_session_for_user(
@@ -361,12 +370,18 @@ impl PamHooks for PamQuickEmbedded {
                 Err(pam_err_code) => return pam_err_code,
             };
 
+        let cred_data = format!("{}-login_ng", username);
+
         // NOTE: if main_by_auth returns a main password the authentication was successful:
         // there is no need to check if the returned main password is the same as the stored one.
         // This will also used below for the user-provided string.
         if let Ok(main_password) = user_cfg.main_by_auth(&Some(String::new())) {
-            let cred_data = format!("{}-login_ng", username);
             if let Err(err) = pamh.set_data(cred_data.as_str(), Box::new(main_password)) {
+                pamh.log(
+                    pam::module::LogLevel::Error,
+                    format!("login_ng: sm_authenticate: set_data error {err}"),
+                );
+
                 return err;
             }
 
@@ -397,14 +412,31 @@ impl PamHooks for PamQuickEmbedded {
         match pam_try!(conv.send(PAM_PROMPT_ECHO_OFF, "Password: "))
             .map(|cstr| cstr.to_str().map(|s| s.to_string()))
         {
-            Some(Ok(password)) => user_cfg
-                .main_by_auth(&Some(password))
-                .map(|main_password| {
-                    let cred_data = format!("{}-login_ng", username);
-                    pamh.set_data(cred_data.as_str(), Box::new(main_password))
-                })
-                .map(|_| PamResultCode::PAM_SUCCESS)
-                .unwrap_or(PamResultCode::PAM_AUTH_ERR),
+            Some(Ok(password)) => {
+                match user_cfg
+                    .main_by_auth(&Some(password)) {
+                        Ok(main_password) => {
+                            if let Err(err) = pamh.set_data(cred_data.as_str(), Box::new(main_password)) {
+                                pamh.log(
+                                    pam::module::LogLevel::Error,
+                                    format!("login_ng: sm_authenticate: set_data error {err}"),
+                                );
+            
+                                return err;
+                            }
+                            PamResultCode::PAM_SUCCESS
+                        },
+                        Err(err) => {
+                            pamh.log(
+                                pam::module::LogLevel::Error,
+                                format!("login_ng: sm_authenticate: authentication error: {err}"),
+                            );
+        
+                            return PamResultCode::PAM_AUTH_ERR;
+                        }
+                    }
+                    
+            },
             Some(Err(_err)) => PamResultCode::PAM_CRED_INSUFFICIENT,
             None => PamResultCode::PAM_CRED_INSUFFICIENT,
         }
