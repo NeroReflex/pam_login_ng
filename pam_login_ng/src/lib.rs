@@ -118,7 +118,7 @@ impl PamHooks for PamQuickEmbedded {
             ),
             Err(err) => {
                 pamh.log(
-                    pam::module::LogLevel::Error,
+                    pam::module::LogLevel::Debug,
                     format!("Couldn't read dbus socket address: {err} - using default..."),
                 );
                 std::env::set_var(
@@ -185,7 +185,7 @@ impl PamHooks for PamQuickEmbedded {
             ),
             Err(err) => {
                 pamh.log(
-                    pam::module::LogLevel::Error,
+                    pam::module::LogLevel::Debug,
                     format!("Couldn't read dbus socket address: {err} - using default..."),
                 );
                 std::env::set_var(
