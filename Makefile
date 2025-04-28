@@ -17,7 +17,7 @@ install: build
 	install -D -m 644 rootfs/etc/pam.d/login_ng-ctl $(PREFIX)/etc/pam.d/login_ng-ctl
 
 .PHONY: build
-build: fetch login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl login_ng-session/target/$(BUILD_TYPE)/login_ng-session pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so
+build: fetch login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl login_ng-gui/target/$(BUILD_TYPE)/login_ng-gui login_ng-session/target/$(BUILD_TYPE)/login_ng-session pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so
 
 .PHONY: fetch
 fetch: Cargo.lock
@@ -28,6 +28,9 @@ login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli:
 
 login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl:
 	cd login_ng-ctl && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target
+
+login_ng-gui/target/$(BUILD_TYPE)/login_ng-gui:
+	cd login_ng-gui && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target
 
 login_ng-session/target/$(BUILD_TYPE)/login_ng-session:
 	cd login_ng-session && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target
@@ -52,5 +55,6 @@ all: build
 deb: fetch
 	cd login_ng-cli && cargo-deb --all-features
 	cd login_ng-ctl && cargo-deb --all-features
+	cd login_ng-gui && cargo-deb --all-features
 	cd login_ng-session && cargo-deb --all-features
 	cd pam_login_ng && cargo-deb --all-features

@@ -12,6 +12,7 @@ members = [
     "pam_login_ng",
     "login_ng-cli",
     "login_ng-ctl",
+    "login_ng-gui",
     "login_ng-session"
 ]
 resolver = "2"
