@@ -5,7 +5,7 @@ Before=greetd.service
 [Service]
 Type=dbus
 BusName=org.neroreflex.login_ng_mount
-ExecStart=/usr/bin/pam_login_ng-service
+ExecStart=pam_login_ng-service
 Restart=always
 IgnoreSIGPIPE=no
 KillSignal=SIGTERM
