@@ -32,6 +32,7 @@ section = "utility"
 priority = "optional"
 assets = [
     ["target/release/pam_login_ng-service", "usr/bin/", "755"],
+    ["../rootfs/usr/bin/start-login_ng-session", "usr/bin/", "755"],
     ["../rootfs/usr/lib/systemd/system/pam_login_ng.service", "usr/lib/systemd/system/", "644"],
     ["../rootfs/usr/lib/systemd/system/greetd.service.d/override.conf", "usr/lib/systemd/system/greetd.service.d/", "644"],
     ["../rootfs/usr/share/dbus-1/system.d/org.neroreflex.login_ng_session.conf", "usr/share/dbus-1/system.d/", "644"],

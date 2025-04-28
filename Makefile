@@ -8,6 +8,7 @@ install: build
 	install -D -m 755 login_ng-session/target/$(BUILD_TYPE)/login_ng-session $(PREFIX)/usr/bin/login_ng-session
 	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service $(PREFIX)/usr/bin/pam_login_ng-service
 	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so $(PREFIX)/usr/lib/security/pam_login_ng.so
+	install -D -m 755 rootfs/usr/bin/start-login_ng-session $(PREFIX)/usr/bin/start-login_ng-session
 	install -D -m 644 rootfs/usr/lib/systemd/system/pam_login_ng.service $(PREFIX)/usr/lib/systemd/system/pam_login_ng.service
 	install -D -m 644 rootfs/usr/lib/systemd/system/login_ng@.service $(PREFIX)/usr/lib/systemd/system/login_ng@.service
 	install -D -m 644 rootfs/usr/lib/sysusers.d/login_ng.conf $(PREFIX)/usr/lib/sysusers.d/login_ng.conf
@@ -51,4 +52,5 @@ all: build
 deb: fetch
 	cd login_ng-cli && cargo-deb --all-features
 	cd login_ng-ctl && cargo-deb --all-features
+	cd login_ng-session && cargo-deb --all-features
 	cd pam_login_ng && cargo-deb --all-features
