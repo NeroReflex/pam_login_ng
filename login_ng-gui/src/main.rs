@@ -1,9 +1,10 @@
 // Prevent console window in addition to Slint window in Windows release builds when, e.g., starting the app via file manager. Ignored on other platforms.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{error::Error, ffi::OsString};
+use std::{env, error::Error, ffi::OsString, sync::{Arc, Mutex}};
 
 use login_ng::users::os::unix::UserExt;
+use login_ng_user_interactions::{cli::CommandLineLoginUserInteractionHandler, login::{LoginExecutor, SessionCommandRetrival}};
 use slint::ModelRc;
 
 slint::include_modules!();
@@ -39,6 +40,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ui_handle = ui.as_weak();
     ui.on_request_login(move |username| {
         let _ui = ui_handle.unwrap();
+
+        let maybe_username = Some(username.as_str().to_string());
+
+        let prompter = Arc::new(Mutex::new(CommandLineLoginUserInteractionHandler::new(
+            true,
+            Some(username.as_str().to_string()),
+            None,
+        )));
+
+        use login_ng_user_interactions::greetd::GreetdLoginExecutor;
+
+        let mut login_executor = GreetdLoginExecutor::new(env::var("GREETD_SOCK").unwrap(), prompter);
+
+        login_executor.execute(&maybe_username, &SessionCommandRetrival::AutodetectFromUserHome).unwrap();
+
         //let ui_handle = ui.as_weak();
         /*move || {
             let ui = ui_handle.unwrap();

@@ -26,18 +26,18 @@ use login_ng_session::desc::NodeServiceDescriptor;
 use login_ng_session::errors::SessionManagerError;
 use login_ng_session::manager::SessionManager;
 use login_ng_session::node::{SessionNode, SessionNodeRestart, SessionNodeType};
-use nix::unistd::{getuid, User};
+use login_ng::users::{get_user_by_name, os::unix::UserExt};
 use std::time::{SystemTime, UNIX_EPOCH};
 use zbus::connection;
 
 #[tokio::main]
 async fn main() -> Result<(), SessionManagerError> {
-    let uid = getuid();
-    let user = User::from_uid(uid)
-        .expect("Failed to get user information")
-        .unwrap();
+    let username = login_ng::users::get_current_username().unwrap();
+
+    let user = get_user_by_name(username.as_os_str())
+        .expect("Failed to get user information");
     let load_directoried = vec![
-        user.clone().dir.join(".config").join("login_ng-session"),
+        user.clone().home_dir().join(".config").join("login_ng-session"),
         PathBuf::from("/etc/login_ng-session/"),
     ];
 
@@ -60,7 +60,7 @@ async fn main() -> Result<(), SessionManagerError> {
             login_ng_session::errors::NodeLoadingError::FileNotFound(filename) => {
                 // if the default target is missing use the default user shell
                 if filename == default_service_name {
-                    let shell = user.clone().shell.to_string_lossy().into_owned();
+                    let shell = user.shell().to_string_lossy().into_owned();
 
                     eprintln!(
                         "Definition for {default_service_name} not found: using shell {shell}"
