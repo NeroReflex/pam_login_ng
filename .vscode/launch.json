@@ -4,7 +4,6 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
         {
             "type": "lldb",
             "request": "launch",
@@ -204,6 +203,43 @@
                 ],
                 "filter": {
                     "name": "login_ng-ctl",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'login_ng-gui'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=login_ng-gui",
+                    "--package=login_ng-gui"
+                ],
+                "filter": {
+                    "name": "login_ng-gui",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'login_ng-gui'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=login_ng-gui",
+                    "--package=login_ng-gui"
+                ],
+                "filter": {
+                    "name": "login_ng-gui",
                     "kind": "bin"
                 }
             },
