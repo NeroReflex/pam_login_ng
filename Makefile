@@ -44,8 +44,13 @@ pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so:
 .PHONY: clean
 clean:
 	cargo clean
+	rm -rf login_ng/target
 	rm -rf login_ng-cli/target
+	rm -rf login_ng-gui/target
 	rm -rf login_ng-ctl/target
+	rm -rf login_ng-session/target
+	rm -rf pam_login_ng-common/target
+	rm -rf pam_login_ng/target
 	rm -rf pam_login_ng/target
 
 .PHONY: all
