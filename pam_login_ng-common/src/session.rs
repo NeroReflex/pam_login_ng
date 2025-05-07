@@ -56,6 +56,7 @@ use crate::{
 
 struct UserSession {
     _mounts: Vec<UnmountDrop<Mount>>,
+    count: usize,
 }
 
 enum RsaPrivateKeyFetchOpStatus {
@@ -187,98 +188,104 @@ impl Sessions {
             return (ServiceOperationResult::CannotIdentifyUser.into(), 0, 0);
         };
 
-        if self.sessions.contains_key(&user.name().to_os_string()) {
-            return (ServiceOperationResult::SessionAlreadyOpened.into(), 0, 0);
-        }
+        match self.sessions.get_mut(&user.name().to_os_string()) {
+            Some(session) => {
+                session.count += 1;
 
-        let priv_key = match self.fetch_priv_key().await {
-            Ok(priv_key) => priv_key,
-            Err(err) => {
-                println!("❌ Error fetching the private RSA key: {err}");
-                return (ServiceOperationResult::PubKeyError.into(), 0, 0);
-            }
-        };
-
-        let (otp, password) = match SessionPrelude::decrypt(priv_key.clone(), password) {
-            Ok(result) => result,
-            Err(err) => {
-                eprintln!("❌ Error in decrypting data: {err}");
-                return (ServiceOperationResult::DataDecryptionFailed.into(), 0, 0);
-            }
-        };
-
-        // check the OTP to be available to defeat replay attacks
-        let mut hasher = DefaultHasher::new();
-        otp.hash(&mut hasher);
-        match self.one_time_tokens.remove(&hasher.finish()) {
-            Some(stored) => {
-                if stored != otp {
-                    eprintln!("🚫 The provided temporary OTP key couldn't be verified");
-                    return (ServiceOperationResult::EncryptionError.into(), 0, 0);
-                }
-            }
+                println!("✅ Incremented count of sessions for user {username}");
+            },
             None => {
-                println!("❌ Error in finding the provided temporary OTP key");
-                return (ServiceOperationResult::EncryptionError.into(), 0, 0);
-            }
-        }
-
-        let user_mounts = match load_user_mountpoints(&source) {
-            Ok(user_cfg) => user_cfg,
-            Err(err) => {
-                eprintln!("❌ Error loading user mount data: {err}");
-                return (
-                    ServiceOperationResult::CannotLoadUserMountError.into(),
-                    0,
-                    0,
-                );
-            }
-        };
-
-        // Check for the mount to be approved by root
-        // otherwise the user might mount everything he wants to
-        // with every dmask, potentially compromising the
-        // security and integrity of the whole system.
-        if let Some(mounts) = user_mounts.clone() {
-            let hash_to_check = mounts.hash();
-            match self.mounts_auth.read().await.read_auth_file().await {
-                Ok(mounts_auth) => {
-                    if !mounts_auth.authorized(username, hash_to_check.clone()) {
-                        eprintln!(
-                            "🚫 User {username} attempted an unauthorized mount {hash_to_check}."
-                        );
-                        return (ServiceOperationResult::UnauthorizedMount.into(), 0, 0);
+                let priv_key = match self.fetch_priv_key().await {
+                    Ok(priv_key) => priv_key,
+                    Err(err) => {
+                        println!("❌ Error fetching the private RSA key: {err}");
+                        return (ServiceOperationResult::PubKeyError.into(), 0, 0);
+                    }
+                };
+        
+                let (otp, password) = match SessionPrelude::decrypt(priv_key.clone(), password) {
+                    Ok(result) => result,
+                    Err(err) => {
+                        eprintln!("❌ Error in decrypting data: {err}");
+                        return (ServiceOperationResult::DataDecryptionFailed.into(), 0, 0);
+                    }
+                };
+        
+                // check the OTP to be available to defeat replay attacks
+                let mut hasher = DefaultHasher::new();
+                otp.hash(&mut hasher);
+                match self.one_time_tokens.remove(&hasher.finish()) {
+                    Some(stored) => {
+                        if stored != otp {
+                            eprintln!("🚫 The provided temporary OTP key couldn't be verified");
+                            return (ServiceOperationResult::EncryptionError.into(), 0, 0);
+                        }
+                    }
+                    None => {
+                        println!("❌ Error in finding the provided temporary OTP key");
+                        return (ServiceOperationResult::EncryptionError.into(), 0, 0);
                     }
                 }
-                Err(err) => {
-                    eprintln!("❌ Error reading mount authorizations file: {err}");
-                    return (ServiceOperationResult::UnauthorizedMount.into(), 0, 0);
+        
+                let user_mounts = match load_user_mountpoints(&source) {
+                    Ok(user_cfg) => user_cfg,
+                    Err(err) => {
+                        eprintln!("❌ Error loading user mount data: {err}");
+                        return (
+                            ServiceOperationResult::CannotLoadUserMountError.into(),
+                            0,
+                            0,
+                        );
+                    }
+                };
+        
+                // Check for the mount to be approved by root
+                // otherwise the user might mount everything he wants to
+                // with every dmask, potentially compromising the
+                // security and integrity of the whole system.
+                if let Some(mounts) = user_mounts.clone() {
+                    let hash_to_check = mounts.hash();
+                    match self.mounts_auth.read().await.read_auth_file().await {
+                        Ok(mounts_auth) => {
+                            if !mounts_auth.authorized(username, hash_to_check.clone()) {
+                                eprintln!(
+                                    "🚫 User {username} attempted an unauthorized mount {hash_to_check}."
+                                );
+                                return (ServiceOperationResult::UnauthorizedMount.into(), 0, 0);
+                            }
+                        }
+                        Err(err) => {
+                            eprintln!("❌ Error reading mount authorizations file: {err}");
+                            return (ServiceOperationResult::UnauthorizedMount.into(), 0, 0);
+                        }
+                    };
+                };
+        
+                let mounted_devices = mount_all(
+                    user_mounts,
+                    password,
+                    user.uid(),
+                    user.primary_group_id(),
+                    user.name().to_string_lossy().to_string(),
+                    user.home_dir().as_os_str().to_string_lossy().to_string(),
+                );
+        
+                if mounted_devices.is_empty() {
+                    eprintln!("❌ Error mounting one or more devices for user {username}");
+                    return (ServiceOperationResult::MountError.into(), 0, 0);
                 }
-            };
-        };
-
-        let mounted_devices = mount_all(
-            user_mounts,
-            password,
-            user.uid(),
-            user.primary_group_id(),
-            user.name().to_string_lossy().to_string(),
-            user.home_dir().as_os_str().to_string_lossy().to_string(),
-        );
-
-        if mounted_devices.is_empty() {
-            eprintln!("❌ Error mounting one or more devices for user {username}");
-            return (ServiceOperationResult::MountError.into(), 0, 0);
+        
+                let user_session = UserSession {
+                    _mounts: mounted_devices,
+                    count: 1,
+                };
+        
+                self.sessions
+                    .insert(user.name().to_os_string(), user_session);
+        
+                println!("✅ Successfully opened session for user {username}");
+            }
         }
-
-        let user_session = UserSession {
-            _mounts: mounted_devices,
-        };
-
-        self.sessions
-            .insert(user.name().to_os_string(), user_session);
-
-        println!("✅ Successfully opened session for user {username}");
 
         (
             ServiceOperationResult::Ok.into(),
@@ -296,16 +303,28 @@ impl Sessions {
 
         let username = user.name().to_string_lossy();
 
-        // due to how directories are mounted discarding the session also umounts all mount points:
-        // either remove the user session from the collection and destroy the session or
-        // report to the caller that the requested session is already closed
-        match self.sessions.remove(user.name()) {
-            Some(user_session) => drop(user_session),
-            None => return ServiceOperationResult::SessionAlreadyClosed.into(),
-        };
+        match self.sessions.get_mut(user.name()) {
+            Some(session) => {
+                session.count -= 1;
+                if session.count == 0 {
+                    // due to how directories are mounted discarding the session also umounts all mount points:
+                    // either remove the user session from the collection and destroy the session or
+                    // report to the caller that the requested session is already closed
+                    match self.sessions.remove(user.name()) {
+                        Some(user_session) => drop(user_session),
+                        None => return ServiceOperationResult::SessionAlreadyClosed.into(),
+                    };
+                }
 
-        println!("✅ Successfully closed session for user '{username}'");
+                println!("✅ Successfully closed session for user '{username}'");
 
-        ServiceOperationResult::Ok.into()
+                ServiceOperationResult::Ok.into()
+            },
+            None => {
+                eprintln!("❌ Error closing session for user {username}: already closed");
+
+                ServiceOperationResult::SessionAlreadyClosed.into()
+            },
+        }
     }
 }
