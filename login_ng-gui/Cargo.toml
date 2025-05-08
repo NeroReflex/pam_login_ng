@@ -6,13 +6,18 @@ edition = "2021"
 license = "GPL-2.0-or-later"
 
 [dependencies]
-slint = "1.8.0"
+slint = { version = "^1.8", default-features = false, features = [
+    "compat-1-2",
+    "gettext",
+    "backend-winit-wayland",
+    "renderer-femtovg",
+] }
 argh = "^0.1"
 login_ng = { path = "../login_ng"}
 login_ng_user_interactions = { path = "../login_ng_user_interactions", features = []}
 
 [build-dependencies]
-slint-build = "1.8.0"
+slint-build = "^1.8"
 
 # Conditional dependencies
 [features]
