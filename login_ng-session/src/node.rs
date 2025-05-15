@@ -301,10 +301,6 @@ impl SessionNode {
 
     pub async fn is_running(&self) -> bool {
         /*
-        if let SessionNodeStatus::Running(_) = self.status {
-            return true;
-        }
-
         for dep in self.dependencies.iter() {
             let dep_guard = dep.read().await;
             if Box::pin(dep_guard.is_running()).await {
@@ -315,7 +311,10 @@ impl SessionNode {
         false
         */
 
-        todo!()
+        match *self.status.read().await {
+            SessionNodeStatus::Running => true,
+            _ => false,
+        }
     }
 
     pub async fn issue_manual_stop(&mut self) {
@@ -343,85 +342,4 @@ impl SessionNode {
         todo!()
     }
 
-    pub async fn poll(&self) -> Option<SessionStalledReason> {
-        /*
-        let mut stall_reason = None;
-
-        self.status = match &self.status {
-            SessionNodeStatus::Ready => {
-                // Check for each dependency to be NOT stalled
-                let mut stalled = false;
-                for dep in self.dependencies.iter() {
-                    let mut guard = dep.write().await;
-
-                    if Box::pin(guard.poll()).await.is_some() {
-                        stalled = true;
-                    }
-                }
-
-                // here dependency node is either stalled or running.
-                // if it is running it might NOT have completed what this node requires
-                // I do not give any fuck (yet?) because programs can wait for what they
-                // need, or fail and will be restarted.
-                match stalled {
-                    true => SessionNodeStatus::Ready,
-                    false => match self.command.spawn() {
-                        Ok(child) => SessionNodeStatus::Running(Arc::new(RwLock::new(child))),
-                        Err(err) => SessionNodeStatus::Stopped {
-                            time: time::Instant::now(),
-                            reason: Arc::new(SessionNodeStopReason::Errored(err)),
-                        },
-                    },
-                }
-            }
-            SessionNodeStatus::Running(proc) => match proc.write().await.try_wait() {
-                Ok(possible_exit_status) => match possible_exit_status {
-                    Some(exit_status) => SessionNodeStatus::Stopped {
-                        time: time::Instant::now(),
-                        reason: Arc::new(SessionNodeStopReason::Completed(exit_status)),
-                    },
-                    None => SessionNodeStatus::Running(proc.clone()),
-                },
-                Err(err) => SessionNodeStatus::Stopped {
-                    time: time::Instant::now(),
-                    reason: Arc::new(SessionNodeStopReason::Errored(err)),
-                },
-            },
-            SessionNodeStatus::Stopped { time, reason } => {
-                stall_reason = match reason.deref() {
-                    SessionNodeStopReason::Errored(_) => {
-                        match self.restarted >= self.restart.max_times {
-                            true => Some(SessionStalledReason::RestartedTooManyTimes),
-                            false => None,
-                        }
-                    }
-                    SessionNodeStopReason::Completed(exit_status) => {
-                        if exit_status.success() {
-                            Some(SessionStalledReason::TerminatedSuccessfully)
-                        } else if self.restarted >= self.restart.max_times {
-                            Some(SessionStalledReason::RestartedTooManyTimes)
-                        } else {
-                            None
-                        }
-                    }
-                    SessionNodeStopReason::Manual => Some(SessionStalledReason::UserRequested),
-                };
-
-                match time.checked_add(self.restart.delay) {
-                    None => self.status.clone(),
-                    Some(restart_time) => match Instant::now() >= restart_time {
-                        false => self.status.clone(),
-                        true => match stall_reason.is_none() {
-                            true => SessionNodeStatus::Ready,
-                            false => self.status.clone(),
-                        },
-                    },
-                }
-            }
-        };
-
-        stall_reason
-        */
-        todo!()
-    }
 }

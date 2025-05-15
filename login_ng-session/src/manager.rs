@@ -97,17 +97,4 @@ impl SessionManager {
 
         Ok(())
     }
-
-    pub async fn step(
-        &mut self,
-        target: &String,
-        minimum_step_delay: Duration,
-    ) -> Result<Option<SessionStalledReason>, SessionManagerError> {
-        let node = self.services.get(target).unwrap();
-
-        let (_sleep_res, stalled) =
-            tokio::join!(tokio::time::sleep(minimum_step_delay), node.poll());
-
-        Ok(stalled)
-    }
 }
