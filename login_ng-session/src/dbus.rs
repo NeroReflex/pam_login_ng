@@ -50,6 +50,10 @@ impl SessionManagerDBus {
         todo!()
     }
 
+    pub async fn restart(&self, target: String) -> u32 {
+        todo!()
+    }
+
     pub async fn is_running(&self, target: String) -> (u32, bool) {
         match self.manager.is_running(&target).await {
             Ok(response) => (0, response),

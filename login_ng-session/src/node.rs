@@ -146,7 +146,7 @@ impl SessionNode {
         }
     }
 
-    pub async fn run(runtime_dir: PathBuf, node: Arc<SessionNode>) {
+    pub async fn run(node: Arc<SessionNode>) {
         assert_send_sync::<Arc<SessionNode>>();
 
         let name = node.name.clone();
@@ -160,9 +160,8 @@ impl SessionNode {
                 .iter()
                 .map(|a| {
                     let dep = a.clone();
-                    let runtime_dir = runtime_dir.clone();
                     tokio::spawn(async move {
-                        Self::wait_for_dependency_satisfied(runtime_dir, dep).await
+                        Self::wait_for_dependency_satisfied(dep).await
                     })
                 })
                 .collect::<JoinSet<_>>()
@@ -254,7 +253,6 @@ impl SessionNode {
     }
 
     pub(crate) async fn wait_for_dependency_satisfied(
-        runtime_dir: PathBuf,
         dependency: Arc<SessionNode>,
     ) -> NodeDependencyResult<()> {
         assert_send_sync::<Arc<SessionNode>>();
@@ -291,7 +289,6 @@ impl SessionNode {
     }
 
     pub(crate) async fn wait_for_dependency_stopped(
-        runtime_dir: PathBuf,
         dependency: Arc<SessionNode>,
     ) {
         assert_send_sync::<Arc<SessionNode>>();

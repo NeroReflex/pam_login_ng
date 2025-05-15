@@ -62,6 +62,18 @@ impl SessionManager {
         }
     }
 
+    pub async fn start(&self, target: &String) -> Result<bool, SessionManagerError> {
+        todo!()
+    }
+
+    pub async fn stop(&self, target: &String) -> Result<bool, SessionManagerError> {
+        todo!()
+    }
+
+    pub async fn restart(&self, target: &String) -> Result<bool, SessionManagerError> {
+        todo!()
+    }
+
     pub async fn run(&self, target: &String) -> Result<(), SessionManagerError> {
         let mut other_nodes = vec![];
         let mut main_node = None;
@@ -83,15 +95,14 @@ impl SessionManager {
             .iter()
             .map(|node| {
                 let n = node.clone();
-                let runtime_dir = self.runtime_dir.clone();
-                async move { SessionNode::run(runtime_dir, n).await }
+                async move { SessionNode::run(n).await }
             })
             .collect::<JoinSet<_>>();
 
         // wait for the target run to exit
         let runtime_dir = self.runtime_dir.clone();
         let (main_node_res, other_nodes_res) = tokio::join!(
-            task::spawn(async move { SessionNode::run(runtime_dir, main_node).await }),
+            task::spawn(async move { SessionNode::run(main_node).await }),
             node_run_tasks.join_all()
         );
 
