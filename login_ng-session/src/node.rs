@@ -106,6 +106,7 @@ pub enum SessionNodeType {
 pub struct SessionNode {
     name: String,
     kind: SessionNodeType,
+    pidfile: Option<PathBuf>,
     stop_signal: Signal,
     restart: SessionNodeRestart,
     cmd: String,
@@ -121,6 +122,7 @@ impl SessionNode {
     pub fn new(
         name: String,
         kind: SessionNodeType,
+        pidfile: Option<PathBuf>,
         cmd: String,
         args: Vec<String>,
         stop_signal: Signal,
@@ -133,6 +135,7 @@ impl SessionNode {
         Self {
             name,
             kind,
+            pidfile,
             cmd,
             args,
             restart,
@@ -176,10 +179,10 @@ impl SessionNode {
 
             match command.spawn() {
                 Ok(mut child) => {
-                    if node.kind == SessionNodeType::Service {
+                    if let Some(pidfile) = &node.pidfile {
                         match child.id() {
                             Some(id) => {
-                                match File::create(runtime_dir.join(format!("{}.pid", node.name)))
+                                match File::create(pidfile)
                                     .await
                                 {
                                     Ok(mut pidfile) => {
@@ -218,6 +221,10 @@ impl SessionNode {
                             },
                         // TODO: here await for the termination signal
                     };
+
+                    if let Some(pidfile) = &node.pidfile {
+                        let _ = std::fs::remove_file(pidfile);
+                    }
 
                     // the status has been changed: notify waiters
                     node.status_notify.notify_waiters();

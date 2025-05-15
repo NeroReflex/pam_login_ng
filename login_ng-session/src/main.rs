@@ -71,9 +71,10 @@ async fn main() -> Result<(), SessionManagerError> {
                         Arc::new(SessionNode::new(
                             default_service_name.clone(),
                             SessionNodeType::Service,
+                            None,
                             shell.clone(),
                             vec![],
-                            nix::sys::signal::Signal::SIGINT,
+                            nix::sys::signal::Signal::SIGKILL,
                             SessionNodeRestart::no_restart(),
                             vec![],
                         )),

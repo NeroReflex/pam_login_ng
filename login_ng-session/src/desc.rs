@@ -37,6 +37,7 @@ use crate::{
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NodeServiceDescriptor {
     kind: String,
+    pidfile: Option<PathBuf>,
     cmd: String,
     args: Vec<String>,
     max_restarts: u64,
@@ -156,6 +157,7 @@ impl NodeServiceDescriptor {
                 "oneshot" => crate::node::SessionNodeType::OneShot,
                 _ => return Err(NodeLoadingError::InvalidKind(main.kind.clone())),
             },
+            main.pidfile(),
             main.cmd(),
             main.args(),
             Signal::SIGABRT,
@@ -169,6 +171,10 @@ impl NodeServiceDescriptor {
         currently_loading.remove(filename);
 
         Ok(())
+    }
+
+    pub fn pidfile(&self) -> Option<PathBuf> {
+        self.pidfile.clone()
     }
 
     pub fn cmd(&self) -> String {
