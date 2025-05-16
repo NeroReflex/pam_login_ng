@@ -43,14 +43,20 @@ impl SessionManagerDBus {
 )]
 impl SessionManagerDBus {
     pub async fn start(&self, target: String) -> u32 {
+        self.manager.start(&target).await;
+
         todo!()
     }
 
     pub async fn stop(&self, target: String) -> u32 {
+        self.manager.stop(&target).await;
+
         todo!()
     }
 
     pub async fn restart(&self, target: String) -> u32 {
+        self.manager.restart(&target).await;
+
         todo!()
     }
 

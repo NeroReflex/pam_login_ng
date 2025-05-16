@@ -193,7 +193,7 @@ impl Sessions {
                 session.count += 1;
 
                 println!("✅ Incremented count of sessions for user {username}");
-            },
+            }
             None => {
                 let priv_key = match self.fetch_priv_key().await {
                     Ok(priv_key) => priv_key,
@@ -202,7 +202,7 @@ impl Sessions {
                         return (ServiceOperationResult::PubKeyError.into(), 0, 0);
                     }
                 };
-        
+
                 let (otp, password) = match SessionPrelude::decrypt(priv_key.clone(), password) {
                     Ok(result) => result,
                     Err(err) => {
@@ -210,7 +210,7 @@ impl Sessions {
                         return (ServiceOperationResult::DataDecryptionFailed.into(), 0, 0);
                     }
                 };
-        
+
                 // check the OTP to be available to defeat replay attacks
                 let mut hasher = DefaultHasher::new();
                 otp.hash(&mut hasher);
@@ -226,7 +226,7 @@ impl Sessions {
                         return (ServiceOperationResult::EncryptionError.into(), 0, 0);
                     }
                 }
-        
+
                 let user_mounts = match load_user_mountpoints(&source) {
                     Ok(user_cfg) => user_cfg,
                     Err(err) => {
@@ -238,7 +238,7 @@ impl Sessions {
                         );
                     }
                 };
-        
+
                 // Check for the mount to be approved by root
                 // otherwise the user might mount everything he wants to
                 // with every dmask, potentially compromising the
@@ -260,7 +260,7 @@ impl Sessions {
                         }
                     };
                 };
-        
+
                 let mounted_devices = mount_all(
                     user_mounts,
                     password,
@@ -269,20 +269,20 @@ impl Sessions {
                     user.name().to_string_lossy().to_string(),
                     user.home_dir().as_os_str().to_string_lossy().to_string(),
                 );
-        
+
                 if mounted_devices.is_empty() {
                     eprintln!("❌ Error mounting one or more devices for user {username}");
                     return (ServiceOperationResult::MountError.into(), 0, 0);
                 }
-        
+
                 let user_session = UserSession {
                     _mounts: mounted_devices,
                     count: 1,
                 };
-        
+
                 self.sessions
                     .insert(user.name().to_os_string(), user_session);
-        
+
                 println!("✅ Successfully opened session for user {username}");
             }
         }
@@ -319,12 +319,12 @@ impl Sessions {
                 println!("✅ Successfully closed session for user '{username}'");
 
                 ServiceOperationResult::Ok.into()
-            },
+            }
             None => {
                 eprintln!("❌ Error closing session for user {username}: already closed");
 
                 ServiceOperationResult::SessionAlreadyClosed.into()
-            },
+            }
         }
     }
 }

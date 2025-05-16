@@ -412,30 +412,26 @@ impl PamHooks for PamQuickEmbedded {
         match pam_try!(conv.send(PAM_PROMPT_ECHO_OFF, "Password: "))
             .map(|cstr| cstr.to_str().map(|s| s.to_string()))
         {
-            Some(Ok(password)) => {
-                match user_cfg
-                    .main_by_auth(&Some(password)) {
-                        Ok(main_password) => {
-                            if let Err(err) = pamh.set_data(cred_data.as_str(), Box::new(main_password)) {
-                                pamh.log(
-                                    pam::module::LogLevel::Error,
-                                    format!("login_ng: sm_authenticate: set_data error {err}"),
-                                );
-            
-                                return err;
-                            }
-                            PamResultCode::PAM_SUCCESS
-                        },
-                        Err(err) => {
-                            pamh.log(
-                                pam::module::LogLevel::Error,
-                                format!("login_ng: sm_authenticate: authentication error: {err}"),
-                            );
-        
-                            return PamResultCode::PAM_AUTH_ERR;
-                        }
+            Some(Ok(password)) => match user_cfg.main_by_auth(&Some(password)) {
+                Ok(main_password) => {
+                    if let Err(err) = pamh.set_data(cred_data.as_str(), Box::new(main_password)) {
+                        pamh.log(
+                            pam::module::LogLevel::Error,
+                            format!("login_ng: sm_authenticate: set_data error {err}"),
+                        );
+
+                        return err;
                     }
-                    
+                    PamResultCode::PAM_SUCCESS
+                }
+                Err(err) => {
+                    pamh.log(
+                        pam::module::LogLevel::Error,
+                        format!("login_ng: sm_authenticate: authentication error: {err}"),
+                    );
+
+                    return PamResultCode::PAM_AUTH_ERR;
+                }
             },
             Some(Err(_err)) => PamResultCode::PAM_CRED_INSUFFICIENT,
             None => PamResultCode::PAM_CRED_INSUFFICIENT,

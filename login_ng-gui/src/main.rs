@@ -1,10 +1,21 @@
 // Prevent console window in addition to Slint window in Windows release builds when, e.g., starting the app via file manager. Ignored on other platforms.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{env, error::Error, ffi::OsString, sync::{Arc, Mutex}};
+use std::{
+    env,
+    error::Error,
+    ffi::OsString,
+    sync::{Arc, Mutex},
+};
 
-use login_ng::{storage::{load_user_auth_data, StorageSource}, user::UserAuthData, users::os::unix::UserExt};
-use login_ng_user_interactions::login::{LoginExecutor, LoginUserInteractionHandler, SessionCommandRetrival};
+use login_ng::{
+    storage::{load_user_auth_data, StorageSource},
+    user::UserAuthData,
+    users::os::unix::UserExt,
+};
+use login_ng_user_interactions::login::{
+    LoginExecutor, LoginUserInteractionHandler, SessionCommandRetrival,
+};
 use slint::ModelRc;
 
 slint::include_modules!();
@@ -19,10 +30,7 @@ pub struct GUILoginUserInteractionHandler {
 }
 
 impl GUILoginUserInteractionHandler {
-    pub fn new(
-        attempt_autologin: bool,
-        maybe_username: Option<String>,
-    ) -> Self {
+    pub fn new(attempt_autologin: bool, maybe_username: Option<String>) -> Self {
         let maybe_user = match &maybe_username {
             Some(username) => {
                 load_user_auth_data(&StorageSource::Username(username.clone())).map_or(None, |a| a)
@@ -92,7 +100,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             continue;
         }
 
-        users.push(slint::SharedString::from(user.name().to_string_lossy().to_string()));
+        users.push(slint::SharedString::from(
+            user.name().to_string_lossy().to_string(),
+        ));
     }
 
     let users = ModelRc::new(users);
@@ -113,9 +123,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         use login_ng_user_interactions::greetd::GreetdLoginExecutor;
 
-        let mut login_executor = GreetdLoginExecutor::new(env::var("GREETD_SOCK").unwrap(), prompter);
+        let mut login_executor =
+            GreetdLoginExecutor::new(env::var("GREETD_SOCK").unwrap(), prompter);
 
-        login_executor.execute(&maybe_username, &SessionCommandRetrival::AutodetectFromUserHome).unwrap();
+        login_executor
+            .execute(
+                &maybe_username,
+                &SessionCommandRetrival::AutodetectFromUserHome,
+            )
+            .unwrap();
 
         /*move || {
             let ui = ui_handle.unwrap();

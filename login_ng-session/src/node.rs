@@ -22,7 +22,7 @@ use std::{
     time::Duration, u64,
 };
 
-use nix::sys::signal::Signal;
+use nix::{libc::pid_t, sys::signal::Signal};
 
 use tokio::{
     fs::File,
@@ -75,13 +75,17 @@ impl Default for SessionNodeRestart {
 pub enum SessionNodeStopReason {
     Completed(ExitStatus),
     Errored(IOError),
-    Manual,
+    ManuallyStopped,
+    ManuallyRestarted,
 }
 
 #[derive(Debug, Clone)]
 pub enum SessionNodeStatus {
     Ready,
-    Running,
+    Running {
+        pid: pid_t,
+        pending: Option<ManualAction>
+    },
     Stopped {
         time: time::Instant,
         restart: bool,
@@ -101,6 +105,15 @@ pub enum SessionNodeType {
     OneShot,
     Service,
 }
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum ManualAction {
+    Restart,
+    Stop,
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum ManualActionIssueError {}
 
 #[derive(Debug)]
 pub struct SessionNode {
@@ -160,9 +173,7 @@ impl SessionNode {
                 .iter()
                 .map(|a| {
                     let dep = a.clone();
-                    tokio::spawn(async move {
-                        Self::wait_for_dependency_satisfied(dep).await
-                    })
+                    tokio::spawn(async move { Self::wait_for_dependency_satisfied(dep).await })
                 })
                 .collect::<JoinSet<_>>()
                 .join_all()
@@ -178,35 +189,33 @@ impl SessionNode {
 
             match command.spawn() {
                 Ok(mut child) => {
+                    let Some(pid) = child.id() else {
+                        eprintln!("Error fetching pid for {name}");
+                        child.kill().await.unwrap();
+                        continue;
+                    };
+
                     if let Some(pidfile) = &node.pidfile {
-                        match child.id() {
-                            Some(id) => {
-                                match File::create(pidfile)
-                                    .await
-                                {
-                                    Ok(mut pidfile) => {
-                                        match pidfile.write_all(format!("{id}").as_bytes()).await {
-                                            Ok(_) => {}
-                                            Err(err) => {
-                                                eprintln!(
-                                                    "Error writing pidfile for {name}: {err}"
-                                                );
-                                            }
-                                        }
-                                    }
+                        match File::create(pidfile).await {
+                            Ok(mut pidfile) => {
+                                match pidfile.write_all(format!("{pid}").as_bytes()).await {
+                                    Ok(_) => {}
                                     Err(err) => {
-                                        eprintln!("Error creating pidfile for {name}: {err}");
+                                        eprintln!("Error writing pidfile for {name}: {err}");
                                     }
                                 }
                             }
-                            None => {
-                                eprintln!("Error fetching pid for {name}");
+                            Err(err) => {
+                                eprintln!("Error creating pidfile for {name}: {err}");
                             }
                         }
                     }
 
                     // the process is now runnig: update the status and notify waiters
-                    *node.status.write().await = SessionNodeStatus::Running;
+                    *node.status.write().await = SessionNodeStatus::Running {
+                        pid: pid.try_into().unwrap(),
+                        pending: None,
+                    };
                     node.status_notify.notify_waiters();
 
                     // here wait for child to exit or for the command to kill the process
@@ -265,7 +274,7 @@ impl SessionNode {
                 }
                 SessionNodeType::Service => match dependency.status.read().await.deref() {
                     SessionNodeStatus::Ready => {}
-                    SessionNodeStatus::Running => return Ok(()),
+                    SessionNodeStatus::Running { pid: _, pending: _ } => return Ok(()),
                     SessionNodeStatus::Stopped {
                         time: _,
                         restart,
@@ -288,9 +297,7 @@ impl SessionNode {
         }
     }
 
-    pub(crate) async fn wait_for_dependency_stopped(
-        dependency: Arc<SessionNode>,
-    ) {
+    pub(crate) async fn wait_for_dependency_stopped(dependency: Arc<SessionNode>) {
         assert_send_sync::<Arc<SessionNode>>();
 
         // TODO: wait for the dependency to be stopped in order to exit cleanly
@@ -309,12 +316,23 @@ impl SessionNode {
         */
 
         match *self.status.read().await {
-            SessionNodeStatus::Running => true,
+            SessionNodeStatus::Running { pid: _, pending: _ } => true,
             _ => false,
         }
     }
 
-    pub async fn issue_manual_stop(&mut self) {
+    pub async fn issue_manual_action(
+        node: Arc<SessionNode>,
+        action: ManualAction,
+    ) -> Result<(), ManualActionIssueError> {
+        let status_guard = node.status.write().await;
+
+        match status_guard.deref() {
+            SessionNodeStatus::Ready => todo!(),
+            SessionNodeStatus::Running { pid: _, pending: _ } => todo!(),
+            SessionNodeStatus::Stopped { time, restart, reason } => todo!(),
+        }
+
         /*
         if let SessionNodeStatus::Running(proc) = &self.status {
             let mut proc_guard = proc.write().await;
@@ -338,5 +356,4 @@ impl SessionNode {
         */
         todo!()
     }
-
 }

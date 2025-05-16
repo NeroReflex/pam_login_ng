@@ -23,7 +23,7 @@ use tokio::task::{self, JoinSet};
 
 use crate::{
     errors::SessionManagerError,
-    node::{SessionNode, SessionStalledReason},
+    node::{ManualAction, SessionNode, SessionStalledReason},
 };
 
 pub struct ManagerStatus {
@@ -71,6 +71,23 @@ impl SessionManager {
     }
 
     pub async fn restart(&self, target: &String) -> Result<bool, SessionManagerError> {
+        let mut main_node = None;
+
+        for (node_name, node_value) in self.services.iter() {
+            if *target == *node_name {
+                main_node = Some(node_value.clone())
+            }
+        }
+
+        let Some(main_node) = main_node else {
+            return Err(SessionManagerError::NotFound(target.clone()));
+        };
+
+        match SessionNode::issue_manual_action(main_node, ManualAction::Restart).await {
+            Ok(_) => return Ok(true),
+            Err(err) => return Ok(false),
+        };
+
         todo!()
     }
 

@@ -21,12 +21,12 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use login_ng::users::{get_user_by_name, os::unix::UserExt};
 use login_ng_session::dbus::SessionManagerDBus;
 use login_ng_session::desc::NodeServiceDescriptor;
 use login_ng_session::errors::SessionManagerError;
 use login_ng_session::manager::SessionManager;
 use login_ng_session::node::{SessionNode, SessionNodeRestart, SessionNodeType};
-use login_ng::users::{get_user_by_name, os::unix::UserExt};
 use std::time::{SystemTime, UNIX_EPOCH};
 use zbus::connection;
 
@@ -34,10 +34,12 @@ use zbus::connection;
 async fn main() -> Result<(), SessionManagerError> {
     let username = login_ng::users::get_current_username().unwrap();
 
-    let user = get_user_by_name(username.as_os_str())
-        .expect("Failed to get user information");
+    let user = get_user_by_name(username.as_os_str()).expect("Failed to get user information");
     let load_directoried = vec![
-        user.clone().home_dir().join(".config").join("login_ng-session"),
+        user.clone()
+            .home_dir()
+            .join(".config")
+            .join("login_ng-session"),
         PathBuf::from("/etc/login_ng-session/"),
     ];
 
