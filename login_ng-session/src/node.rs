@@ -22,7 +22,12 @@ use std::{
     time::Duration, u64,
 };
 
-use nix::{libc::pid_t, sys::signal::Signal};
+use nix::{
+    errno::Errno,
+    libc::pid_t,
+    sys::signal::{self, Signal},
+    unistd::Pid,
+};
 
 use tokio::{
     fs::File,
@@ -71,10 +76,10 @@ impl Default for SessionNodeRestart {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum SessionNodeStopReason {
     Completed(ExitStatus),
-    Errored(IOError),
+    Errored, /*(IOError)*/
     ManuallyStopped,
     ManuallyRestarted,
 }
@@ -84,12 +89,12 @@ pub enum SessionNodeStatus {
     Ready,
     Running {
         pid: pid_t,
-        pending: Option<ManualAction>
+        pending: Option<ManualAction>,
     },
     Stopped {
         time: time::Instant,
         restart: bool,
-        reason: Arc<SessionNodeStopReason>,
+        reason: SessionNodeStopReason,
     },
 }
 
@@ -113,7 +118,10 @@ pub enum ManualAction {
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub enum ManualActionIssueError {}
+pub enum ManualActionIssueError {
+    AlreadyPendingAction,
+    CannotSendSignal(Errno),
+}
 
 #[derive(Debug)]
 pub struct SessionNode {
@@ -224,8 +232,8 @@ impl SessionNode {
                     tokio::select! {
                         result = child.wait() =>
                             match result {
-                                Ok(result) => SessionNodeStatus::Stopped { time: Instant::now(), restart: !result.success() && will_restart_if_failed, reason: Arc::new(SessionNodeStopReason::Completed(result)) },
-                                Err(err) => SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: Arc::new(SessionNodeStopReason::Errored(err)) }
+                                Ok(result) => SessionNodeStatus::Stopped { time: Instant::now(), restart: !result.success() && will_restart_if_failed, reason: SessionNodeStopReason::Completed(result) },
+                                Err(err) => SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: SessionNodeStopReason::Errored /*(err)*/ }
                             },
                         // TODO: here await for the termination signal
                     };
@@ -243,7 +251,7 @@ impl SessionNode {
                     *node.status.write().await = SessionNodeStatus::Stopped {
                         time: Instant::now(),
                         restart: will_restart_if_failed,
-                        reason: Arc::new(SessionNodeStopReason::Errored(err)),
+                        reason: SessionNodeStopReason::Errored, /*(err)*/
                     };
                     node.status_notify.notify_waiters();
                 }
@@ -325,35 +333,32 @@ impl SessionNode {
         node: Arc<SessionNode>,
         action: ManualAction,
     ) -> Result<(), ManualActionIssueError> {
-        let status_guard = node.status.write().await;
+        let mut status_guard = node.status.write().await;
 
-        match status_guard.deref() {
-            SessionNodeStatus::Ready => todo!(),
-            SessionNodeStatus::Running { pid: _, pending: _ } => todo!(),
-            SessionNodeStatus::Stopped { time, restart, reason } => todo!(),
-        }
+        match *status_guard {
+            SessionNodeStatus::Ready => match &action {
+                ManualAction::Restart => todo!(),
+                ManualAction::Stop => todo!(),
+            },
+            SessionNodeStatus::Running { pid, pending } => match pending {
+                Some(_) => Err(ManualActionIssueError::AlreadyPendingAction),
+                None => {
+                    *status_guard = SessionNodeStatus::Running {
+                        pid: pid,
+                        pending: Some(action),
+                    };
 
-        /*
-        if let SessionNodeStatus::Running(proc) = &self.status {
-            let mut proc_guard = proc.write().await;
-
-            match proc_guard.id() {
-                Some(pid) => {
-                    match signal::kill(Pid::from_raw(pid.try_into().unwrap()), self.stop_signal) {
-                        Ok(_) => match proc_guard.wait().await {
-                            Ok(exit_status) => todo!(),
-                            Err(err) => todo!(),
-                        },
-                        Err(err) => todo!(),
+                    match signal::kill(Pid::from_raw(pid.try_into().unwrap()), node.stop_signal) {
+                        Ok(_) => Ok(()),
+                        Err(err) => Err(ManualActionIssueError::CannotSendSignal(err)),
                     }
                 }
-                None => match proc_guard.kill().await {
-                    Ok(_) => todo!(),
-                    Err(err) => todo!(),
-                },
-            }
+            },
+            SessionNodeStatus::Stopped {
+                time,
+                restart,
+                reason,
+            } => todo!(),
         }
-        */
-        todo!()
     }
 }
