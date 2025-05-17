@@ -67,10 +67,14 @@ impl SessionManager {
     }
 
     pub async fn stop(&self, target: &String) -> Result<bool, SessionManagerError> {
-        todo!()
+        self.manual_action(target, ManualAction::Stop).await
     }
 
     pub async fn restart(&self, target: &String) -> Result<bool, SessionManagerError> {
+        self.manual_action(target, ManualAction::Restart).await
+    }
+
+    async fn manual_action(&self, target: &String, action: ManualAction) -> Result<bool, SessionManagerError> {
         let selected_node =
             self.services
                 .iter()
@@ -83,7 +87,7 @@ impl SessionManager {
             return Err(SessionManagerError::NotFound(target.clone()));
         };
 
-        match SessionNode::issue_manual_action(selected_node, ManualAction::Restart).await {
+        match SessionNode::issue_manual_action(selected_node, action).await {
             Ok(_) => Ok(true),
             Err(err) => Err(SessionManagerError::ManualActionError(err)),
         }
