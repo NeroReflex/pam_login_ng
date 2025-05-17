@@ -29,6 +29,7 @@ use nix::{
     unistd::Pid,
 };
 
+use thiserror::Error;
 use tokio::{
     fs::File,
     io::AsyncWriteExt,
@@ -117,9 +118,12 @@ pub enum ManualAction {
     Stop,
 }
 
-#[derive(Copy, Clone, PartialEq, Debug)]
+#[derive(Error, Copy, Clone, PartialEq, Debug)]
 pub enum ManualActionIssueError {
+    #[error("Error performing the requested action: action pending already")]
     AlreadyPendingAction,
+
+    #[error("Error sending the termination signal: {0}")]
     CannotSendSignal(Errno),
 }
 
@@ -188,7 +192,9 @@ impl SessionNode {
                 .await
                 .iter()
                 .any(|dep_res| dep_res.is_err())
-            {}
+            {
+                // TODO: what if there is an error?
+            }
 
             let mut command = Command::new(node.cmd.as_str());
             command.args(node.args.as_slice());

@@ -71,24 +71,22 @@ impl SessionManager {
     }
 
     pub async fn restart(&self, target: &String) -> Result<bool, SessionManagerError> {
-        let mut main_node = None;
+        let selected_node =
+            self.services
+                .iter()
+                .find_map(|(node_name, node_value)| match *target == **node_name {
+                    false => None,
+                    true => Some(node_value.clone()),
+                });
 
-        for (node_name, node_value) in self.services.iter() {
-            if *target == *node_name {
-                main_node = Some(node_value.clone())
-            }
-        }
-
-        let Some(main_node) = main_node else {
+        let Some(selected_node) = selected_node else {
             return Err(SessionManagerError::NotFound(target.clone()));
         };
 
-        match SessionNode::issue_manual_action(main_node, ManualAction::Restart).await {
-            Ok(_) => return Ok(true),
-            Err(err) => return Ok(false),
-        };
-
-        todo!()
+        match SessionNode::issue_manual_action(selected_node, ManualAction::Restart).await {
+            Ok(_) => Ok(true),
+            Err(err) => Err(SessionManagerError::ManualActionError(err)),
+        }
     }
 
     pub async fn run(&self, target: &String) -> Result<(), SessionManagerError> {

@@ -22,6 +22,8 @@ use std::io::Error as IOError;
 use thiserror::Error;
 use zbus::Error as ZError;
 
+use crate::node::ManualActionIssueError;
+
 #[derive(Debug, Error)]
 pub enum SessionManagerError {
     #[error("DBus error: {0}")]
@@ -29,6 +31,9 @@ pub enum SessionManagerError {
 
     #[error("Service name not found: {0}")]
     NotFound(String),
+
+    #[error("Error issuing manual action: {0}")]
+    ManualActionError(#[from] ManualActionIssueError),
 }
 
 #[derive(Debug, Error)]
