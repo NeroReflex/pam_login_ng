@@ -38,19 +38,17 @@ impl ManagerStatus {
 
 #[derive(Debug, Default)]
 pub struct SessionManager {
-    runtime_dir: PathBuf,
     services: HashMap<String, Arc<SessionNode>>,
 }
 
 impl SessionManager {
-    pub fn new(runtime_dir: PathBuf, map: HashMap<String, Arc<SessionNode>>) -> Self {
+    pub fn new(map: HashMap<String, Arc<SessionNode>>) -> Self {
         let services = map
             .into_iter()
             .map(|(name, node)| (name.clone(), node.clone()))
             .collect::<HashMap<String, Arc<SessionNode>>>();
 
         Self {
-            runtime_dir,
             services,
         }
     }
@@ -119,7 +117,6 @@ impl SessionManager {
             .collect::<JoinSet<_>>();
 
         // wait for the target run to exit
-        let runtime_dir = self.runtime_dir.clone();
         let (main_node_res, other_nodes_res) = tokio::join!(
             task::spawn(async move { SessionNode::run(main_node).await }),
             node_run_tasks.join_all()

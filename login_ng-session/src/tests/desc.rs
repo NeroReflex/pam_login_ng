@@ -17,9 +17,11 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
 
-use crate::desc::NodeServiceDescriptor;
+use tokio::{join, time::sleep};
+
+use crate::{desc::NodeServiceDescriptor, manager::SessionManager};
 
 #[tokio::test]
 async fn test_not_found() {
@@ -46,7 +48,7 @@ async fn test_not_found() {
 }
 
 #[tokio::test]
-async fn test_new() {
+async fn test_cyclic_deps() {
     let load_path = PathBuf::from("../test_data/test_cyclic_deps");
     assert!(load_path.exists());
 
@@ -72,4 +74,43 @@ async fn test_new() {
         crate::errors::NodeLoadingError::JSONError(_) => assert_eq!(3, 4),
         crate::errors::NodeLoadingError::InvalidKind(_) => assert_eq!(4, 4),
     }
+}
+
+#[tokio::test]
+async fn test_restart() {
+    let load_path = PathBuf::from("../test_data/test_restart");
+    assert!(load_path.exists());
+
+    let load_directoried = vec![load_path.clone()];
+
+    let default_service_name = String::from("default.service");
+
+    let mut nodes = HashMap::new();
+    let _ = NodeServiceDescriptor::load_tree(
+        &mut nodes,
+        &default_service_name,
+        load_directoried.as_slice(),
+    )
+    .await
+    .unwrap();
+
+    let manager = Arc::new(SessionManager::new(nodes));
+
+    let service = String::from("default.service");
+
+    let (res1, res2) = join!(
+        manager.run(&service),
+        async {
+            sleep(Duration::from_millis(500)).await;
+            manager.restart(&service).await
+        }
+    );
+
+    res1.unwrap();
+    res2.unwrap();
+
+    std::fs::remove_file("f1").unwrap();
+    std::fs::remove_file("f2").unwrap();
+
+    assert_eq!(std::fs::exists("f3").unwrap(), false)
 }

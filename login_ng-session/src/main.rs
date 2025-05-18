@@ -115,7 +115,7 @@ async fn main() -> Result<(), SessionManagerError> {
 
     std::fs::create_dir(manager_runtime_path.clone()).unwrap();
 
-    let manager = Arc::new(SessionManager::new(manager_runtime_path, nodes));
+    let manager = Arc::new(SessionManager::new(nodes));
 
     // This is the default user dbus address
     // DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
