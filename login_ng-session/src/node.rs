@@ -259,6 +259,14 @@ impl SessionNode {
             // so that a stop or restart command can be issued
             drop(node_status);
 
+            enum ForcedAction {
+                ForcefullyRestart,
+                ForcefullyStop,
+            }
+
+            let mut end_loop_action = None;
+            let mut success = false;
+
             // here wait for child to exit or for the command to kill the process
             // in the case user has requested program to exit use wait_for_dependency_stopped
             // to wait until all dependencies are stopped
@@ -268,11 +276,20 @@ impl SessionNode {
                     *new_status = match *(new_status) {
                         SessionNodeStatus::Running { pid: _, pending } => match pending {
                             Some(pending_action) => match pending_action {
-                                ManualAction::Restart => SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: SessionNodeStopReason::Errored /*(err)*/ },
-                                ManualAction::Stop => SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: SessionNodeStopReason::Errored /*(err)*/ },
+                                ManualAction::Restart => {
+                                    end_loop_action = Some(ForcedAction::ForcefullyRestart);
+                                    SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: SessionNodeStopReason::Errored /*(err)*/ }
+                                },
+                                ManualAction::Stop => {
+                                    end_loop_action = Some(ForcedAction::ForcefullyStop);
+                                    SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: SessionNodeStopReason::Errored /*(err)*/ }
+                                },
                             },
                             None => match result {
-                                Ok(result) => SessionNodeStatus::Stopped { time: Instant::now(), restart: !result.success() && will_restart_if_failed, reason: SessionNodeStopReason::Completed(result) },
+                                Ok(result) => {
+                                    success = result.success();
+                                    SessionNodeStatus::Stopped { time: Instant::now(), restart: !result.success() && will_restart_if_failed, reason: SessionNodeStopReason::Completed(result) }
+                                },
                                 Err(err) => SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: SessionNodeStopReason::Errored /*(err)*/ }
                             }
                         },
@@ -289,14 +306,27 @@ impl SessionNode {
             // the status has been changed: notify waiters
             node.status_notify.notify_waiters();
 
-            // node exited (either successfully or with an error)
-            // attempt to sleep before restarting it
-            if will_restart_if_failed {
-                sleep(node.restart.delay()).await;
-                continue;
-            } else {
-                // TODO: here return the run result
-                break;
+            match end_loop_action {
+                Some(todo) => match todo {
+                    ForcedAction::ForcefullyRestart => {
+                        restarted -= 1;
+                        continue;
+                    },
+                    ForcedAction::ForcefullyStop => {
+                        break;
+                    }
+                },
+                None => {
+                    // node exited (either successfully or with an error)
+                    // attempt to sleep before restarting it
+                    if will_restart_if_failed && !success {
+                        sleep(node.restart.delay()).await;
+                        continue;
+                    } else {
+                        // TODO: here return the run result
+                        break;
+                    }
+                }
             }
         }
     }
