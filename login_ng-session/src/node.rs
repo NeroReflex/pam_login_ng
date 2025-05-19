@@ -17,10 +17,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{
-    io::Error as IOError, ops::Deref, path::PathBuf, process::ExitStatus, sync::Arc,
-    time::Duration, u64,
-};
+use std::{ops::Deref, path::PathBuf, process::ExitStatus, sync::Arc, time::Duration, u64};
 
 use nix::{
     errno::Errno,
@@ -206,7 +203,10 @@ impl SessionNode {
 
             let spawn_res = command.spawn();
             let Ok(mut child) = spawn_res else {
-                eprintln!("Error spawning the child process: {}", spawn_res.unwrap_err());
+                eprintln!(
+                    "Error spawning the child process: {}",
+                    spawn_res.unwrap_err()
+                );
 
                 *node_status = SessionNodeStatus::Stopped {
                     time: Instant::now(),
@@ -234,14 +234,12 @@ impl SessionNode {
 
             if let Some(pidfile) = &node.pidfile {
                 match File::create(pidfile).await {
-                    Ok(mut pidfile) => {
-                        match pidfile.write_all(format!("{pid}").as_bytes()).await {
-                            Ok(_) => {}
-                            Err(err) => {
-                                eprintln!("Error writing pidfile for {name}: {err}");
-                            }
+                    Ok(mut pidfile) => match pidfile.write_all(format!("{pid}").as_bytes()).await {
+                        Ok(_) => {}
+                        Err(err) => {
+                            eprintln!("Error writing pidfile for {name}: {err}");
                         }
-                    }
+                    },
                     Err(err) => {
                         eprintln!("Error creating pidfile for {name}: {err}");
                     }
@@ -311,7 +309,7 @@ impl SessionNode {
                     ForcedAction::ForcefullyRestart => {
                         restarted -= 1;
                         continue;
-                    },
+                    }
                     ForcedAction::ForcefullyStop => {
                         break;
                     }
@@ -406,7 +404,7 @@ impl SessionNode {
                 Some(_) => Err(ManualActionIssueError::AlreadyPendingAction),
                 None => {
                     *status_guard = SessionNodeStatus::Running {
-                        pid: pid,
+                        pid,
                         pending: Some(action),
                     };
 

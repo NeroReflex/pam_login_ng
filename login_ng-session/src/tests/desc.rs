@@ -86,7 +86,7 @@ async fn test_restart() {
     let default_service_name = String::from("default.service");
 
     let mut nodes = HashMap::new();
-    let _ = NodeServiceDescriptor::load_tree(
+    NodeServiceDescriptor::load_tree(
         &mut nodes,
         &default_service_name,
         load_directoried.as_slice(),
@@ -98,13 +98,10 @@ async fn test_restart() {
 
     let service = String::from("default.service");
 
-    let (res1, res2) = join!(
-        manager.run(&service),
-        async {
-            sleep(Duration::from_millis(500)).await;
-            manager.restart(&service).await
-        }
-    );
+    let (res1, res2) = join!(manager.run(&service), async {
+        sleep(Duration::from_millis(500)).await;
+        manager.restart(&service).await
+    });
 
     res1.unwrap();
     res2.unwrap();
@@ -112,5 +109,5 @@ async fn test_restart() {
     std::fs::remove_file("f1").unwrap();
     std::fs::remove_file("f2").unwrap();
 
-    assert_eq!(std::fs::exists("f3").unwrap(), false)
+    assert!(!std::fs::exists("f3").unwrap())
 }

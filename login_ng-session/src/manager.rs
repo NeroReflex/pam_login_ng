@@ -17,13 +17,13 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 
 use tokio::task::{self, JoinSet};
 
 use crate::{
     errors::SessionManagerError,
-    node::{ManualAction, SessionNode, SessionStalledReason},
+    node::{ManualAction, SessionNode},
 };
 
 pub struct ManagerStatus {
@@ -48,9 +48,7 @@ impl SessionManager {
             .map(|(name, node)| (name.clone(), node.clone()))
             .collect::<HashMap<String, Arc<SessionNode>>>();
 
-        Self {
-            services,
-        }
+        Self { services }
     }
 
     pub async fn is_running(&self, target: &String) -> Result<bool, SessionManagerError> {
@@ -72,7 +70,11 @@ impl SessionManager {
         self.manual_action(target, ManualAction::Restart).await
     }
 
-    async fn manual_action(&self, target: &String, action: ManualAction) -> Result<bool, SessionManagerError> {
+    async fn manual_action(
+        &self,
+        target: &String,
+        action: ManualAction,
+    ) -> Result<bool, SessionManagerError> {
         let selected_node =
             self.services
                 .iter()

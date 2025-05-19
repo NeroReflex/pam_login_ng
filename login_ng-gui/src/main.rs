@@ -87,7 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let users = slint::VecModel::<slint::SharedString>::default();
 
     for user in unsafe { login_ng::users::all_users() } {
-        if user.name() == OsString::from("nobody") {
+        if user.name() == "nobody" {
             continue;
         }
 

@@ -430,7 +430,7 @@ impl PamHooks for PamQuickEmbedded {
                         format!("login_ng: sm_authenticate: authentication error: {err}"),
                     );
 
-                    return PamResultCode::PAM_AUTH_ERR;
+                    PamResultCode::PAM_AUTH_ERR
                 }
             },
             Some(Err(_err)) => PamResultCode::PAM_CRED_INSUFFICIENT,
