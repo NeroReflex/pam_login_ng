@@ -115,6 +115,10 @@ pub enum ManualAction {
     Stop,
 }
 
+pub enum RunResult {
+
+}
+
 #[derive(Error, Copy, Clone, PartialEq, Debug)]
 pub enum ManualActionIssueError {
     #[error("Error performing the requested action: action pending already")]
@@ -168,7 +172,7 @@ impl SessionNode {
         }
     }
 
-    pub async fn run(node: Arc<SessionNode>) {
+    pub async fn run(node: Arc<SessionNode>, main: bool) -> RunResult {
         assert_send_sync::<Arc<SessionNode>>();
 
         let name = node.name.clone();
@@ -307,11 +311,24 @@ impl SessionNode {
             match end_loop_action {
                 Some(todo) => match todo {
                     ForcedAction::ForcefullyRestart => {
-                        restarted -= 1;
+                        // clear out the restart count to be coherent
+                        // with a restarted node that was halted due
+                        // to too many restarts.
+                        restarted = 0;
                         continue;
                     }
                     ForcedAction::ForcefullyStop => {
-                        break;
+                        if main {
+                            // TODO: flag the outcome: user has requested the
+                            // node to be stopped, and this is the main node
+                            // to program must now be closed
+                            break;
+                        } else {
+                            // trap the logic in an endless wait that
+                            // can only be escaped by restarting the node
+                            // or by the program termination (when main exits)
+                            todo!()
+                        }
                     }
                 },
                 None => {
@@ -320,13 +337,36 @@ impl SessionNode {
                     if will_restart_if_failed && !success {
                         sleep(node.restart.delay()).await;
                         continue;
-                    } else {
-                        // TODO: here return the run result
+                    }
+
+                    if main {
+                        // TODO: flag the outcome: either success or not
                         break;
+                    } else {
+                        // trap the logic in an endless wait that
+                        // can only be escaped by restarting the node
+                        // or by the program termination (when main exits)
+                        todo!()
                     }
                 }
             }
         }
+
+        // if we are here the main node has exited:
+        // it also means the program has to exit
+        // and therefore every service has to be stopped
+        node
+            .dependencies
+            .iter()
+            .map(|a| {
+                let dep = a.clone();
+                tokio::spawn(async move { Self::wait_for_dependency_stopped(dep).await })
+            })
+            .collect::<JoinSet<_>>()
+            .join_all()
+            .await;
+        
+        todo!()
     }
 
     pub(crate) async fn wait_for_dependency_satisfied(

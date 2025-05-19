@@ -114,13 +114,13 @@ impl SessionManager {
             .iter()
             .map(|node| {
                 let n = node.clone();
-                async move { SessionNode::run(n).await }
+                async move { SessionNode::run(n, false).await }
             })
             .collect::<JoinSet<_>>();
 
         // wait for the target run to exit
         let (main_node_res, other_nodes_res) = tokio::join!(
-            task::spawn(async move { SessionNode::run(main_node).await }),
+            task::spawn(async move { SessionNode::run(main_node, true).await }),
             node_run_tasks.join_all()
         );
 
