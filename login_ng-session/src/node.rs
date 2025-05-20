@@ -116,7 +116,9 @@ pub enum ManualAction {
 }
 
 pub enum RunResult {
-
+    NeverRun,
+    Exited(ExitStatus),
+    Error
 }
 
 #[derive(Error, Copy, Clone, PartialEq, Debug)]
@@ -272,8 +274,13 @@ impl SessionNode {
             // here wait for child to exit or for the command to kill the process
             // in the case user has requested program to exit use wait_for_dependency_stopped
             // to wait until all dependencies are stopped
+            let mut last_exec_result = RunResult::NeverRun;
             tokio::select! {
                 result = child.wait() => {
+                    last_exec_result = match result {
+                        Ok(result) => RunResult::Exited(result),
+                        Err(_err) => RunResult::Error,
+                    };
                     let mut new_status = node.status.write().await;
                     *new_status = match *(new_status) {
                         SessionNodeStatus::Running { pid: _, pending } => match pending {
@@ -287,12 +294,15 @@ impl SessionNode {
                                     SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: SessionNodeStopReason::Errored /*(err)*/ }
                                 },
                             },
-                            None => match result {
-                                Ok(result) => {
+                            None => match &last_exec_result {
+                                RunResult::Exited(result) => {
                                     success = result.success();
-                                    SessionNodeStatus::Stopped { time: Instant::now(), restart: !result.success() && will_restart_if_failed, reason: SessionNodeStopReason::Completed(result) }
+                                    SessionNodeStatus::Stopped { time: Instant::now(), restart: !result.success() && will_restart_if_failed, reason: SessionNodeStopReason::Completed(result.clone()) }
                                 },
-                                Err(err) => SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: SessionNodeStopReason::Errored /*(err)*/ }
+                                RunResult::Error => {
+                                    SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: SessionNodeStopReason::Errored /*(err)*/ }
+                                },
+                                RunResult::NeverRun => unreachable!()
                             }
                         },
                         _ => unreachable!(),
@@ -322,13 +332,13 @@ impl SessionNode {
                             // TODO: flag the outcome: user has requested the
                             // node to be stopped, and this is the main node
                             // to program must now be closed
-                            break;
-                        } else {
-                            // trap the logic in an endless wait that
-                            // can only be escaped by restarting the node
-                            // or by the program termination (when main exits)
-                            todo!()
+                            return Self::terminate_run(node.clone(), last_exec_result).await
                         }
+
+                        // trap the logic in an endless wait that
+                        // can only be escaped by restarting the node
+                        // or by the program termination (when main exits)
+                        todo!()
                     }
                 },
                 None => {
@@ -340,21 +350,22 @@ impl SessionNode {
                     }
 
                     if main {
-                        // TODO: flag the outcome: either success or not
-                        break;
-                    } else {
-                        // trap the logic in an endless wait that
-                        // can only be escaped by restarting the node
-                        // or by the program termination (when main exits)
-                        todo!()
+                        // if we are here the main node has exited:
+                        // it also means the program has to exit
+                        // and therefore every service has to be stopped
+                        return Self::terminate_run(node.clone(), last_exec_result).await
                     }
+
+                    // trap the logic in an endless wait that
+                    // can only be escaped by restarting the node
+                    // or by the program termination (when main exits)
+                    todo!()
                 }
             }
         }
+    }
 
-        // if we are here the main node has exited:
-        // it also means the program has to exit
-        // and therefore every service has to be stopped
+    async fn terminate_run(node: Arc<SessionNode>, result: RunResult) -> RunResult {
         node
             .dependencies
             .iter()
@@ -365,8 +376,8 @@ impl SessionNode {
             .collect::<JoinSet<_>>()
             .join_all()
             .await;
-        
-        todo!()
+
+        result
     }
 
     pub(crate) async fn wait_for_dependency_satisfied(
