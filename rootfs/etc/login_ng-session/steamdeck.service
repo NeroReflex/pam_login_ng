@@ -1,0 +1,13 @@
+{
+    "kind": "service",
+    "cmd": "gamescope",
+    "args": [
+        "-e",
+        "-r", "120",
+        "--steam",
+        "--", "steam", "-gamepadui", "-steamos3" ,"-steampal", "-steamdeck"
+    ],
+    "max_restarts": 0,
+    "restart_delay_secs": 5,
+    "dependencies": [  ]
+}
