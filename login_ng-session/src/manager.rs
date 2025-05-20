@@ -62,11 +62,11 @@ impl SessionManager {
         todo!()
     }
 
-    pub async fn stop(&self, target: &String) -> Result<bool, SessionManagerError> {
+    pub async fn stop(&self, target: &String) -> Result<(), SessionManagerError> {
         self.manual_action(target, ManualAction::Stop).await
     }
 
-    pub async fn restart(&self, target: &String) -> Result<bool, SessionManagerError> {
+    pub async fn restart(&self, target: &String) -> Result<(), SessionManagerError> {
         self.manual_action(target, ManualAction::Restart).await
     }
 
@@ -74,7 +74,7 @@ impl SessionManager {
         &self,
         target: &String,
         action: ManualAction,
-    ) -> Result<bool, SessionManagerError> {
+    ) -> Result<(), SessionManagerError> {
         let selected_node =
             self.services
                 .iter()
@@ -88,7 +88,7 @@ impl SessionManager {
         };
 
         match SessionNode::issue_manual_action(selected_node, action).await {
-            Ok(_) => Ok(true),
+            Ok(_) => Ok(()),
             Err(err) => Err(SessionManagerError::ManualActionError(err)),
         }
     }

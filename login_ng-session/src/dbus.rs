@@ -49,15 +49,25 @@ impl SessionManagerDBus {
     }
 
     pub async fn stop(&self, target: String) -> u32 {
-        self.manager.stop(&target).await;
+        match self.manager.stop(&target).await {
+            Ok(_) => 0u32,
+            Err(err) => {
+                eprint!("Error stopping {target}: {err}");
 
-        todo!()
+                todo!()
+            },
+        }
     }
 
     pub async fn restart(&self, target: String) -> u32 {
-        self.manager.restart(&target).await;
+        match self.manager.restart(&target).await {
+            Ok(_) => 0u32,
+            Err(err) => {
+                eprint!("Error restarting {target}: {err}");
 
-        todo!()
+                todo!()
+            },
+        }
     }
 
     pub async fn is_running(&self, target: String) -> (u32, bool) {
