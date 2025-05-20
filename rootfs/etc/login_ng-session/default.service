@@ -1,0 +1,8 @@
+{
+    "kind": "service",
+    "cmd": "login_ng-session-main",
+    "args": [],
+    "max_restarts": 0,
+    "restart_delay_secs": 5,
+    "dependencies": [  ]
+}

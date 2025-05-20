@@ -9,6 +9,9 @@ install: build
 	install -D -m 755 login_ng-session/target/$(BUILD_TYPE)/login_ng-sessionctl $(PREFIX)/usr/bin/login_ng-sessionctl
 	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service $(PREFIX)/usr/bin/pam_login_ng-service
 	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so $(PREFIX)/usr/lib/security/pam_login_ng.so
+	install -D -m 755 rootfs/usr/bin/login_ng-session-desktop $(PREFIX)/usr/bin/login_ng-session-desktop
+	install -D -m 755 rootfs/usr/bin/login_ng-session-steam $(PREFIX)/usr/bin/login_ng-session-steam
+	install -D -m 755 rootfs/usr/bin/login_ng-session-main $(PREFIX)/usr/bin/login_ng-session-main
 	install -D -m 755 rootfs/usr/bin/start-login_ng-session $(PREFIX)/usr/bin/start-login_ng-session
 	install -D -m 644 rootfs/usr/lib/systemd/system/pam_login_ng.service $(PREFIX)/usr/lib/systemd/system/pam_login_ng.service
 	install -D -m 644 rootfs/usr/lib/systemd/system/login_ng@.service $(PREFIX)/usr/lib/systemd/system/login_ng@.service
@@ -17,6 +20,7 @@ install: build
 	install -D -m 644 rootfs/etc/pam.d/login_ng-autologin $(PREFIX)/etc/pam.d/login_ng-autologin
 	install -D -m 644 rootfs/etc/pam.d/login_ng-ctl $(PREFIX)/etc/pam.d/login_ng-ctl
 	install -D -m 644 rootfs/etc/login_ng-session/steamdeck.service $(PREFIX)/etc/login_ng-session/steamdeck.service
+	install -D -m 644 rootfs/etc/login_ng-session/default.service $(PREFIX)/etc/login_ng-session/default.service
 
 .PHONY: build
 build: fetch login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl login_ng-gui/target/$(BUILD_TYPE)/login_ng-gui login_ng-session/target/$(BUILD_TYPE)/login_ng-session login_ng-session/target/$(BUILD_TYPE)/login_ng-sessionctl pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so

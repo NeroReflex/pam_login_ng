@@ -1,0 +1,8 @@
+#!/bin/sh
+if [ -f "$HOME/.lastsession_was_steam" ]; then
+    rm "$HOME/.lastsession_was_steam"
+    "${BASH_SOURCE%/*}/login_ng-session-desktop"
+else
+    touch "$HOME/.lastsession_was_steam"
+    "${BASH_SOURCE%/*}/login_ng-session-steam"
+fi

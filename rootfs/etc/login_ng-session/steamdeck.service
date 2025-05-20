@@ -3,7 +3,6 @@
     "cmd": "gamescope",
     "args": [
         "-e",
-        "-r", "120",
         "--steam",
         "--", "steam", "-gamepadui", "-steamos3" ,"-steampal", "-steamdeck"
     ],
