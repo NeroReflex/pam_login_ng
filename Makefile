@@ -6,6 +6,7 @@ install: build
 	install -D -m 755 login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl $(PREFIX)/usr/bin/login_ng-ctl
 	install -D -m 755 login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli $(PREFIX)/usr/bin/login_ng-cli
 	install -D -m 755 login_ng-session/target/$(BUILD_TYPE)/login_ng-session $(PREFIX)/usr/bin/login_ng-session
+	install -D -m 755 login_ng-session/target/$(BUILD_TYPE)/login_ng-sessionctl $(PREFIX)/usr/bin/login_ng-sessionctl
 	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service $(PREFIX)/usr/bin/pam_login_ng-service
 	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so $(PREFIX)/usr/lib/security/pam_login_ng.so
 	install -D -m 755 rootfs/usr/bin/start-login_ng-session $(PREFIX)/usr/bin/start-login_ng-session
@@ -15,9 +16,10 @@ install: build
 	install -D -m 644 rootfs/etc/pam.d/login_ng $(PREFIX)/etc/pam.d/login_ng
 	install -D -m 644 rootfs/etc/pam.d/login_ng-autologin $(PREFIX)/etc/pam.d/login_ng-autologin
 	install -D -m 644 rootfs/etc/pam.d/login_ng-ctl $(PREFIX)/etc/pam.d/login_ng-ctl
+	install -D -m 644 rootfs/etc/login_ng-session/steamdeck.service $(PREFIX)/etc/login_ng-session/steamdeck.service
 
 .PHONY: build
-build: fetch login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl login_ng-gui/target/$(BUILD_TYPE)/login_ng-gui login_ng-session/target/$(BUILD_TYPE)/login_ng-session pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so
+build: fetch login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl login_ng-gui/target/$(BUILD_TYPE)/login_ng-gui login_ng-session/target/$(BUILD_TYPE)/login_ng-session login_ng-session/target/$(BUILD_TYPE)/login_ng-sessionctl pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so
 
 .PHONY: fetch
 fetch: Cargo.lock
@@ -34,6 +36,9 @@ login_ng-gui/target/$(BUILD_TYPE)/login_ng-gui:
 
 login_ng-session/target/$(BUILD_TYPE)/login_ng-session:
 	cd login_ng-session && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target
+
+login_ng-session/target/$(BUILD_TYPE)/login_ng-sessionctl:
+	cd login_ng-session && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target --bin login_ng-sessionctl
 
 pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service: pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so
 	cd pam_login_ng && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --bin pam_login_ng-service --target-dir target

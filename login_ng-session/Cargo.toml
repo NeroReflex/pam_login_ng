@@ -4,6 +4,10 @@ authors = ["Denis Benato <benato.denis96@gmail.com>"]
 edition = "2021"
 license = "GPL-2.0-or-later"
 
+[[bin]]
+name = "login_ng-sessionctl"
+path = "src/sessionctl/main.rs"
+
 [dependencies]
 argh = "^0.1"
 login_ng = { path = "../login_ng" }
@@ -24,5 +28,6 @@ priority = "optional"
 assets = [
     ["target/release/login_ng-session", "usr/bin/", "755"],
     ["../rootfs/usr/bin/start-login_ng-session", "usr/bin/", "755"],
+    ["../rootfs/usr/bin/start-login_ng-sessionctl", "usr/bin/", "755"],
     ["../rootfs/etc/login_ng-session/steamdeck.service", "etc/login_ng-session/", "644"],
 ]
