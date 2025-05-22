@@ -1,0 +1,20 @@
+[package]
+name = "sessionexec"
+authors = ["Denis Benato <benato.denis96@gmail.com>"]
+edition = "2021"
+license = "GPL-2.0-or-later"
+
+[dependencies]
+rust-ini = { version = "*" }
+libc = { version = "*", features = [] }
+
+[package.metadata.deb]
+license-file = ["../LICENSE.md", "4"]
+extended-description = """\
+Starts the user desktop environment of choice."""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/sessionexec", "usr/bin/", "755"],
+]

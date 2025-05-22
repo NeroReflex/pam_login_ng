@@ -118,7 +118,7 @@ pub enum ManualAction {
 pub enum RunResult {
     NeverRun,
     Exited(ExitStatus),
-    Error
+    Error,
 }
 
 #[derive(Error, Copy, Clone, PartialEq, Debug)]
@@ -332,7 +332,7 @@ impl SessionNode {
                             // TODO: flag the outcome: user has requested the
                             // node to be stopped, and this is the main node
                             // to program must now be closed
-                            return Self::terminate_run(node.clone(), last_exec_result).await
+                            return Self::terminate_run(node.clone(), last_exec_result).await;
                         }
 
                         // trap the logic in an endless wait that
@@ -353,7 +353,7 @@ impl SessionNode {
                         // if we are here the main node has exited:
                         // it also means the program has to exit
                         // and therefore every service has to be stopped
-                        return Self::terminate_run(node.clone(), last_exec_result).await
+                        return Self::terminate_run(node.clone(), last_exec_result).await;
                     }
 
                     // trap the logic in an endless wait that
@@ -366,8 +366,7 @@ impl SessionNode {
     }
 
     async fn terminate_run(node: Arc<SessionNode>, result: RunResult) -> RunResult {
-        node
-            .dependencies
+        node.dependencies
             .iter()
             .map(|a| {
                 let dep = a.clone();

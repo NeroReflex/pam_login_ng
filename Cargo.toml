@@ -13,6 +13,7 @@ members = [
     "login_ng-cli",
     "login_ng-ctl",
     "login_ng-gui",
-    "login_ng-session"
+    "login_ng-session",
+    "sessionexec"
 ]
 resolver = "2"

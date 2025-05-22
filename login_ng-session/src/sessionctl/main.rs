@@ -47,30 +47,22 @@ enum Command {
 #[derive(FromArgs, PartialEq, Debug)]
 /// Inspect a target and its dependencies
 #[argh(subcommand, name = "inspect")]
-struct InspectCommand {
-    
-}
+struct InspectCommand {}
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Start a target from within login_ng-session
 #[argh(subcommand, name = "start")]
-struct StartCommand {
-    
-}
+struct StartCommand {}
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Stop a target from within login_ng-session
 #[argh(subcommand, name = "stop")]
-struct StopCommand {
-    
-}
+struct StopCommand {}
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Restart a target from within login_ng-session
 #[argh(subcommand, name = "restart")]
-struct RestartCommand {
-
-}
+struct RestartCommand {}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -102,9 +94,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Args = argh::from_env();
 
     match &args.command {
-        Command::Stop(_stop_command)=>{proxy.stop(args.target.clone()).await.unwrap();Ok(())},
-        Command::Restart(_restart_command)=>{proxy.restart(args.target.clone()).await.unwrap();Ok(())},
-        Command::Start(_start_command)=>{proxy.start(args.target.clone()).await.unwrap();Ok(())},
+        Command::Stop(_stop_command) => {
+            proxy.stop(args.target.clone()).await.unwrap();
+            Ok(())
+        }
+        Command::Restart(_restart_command) => {
+            proxy.restart(args.target.clone()).await.unwrap();
+            Ok(())
+        }
+        Command::Start(_start_command) => {
+            proxy.start(args.target.clone()).await.unwrap();
+            Ok(())
+        }
         Command::Inspect(inspect_command) => todo!(),
     }
 }

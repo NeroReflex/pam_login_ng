@@ -55,7 +55,7 @@ impl SessionManagerDBus {
                 eprint!("Error stopping {target}: {err}");
 
                 todo!()
-            },
+            }
         }
     }
 
@@ -66,7 +66,7 @@ impl SessionManagerDBus {
                 eprint!("Error restarting {target}: {err}");
 
                 todo!()
-            },
+            }
         }
     }
 
