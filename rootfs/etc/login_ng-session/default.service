@@ -1,7 +1,7 @@
 {
     "kind": "service",
-    "cmd": "login_ng-session-main",
-    "args": [],
+    "cmd": "sessionexec",
+    "args": [ "default.desktop" ],
     "max_restarts": 0,
     "restart_delay_secs": 5,
     "dependencies": [  ]

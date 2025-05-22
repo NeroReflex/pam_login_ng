@@ -1,2 +1,0 @@
-#!/bin/sh
-gamescope -e --steam -- steam -gamepadui -steamos3 -steampal -steamdeck
