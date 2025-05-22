@@ -17,17 +17,19 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use argh::FromArgs;
-use login_ng_session::dbus::{SessionManagerDBus, SessionManagerDBusProxy};
+use login_ng_session::dbus::SessionManagerDBusProxy;
 use zbus::Connection;
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Command line tool for managing login_ng-session
 struct Args {
+    #[argh(option, short = 't')]
+    /// the target to be started/stopped/restarted or the subtree to be evaluated
+    target: String,
+
     #[argh(subcommand)]
     command: Command,
 }
@@ -36,26 +38,38 @@ struct Args {
 #[argh(subcommand)]
 /// Subcommands for managing login_ng-session
 enum Command {
+    Inspect(InspectCommand),
+    Start(StartCommand),
     Stop(StopCommand),
     Restart(RestartCommand),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Inspect a target and its dependencies
+#[argh(subcommand, name = "inspect")]
+struct InspectCommand {
+    
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Start a target from within login_ng-session
+#[argh(subcommand, name = "start")]
+struct StartCommand {
+    
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Stop a target from within login_ng-session
 #[argh(subcommand, name = "stop")]
 struct StopCommand {
-    #[argh(option)]
-    /// the target to be stopped
-    target: String,
+    
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Restart a target from within login_ng-session
 #[argh(subcommand, name = "restart")]
 struct RestartCommand {
-    #[argh(option)]
-    /// the target to be restarted
-    target: String,
+
 }
 
 #[tokio::main]
@@ -88,15 +102,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Args = argh::from_env();
 
     match &args.command {
-        Command::Stop(stop_command) => {
-            proxy.stop(stop_command.target.clone()).await.unwrap();
-
-            Ok(())
-        },
-        Command::Restart(restart_command) => {
-            proxy.restart(restart_command.target.clone()).await.unwrap();
-
-            Ok(())
-        },
+        Command::Stop(_stop_command)=>{proxy.stop(args.target.clone()).await.unwrap();Ok(())},
+        Command::Restart(_restart_command)=>{proxy.restart(args.target.clone()).await.unwrap();Ok(())},
+        Command::Start(_start_command)=>{proxy.start(args.target.clone()).await.unwrap();Ok(())},
+        Command::Inspect(inspect_command) => todo!(),
     }
 }
