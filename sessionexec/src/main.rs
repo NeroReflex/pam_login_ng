@@ -20,7 +20,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let splitted = exec
         .split_whitespace()
-        .into_iter()
         .map(|a| a.to_string())
         .collect::<Vec<String>>();
 

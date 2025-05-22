@@ -297,7 +297,7 @@ impl SessionNode {
                             None => match &last_exec_result {
                                 RunResult::Exited(result) => {
                                     success = result.success();
-                                    SessionNodeStatus::Stopped { time: Instant::now(), restart: !result.success() && will_restart_if_failed, reason: SessionNodeStopReason::Completed(result.clone()) }
+                                    SessionNodeStatus::Stopped { time: Instant::now(), restart: !result.success() && will_restart_if_failed, reason: SessionNodeStopReason::Completed(*result) }
                                 },
                                 RunResult::Error => {
                                     SessionNodeStatus::Stopped { time: Instant::now(), restart: will_restart_if_failed, reason: SessionNodeStopReason::Errored /*(err)*/ }
