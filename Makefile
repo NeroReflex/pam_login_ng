@@ -11,12 +11,15 @@ install: build
 	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service $(PREFIX)/usr/bin/pam_login_ng-service
 	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so $(PREFIX)/usr/lib/security/pam_login_ng.so
 	install -D -m 755 rootfs/usr/share/wayland-sessions/game-mode.desktop $(PREFIX)/usr/share/wayland-sessions/game-mode.desktop
+	install -D -m 755 rootfs/usr/share/applications/org.sessionexec.session-return.desktop $(PREFIX)/usr/share/applications/org.sessionexec.session-return.desktop
 	ln -s /usr/share/wayland-sessions/game-mode.desktop $(PREFIX)/usr/share/wayland-sessions/default.desktop
 	install -D -m 755 rootfs/usr/bin/start-login_ng-session $(PREFIX)/usr/bin/start-login_ng-session
 	install -D -m 644 rootfs/usr/lib/systemd/system/pam_login_ng.service $(PREFIX)/usr/lib/systemd/system/pam_login_ng.service
 	install -D -m 644 rootfs/usr/lib/systemd/system/login_ng@.service $(PREFIX)/usr/lib/systemd/system/login_ng@.service
 	install -D -m 644 rootfs/usr/lib/sysusers.d/login_ng.conf $(PREFIX)/usr/lib/sysusers.d/login_ng.conf
-	install -D -m 644 rootfs/usr/lib/os-session-select $(PREFIX)/usr/lib/os-session-select
+	install -D -m 644 rootfs/usr/lib/sessionexec/restart_session.sh $(PREFIX)/usr/lib/sessionexec/restart_session.sh
+	install -D -m 644 rootfs/usr/lib/sessionexec/session-return.sh $(PREFIX)/usr/lib/sessionexec/session-return.sh
+	install -D -m 755 rootfs/usr/lib/os-session-select $(PREFIX)/usr/lib/os-session-select
 	install -D -m 644 rootfs/etc/pam.d/login_ng $(PREFIX)/etc/pam.d/login_ng
 	install -D -m 644 rootfs/etc/pam.d/login_ng-autologin $(PREFIX)/etc/pam.d/login_ng-autologin
 	install -D -m 644 rootfs/etc/pam.d/login_ng-ctl $(PREFIX)/etc/pam.d/login_ng-ctl
