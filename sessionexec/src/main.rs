@@ -41,7 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("No command specified!");
     }
 
-    let mut argv: Vec<*const libc::c_char> = vec![];
+    let mut argv_data: Vec<CString> = vec![];
     let mut prog = CString::new("false").unwrap();
 
     for (idx, val) in splitted.iter().enumerate() {
@@ -56,17 +56,22 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
 
-        argv.push(c_string.as_ptr());
-    }
-    argv.push(null());
+        println!("argv[{idx}]: {val}");
 
-    let mut envp: Vec<*const libc::c_char> = vec![];
-    for (key, value) in env::vars() {
-        let env_var = format!("{}={}", key, value);
-        let c_string = CString::new(env_var)?;
-        envp.push(c_string.as_ptr());
+        argv_data.push(c_string);
     }
-    envp.push(null());
+
+    let argv = argv_data.iter().map(|e| e.as_ptr()).chain(std::iter::once(std::ptr::null())).collect::<Vec<*const libc::c_char>>();
+
+    let mut envp_data: Vec<CString> = vec![];
+    for (idx, (key, value)) in env::vars().enumerate() {
+        let env_var = format!("{}={}", key, value);
+        println!("envp[{idx}]: {env_var}");
+        let c_string = CString::new(env_var)?;
+        envp_data.push(c_string);
+    }
+
+    let envp = envp_data.iter().map(|e| e.as_ptr()).chain(std::iter::once(std::ptr::null())).collect::<Vec<*const libc::c_char>>();
 
     let execve_err = unsafe { libc::execve(prog.as_ptr(), argv.as_ptr(), envp.as_ptr()) };
 
