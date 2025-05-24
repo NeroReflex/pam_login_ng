@@ -1,6 +1,20 @@
 use ini::Ini;
 use std::error::Error;
+use std::process::Command;
 use std::{env, ffi::CString, path::PathBuf, ptr::null};
+
+fn find_program_path(program: &str) -> Result<String, Box<dyn Error>> {
+    let output = Command::new("which")
+        .arg(program)
+        .output()?;
+
+    if output.status.success() {
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        Ok(path)
+    } else {
+        Err(format!("Program '{}' not found in PATH", program).into())
+    }
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
@@ -33,10 +47,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     for (idx, val) in splitted.iter().enumerate() {
         let c_string = CString::new(val.as_str()).expect("CString::new failed");
         if idx == 0 {
-            prog = c_string;
-        } else {
-            argv.push(c_string.as_ptr());
+            prog = match find_program_path(val.as_str()) {
+                Ok(program_path) => CString::new(program_path.as_str()).unwrap(),
+                Err(err) => {
+                    println!("Error searching for the specified program: {err}");
+                    c_string.clone()
+                }
+            }
         }
+
+        argv.push(c_string.as_ptr());
     }
     argv.push(null());
 
