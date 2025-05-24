@@ -73,19 +73,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // This is the default user dbus address
     // DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
     // where /run/user/1000 is XDG_RUNTIME_DIR
-    match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
-        Ok(value) => println!("Starting dbus service on socket {value}"),
-        Err(err) => {
-            println!("Couldn't read dbus socket address: {err} - using default...");
-            std::env::set_var(
-                "DBUS_SESSION_BUS_ADDRESS",
-                format!(
-                    "unix:path={}/bus",
-                    xdg_runtime_dir.as_os_str().to_string_lossy()
-                )
-                .as_str(),
+    if let Err(err) = std::env::var("DBUS_SESSION_BUS_ADDRESS") {
+        println!("Couldn't read dbus socket address: {err} - using default...");
+        std::env::set_var(
+            "DBUS_SESSION_BUS_ADDRESS",
+            format!(
+                "unix:path={}/bus",
+                xdg_runtime_dir.as_os_str().to_string_lossy()
             )
-        }
+            .as_str(),
+        )
     }
 
     let connection = Connection::session().await?;
