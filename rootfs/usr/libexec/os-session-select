@@ -10,7 +10,6 @@ export DESKTOP_WAYLAND=true
 
 SENTINEL_FILE="steamos-session-select"
 
-
 session="${1:-gamescope}"
 if ${DESKTOP_WAYLAND}; then
   session_type="wayland"
@@ -98,4 +97,5 @@ else
 fi
 
 # Use $session_launcher.desktop to start the next
-
+mkdir -p $HOME/.config/sessionexec/
+echo "$session_launcher.desktop" | tee "$HOME/.config/sessionexec/default"

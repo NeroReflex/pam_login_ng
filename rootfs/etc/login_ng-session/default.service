@@ -1,7 +1,7 @@
 {
     "kind": "service",
     "cmd": "sessionexec",
-    "args": [ "default.desktop" ],
+    "args": [  ],
     "max_restarts": 0,
     "restart_delay_secs": 5,
     "dependencies": [  ]

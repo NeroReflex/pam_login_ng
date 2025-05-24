@@ -17,4 +17,5 @@ section = "utility"
 priority = "optional"
 assets = [
     ["target/release/sessionexec", "usr/bin/", "755"],
+    ["../rootfs/usr/libexec/os-session-select", "usr/libexec/", "755"],
 ]
