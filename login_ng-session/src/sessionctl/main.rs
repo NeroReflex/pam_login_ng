@@ -28,7 +28,7 @@ use zbus::Connection;
 struct Args {
     #[argh(option, short = 't')]
     /// the target to be started/stopped/restarted or the subtree to be evaluated
-    target: String,
+    target: Option<String>,
 
     #[argh(subcommand)]
     command: Command,
@@ -90,19 +90,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let args: Args = argh::from_env();
 
+    let target = match &args.target {
+        Some(t) => t.clone(),
+        None => String::from("default.service"),
+    };
+
     match &args.command {
         Command::Stop(_stop_command) => {
-            proxy.stop(args.target.clone()).await.unwrap();
+            proxy.stop(target).await.unwrap();
             Ok(())
         }
         Command::Restart(_restart_command) => {
-            proxy.restart(args.target.clone()).await.unwrap();
+            proxy.restart(target).await.unwrap();
             Ok(())
         }
         Command::Start(_start_command) => {
-            proxy.start(args.target.clone()).await.unwrap();
+            proxy.start(target).await.unwrap();
             Ok(())
         }
-        Command::Inspect(inspect_command) => todo!(),
+        Command::Inspect(_inspect_command) => {
+            let (status, result) = proxy.inspect(target).await.unwrap();
+            if status == 0 {
+                println!("{result}")
+            } else {
+                panic!("inspect errorer with {status}: {result}")
+            }
+
+            Ok(())
+        }
     }
 }

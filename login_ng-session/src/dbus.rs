@@ -19,6 +19,7 @@
 
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
 use zbus::interface;
 
 use crate::manager::SessionManager;
@@ -32,6 +33,11 @@ impl SessionManagerDBus {
     pub fn new(manager: Arc<SessionManager>) -> Self {
         Self { manager }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TargetStatus {
+    running: bool,
 }
 
 #[interface(
@@ -70,12 +76,26 @@ impl SessionManagerDBus {
         }
     }
 
-    pub async fn is_running(&self, target: String) -> (u32, bool) {
+    pub async fn inspect(&self, target: String) -> (u32, String) {
         match self.manager.is_running(&target).await {
-            Ok(response) => (0, response),
+            Ok(running) => {
+                let response = TargetStatus { running };
+
+                match serde_json::to_string_pretty(&response) {
+                    Ok(response) => (0, serde_json::to_string_pretty(&response).unwrap()),
+                    Err(err) => (4, format!("{err}")),
+                }
+            }
             Err(err) => {
                 eprintln!("Error in fetching the running status of {target}: {err}");
-                (1, false)
+
+                match &err {
+                    crate::errors::SessionManagerError::ZbusError(error) => (1, format!("{error}")),
+                    crate::errors::SessionManagerError::NotFound(error) => (2, format!("{error}")),
+                    crate::errors::SessionManagerError::ManualActionError(error) => {
+                        (3, format!("{error}"))
+                    }
+                }
             }
         }
     }
