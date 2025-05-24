@@ -99,3 +99,6 @@ fi
 # Use $session_launcher.desktop to start the next
 mkdir -p $HOME/.config/sessionexec/
 echo "$session_launcher.desktop" | tee "$HOME/.config/sessionexec/default"
+
+# restart login_ng
+login_ng-sessionctl --target "default.service" restart
