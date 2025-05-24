@@ -98,15 +98,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match &args.command {
         Command::Stop(_stop_command) => {
             proxy.stop(target).await.unwrap();
-            Ok(())
         }
         Command::Restart(_restart_command) => {
             proxy.restart(target).await.unwrap();
-            Ok(())
         }
         Command::Start(_start_command) => {
             proxy.start(target).await.unwrap();
-            Ok(())
         }
         Command::Inspect(_inspect_command) => {
             let (status, result) = proxy.inspect(target).await.unwrap();
@@ -115,8 +112,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 panic!("inspect errorer with {status}: {result}")
             }
-
-            Ok(())
         }
     }
+
+    Ok(())
 }
