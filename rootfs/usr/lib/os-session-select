@@ -101,4 +101,4 @@ mkdir -p $HOME/.config/sessionexec/
 echo "$session_launcher.desktop" | tee "$HOME/.config/sessionexec/default"
 
 # switch the session now
-bash /usr/lib/restart_session.sh
+bash /usr/lib/sessionexec/restart_session.sh
