@@ -20,7 +20,7 @@ assets = [
     ["../rootfs/usr/lib/os-session-select", "usr/lib/", "755"],
     ["../rootfs/usr/lib/sessionexec/restart_session.sh", "usr/lib/", "755"],
     ["../rootfs/usr/lib/sessionexec/session-return.sh", "usr/lib/", "755"],
-    ["../rootfs/usr/share/sessionexec/org.sessionexec.session-return.desktop", "usr/share/applications/", "755"],
+    ["../rootfs/usr/share/applications/org.sessionexec.session-return.desktop", "usr/share/applications/", "755"],
     ["../rootfs/etc/login_ng-session/steamdeck.service", "etc/login_ng-session/", "644"],
     ["../rootfs/etc/login_ng-session/restart_session.service", "etc/login_ng-session/", "644"],
 ]
