@@ -1,21 +1,13 @@
 use ini::Ini;
+use sessionexec::execve::ExecveRunner;
+use sessionexec::gamescope::GamescopeRunner;
+use sessionexec::plasma::PlasmaRunner;
+use sessionexec::runner::Runner;
 use std::error::Error;
-use std::process::Command;
-use std::{env, ffi::CString, path::PathBuf};
-
-fn find_program_path(program: &str) -> Result<String, Box<dyn Error>> {
-    let output = Command::new("which").arg(program).output()?;
-
-    if output.status.success() {
-        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        Ok(path)
-    } else {
-        Err(format!("Program '{}' not found in PATH", program).into())
-    }
-}
+use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let args: Vec<String> = env::args().collect();
+    let args: Vec<String> = std::env::args().collect();
 
     let param = if args.len() < 2 {
         match std::env::home_dir() {
@@ -42,9 +34,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         args[1].to_string()
     };
 
-    let path = PathBuf::from("/usr/share/wayland-sessions/").join(param);
+    let path = match std::fs::exists(&param)? {
+        false => PathBuf::from("/usr/share/wayland-sessions/").join(param),
+        true => PathBuf::from(&param),
+    };
 
-    let conf = Ini::load_from_file(path).unwrap();
+    let conf = Ini::load_from_file(path)?;
 
     let section = conf.section(Some("Desktop Entry")).unwrap();
     let exec = section.get("Exec").unwrap();
@@ -58,51 +53,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("No command specified!");
     }
 
-    let mut argv_data: Vec<CString> = vec![];
-    let mut prog = CString::new("false").unwrap();
+    let mut executor: Box<dyn Runner> = if splitted[0].contains("startplasma-wayland") {
+        Box::new(PlasmaRunner::new(splitted))
+    } else if splitted[0].contains("gamescope") {
+        Box::new(GamescopeRunner::new(splitted))
+    } else {
+        Box::new(ExecveRunner::new(splitted))
+    };
 
-    for (idx, val) in splitted.iter().enumerate() {
-        let c_string = CString::new(val.as_str()).expect("CString::new failed");
-        if idx == 0 {
-            prog = match find_program_path(val.as_str()) {
-                Ok(program_path) => CString::new(program_path.as_str()).unwrap(),
-                Err(err) => {
-                    println!("Error searching for the specified program: {err}");
-                    c_string.clone()
-                }
-            }
-        }
-
-        println!("argv[{idx}]: {val}");
-
-        argv_data.push(c_string);
-    }
-
-    let argv = argv_data
-        .iter()
-        .map(|e| e.as_ptr())
-        .chain(std::iter::once(std::ptr::null()))
-        .collect::<Vec<*const libc::c_char>>();
-
-    let mut envp_data: Vec<CString> = vec![];
-    for (idx, (key, value)) in env::vars().enumerate() {
-        let env_var = format!("{}={}", key, value);
-        println!("envp[{idx}]: {env_var}");
-        let c_string = CString::new(env_var)?;
-        envp_data.push(c_string);
-    }
-
-    let envp = envp_data
-        .iter()
-        .map(|e| e.as_ptr())
-        .chain(std::iter::once(std::ptr::null()))
-        .collect::<Vec<*const libc::c_char>>();
-
-    let execve_err = unsafe { libc::execve(prog.as_ptr(), argv.as_ptr(), envp.as_ptr()) };
-
-    if execve_err == -1 {
-        return Err(format!("execve failed: {}", std::io::Error::last_os_error()).into());
-    }
-
-    unreachable!()
+    executor.run()
 }

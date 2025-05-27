@@ -301,6 +301,117 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'login_ng-sessionctl'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=login_ng-sessionctl",
+                    "--package=login_ng-session"
+                ],
+                "filter": {
+                    "name": "login_ng-sessionctl",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'login_ng-sessionctl'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=login_ng-sessionctl",
+                    "--package=login_ng-session"
+                ],
+                "filter": {
+                    "name": "login_ng-sessionctl",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'sessionexec'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=sessionexec"
+                ],
+                "filter": {
+                    "name": "sessionexec",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'sessionexec'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=sessionexec",
+                    "--package=sessionexec"
+                ],
+                "filter": {
+                    "name": "sessionexec",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'sessionexec' with gamescope",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=sessionexec",
+                    "--package=sessionexec"
+                ],
+                "filter": {
+                    "name": "sessionexec",
+                    "kind": "bin"
+                }
+            },
+            "args": [ "game-mode.desktop" ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'sessionexec'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=sessionexec",
+                    "--package=sessionexec"
+                ],
+                "filter": {
+                    "name": "sessionexec",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
