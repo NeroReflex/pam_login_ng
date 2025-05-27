@@ -10,6 +10,7 @@ install: build
 	install -D -m 755 login_ng-session/target/$(BUILD_TYPE)/login_ng-sessionctl $(PREFIX)/usr/bin/login_ng-sessionctl
 	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service $(PREFIX)/usr/bin/pam_login_ng-service
 	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so $(PREFIX)/usr/lib/security/pam_login_ng.so
+	install -D -m 755 rootfs/usr/share/wayland-sessions/login_ng-session.desktop $(PREFIX)/usr/share/wayland-sessions/login_ng-session.desktop
 	install -D -m 755 rootfs/usr/share/wayland-sessions/game-mode.desktop $(PREFIX)/usr/share/wayland-sessions/game-mode.desktop
 	install -D -m 755 rootfs/usr/share/applications/org.sessionexec.session-return.desktop $(PREFIX)/usr/share/applications/org.sessionexec.session-return.desktop
 	ln -s /usr/share/wayland-sessions/game-mode.desktop $(PREFIX)/usr/share/wayland-sessions/default.desktop
