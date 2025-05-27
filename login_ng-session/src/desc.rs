@@ -39,6 +39,7 @@ pub struct NodeServiceDescriptor {
     kind: String,
     pidfile: Option<PathBuf>,
     cmd: String,
+    stop_signal: Option<String>,
     args: Vec<String>,
     max_restarts: u64,
     restart_delay_secs: u64,
@@ -150,6 +151,39 @@ impl NodeServiceDescriptor {
             dependencies.push(just_loaded.clone());
         }
 
+        let stop_signal = match &main.stop_signal {
+            Some(sig) => match sig.to_ascii_uppercase().as_str() {
+                "SIGABRT" => Signal::SIGABRT,
+                "SIGABORT" => Signal::SIGABRT,
+                "SIGALRM" => Signal::SIGALRM,
+                "SIGBUS" => Signal::SIGBUS,
+                "SIGCHLD" => Signal::SIGCHLD,
+                "SIGCLD" => Signal::SIGCHLD,
+                "SIGCONT" => Signal::SIGCONT,
+                "SIGFPE" => Signal::SIGFPE,
+                "SIGHUP" => Signal::SIGHUP,
+                "SIGILL" => Signal::SIGILL,
+                "SIGINT" => Signal::SIGINT,
+                "SIGKILL" => Signal::SIGKILL,
+                "SIGPIPE" => Signal::SIGPIPE,
+                "SIGTERM" => Signal::SIGTERM,
+                "SIGQUIT" => Signal::SIGQUIT,
+                "SIGSTOP" => Signal::SIGSTOP,
+                "SIGTSTP" => Signal::SIGTSTP,
+                "SIGTRAP" => Signal::SIGTRAP,
+                "SIGTTIN" => Signal::SIGTTIN,
+                "SIGTTOU" => Signal::SIGTTOU,
+                "SIGURG" => Signal::SIGURG,
+                "SIGUSR1" => Signal::SIGUSR1,
+                "SIGUSR2" => Signal::SIGUSR2,
+                "SIGVTALRM" => Signal::SIGVTALRM,
+                "SIGXCPU" => Signal::SIGXCPU,
+                "SIGXFSZ" => Signal::SIGXFSZ,
+                _ => panic!("unrecognised!"),
+            },
+            None => Signal::SIGTERM,
+        };
+
         let node = SessionNode::new(
             filename.clone(),
             match main.kind.as_str() {
@@ -160,7 +194,7 @@ impl NodeServiceDescriptor {
             main.pidfile(),
             main.cmd(),
             main.args(),
-            Signal::SIGABRT,
+            stop_signal,
             SessionNodeRestart::new(main.max_restarts(), main.delay()),
             dependencies,
         );

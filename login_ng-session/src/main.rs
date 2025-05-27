@@ -76,7 +76,7 @@ async fn main() -> Result<(), SessionManagerError> {
                             None,
                             shell.clone(),
                             vec![],
-                            nix::sys::signal::Signal::SIGKILL,
+                            nix::sys::signal::Signal::SIGTERM,
                             SessionNodeRestart::no_restart(),
                             vec![],
                         )),
