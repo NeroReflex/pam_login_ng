@@ -39,15 +39,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         true => PathBuf::from(&param),
     };
 
-    let conf = Ini::load_from_file(path)?;
+    let splitted = match std::fs::exists(&path)? {
+        true => {
+            let conf = Ini::load_from_file(path)?;
 
-    let section = conf.section(Some("Desktop Entry")).unwrap();
-    let exec = section.get("Exec").unwrap();
+            let section = conf.section(Some("Desktop Entry")).unwrap();
+            let exec = section.get("Exec").unwrap();
 
-    let splitted = exec
-        .split_whitespace()
-        .map(|a| a.to_string())
-        .collect::<Vec<String>>();
+            exec
+                .split_whitespace()
+                .map(|a| a.to_string())
+                .collect::<Vec<String>>()
+        },
+        false => vec![String::from("startplasma-wayland")],
+    };
 
     if splitted.is_empty() {
         panic!("No command specified!");

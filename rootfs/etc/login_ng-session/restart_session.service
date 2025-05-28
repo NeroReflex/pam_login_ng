@@ -1,7 +1,7 @@
 {
     "kind": "service",
-    "cmd": "/usr/lib/sessionexec/restart_session.sh",
-    "args": [  ],
+    "cmd": "login_ng-session",
+    "args": [ "restart" ],
     "stop_signal": "SIGTERM",
     "max_restarts": 0,
     "restart_delay_secs": 5,

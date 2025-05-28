@@ -18,7 +18,6 @@ install: build
 	install -D -m 644 rootfs/usr/lib/systemd/system/pam_login_ng.service $(PREFIX)/usr/lib/systemd/system/pam_login_ng.service
 	install -D -m 644 rootfs/usr/lib/systemd/system/login_ng@.service $(PREFIX)/usr/lib/systemd/system/login_ng@.service
 	install -D -m 644 rootfs/usr/lib/sysusers.d/login_ng.conf $(PREFIX)/usr/lib/sysusers.d/login_ng.conf
-	install -D -m 755 rootfs/usr/lib/sessionexec/restart_session.sh $(PREFIX)/usr/lib/sessionexec/restart_session.sh
 	install -D -m 755 rootfs/usr/lib/sessionexec/session-return.sh $(PREFIX)/usr/lib/sessionexec/session-return.sh
 	install -D -m 755 rootfs/usr/lib/os-session-select $(PREFIX)/usr/lib/os-session-select
 	install -D -m 644 rootfs/etc/pam.d/login_ng $(PREFIX)/etc/pam.d/login_ng

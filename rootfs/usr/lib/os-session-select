@@ -96,9 +96,10 @@ else
     fi
 fi
 
-# Use $session_launcher.desktop to start the next
+# Use $session_launcher.desktop to start the next session
 mkdir -p $HOME/.config/sessionexec/
 echo "$session_launcher.desktop" | tee "$HOME/.config/sessionexec/default"
+sync
 
-# switch the session now
-bash /usr/lib/sessionexec/restart_session.sh
+# switch the session now by restarting login_ng-session default session
+login_ng-sessionctl restart
