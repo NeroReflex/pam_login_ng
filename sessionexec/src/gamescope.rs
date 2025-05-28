@@ -467,19 +467,18 @@ impl GamescopeExecveRunner {
             }
         };
 
+        let mut mangoapp_envp_data: Vec<CString> = vec![];
         let mut mangoapp_argv_data: Vec<CString> = vec![];
-        let mut mangoapp_prog = CString::new("mangoapp").unwrap();
-        match find_program_path("mangoapp") {
-            Ok(program_path) => mangoapp_prog = CString::new(program_path.as_str()).unwrap(),
+        let mangoapp_prog = match find_program_path("mangoapp") {
+            Ok(program_path) => CString::new(program_path.as_str()).unwrap(),
             Err(err) => {
                 println!("Error searching for the specified program: {err}");
-                mangoapp_prog = CString::new("mangoapp").unwrap()
+                CString::new("mangoapp").unwrap()
             }
         };
 
         mangoapp_argv_data.push(mangoapp_prog.clone());
 
-        let mut mangoapp_envp_data: Vec<CString> = vec![];
         for (key, value) in std::env::vars() {
             let env_var = format!("{}={}", key, value);
             let c_string = CString::new(env_var).unwrap();
