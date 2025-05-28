@@ -1,4 +1,5 @@
 use std::ffi::OsStr;
+use std::io::{BufReader, Read};
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use std::{path::PathBuf, process::Command};
@@ -9,6 +10,8 @@ use signal_hook::{consts::SIGTERM, iterator::Signals};
 pub struct GamescopeRunner {
     command: Command,
     shared_env: Vec<(String, String)>,
+    socket: PathBuf,
+    stats: PathBuf,
 }
 
 pub fn mktemp<S>(n: S) -> String
@@ -35,6 +38,57 @@ where
     }
 }
 
+pub fn mktemp_dir<S, Q>(path: S, dir: Q) -> String
+where
+    S: AsRef<OsStr>,
+    Q: AsRef<OsStr>
+{
+    // Call the mktemp command
+    let output = Command::new("mktemp")
+        .arg("-p")
+        .arg(path)
+        .arg("-d")
+        .arg("-t")
+        .arg(dir)
+        .output()
+        .expect("Failed to execute mktemp");
+
+    // Check if the command was successful
+    if output.status.success() {
+        // Convert the output to a string
+        let temp_file_path = str::from_utf8(&output.stdout).expect("Invalid UTF-8 output");
+        
+        // Print the path of the temporary file
+        String::from(temp_file_path.trim())
+    } else {
+        // Handle the error
+        let error_message = str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
+        panic!("Error: {}", error_message)
+    }
+}
+
+pub fn mkfifo<S>(n: S) -> ()
+where
+    S: AsRef<OsStr>
+{
+    // Call the mktemp command
+    let output = Command::new("mkfifo")
+        .arg("--")
+        .arg(n)
+        .output()
+        .expect("Failed to execute mktemp");
+
+    // Check if the command was successful
+    if output.status.success() {
+        return ()
+    }
+    
+    // Handle the error
+    let error_message = str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
+    panic!("Error in mkfifo: {}", error_message)
+
+}
+
 impl GamescopeRunner {
     pub fn new(splitted: Vec<String>) -> Self {
         let xdg_runtime_dir = PathBuf::from(match std::env::var("XDG_RUNTIME_DIR") {
@@ -46,7 +100,14 @@ impl GamescopeRunner {
             }
         });
 
-        let mangohud_configfile = mktemp(xdg_runtime_dir.join("mangohud.XXXXXXXX"));
+        let tmp_dir = PathBuf::from(mktemp_dir(&xdg_runtime_dir, "gamescope.XXXXXXX"));
+        let socket = tmp_dir.join("startup.socket");
+        let stats = tmp_dir.join("stats.pipe");
+
+        mkfifo(&socket);
+        mkfifo(&stats);
+
+        let mangohud_configfile = mktemp(&xdg_runtime_dir.join("mangohud.XXXXXXXX"));
         std::fs::write(PathBuf::from(&mangohud_configfile), b"no_display").unwrap();
 
         let radv_force_vrs_config_filec = mktemp(xdg_runtime_dir.join("radv_vrs.XXXXXXXX"));
@@ -77,6 +138,12 @@ impl GamescopeRunner {
         }
 
         let mut command = Command::new(prog);
+
+        command.arg("-R");
+        command.arg(&socket);
+        command.arg("-T");
+        command.arg(&stats);
+
         for arg in argv_data.iter() {
             command.arg(arg);
         }
@@ -91,7 +158,9 @@ impl GamescopeRunner {
 
         Self {
             shared_env,
-            command
+            command,
+            socket,
+            stats,
         }
     }
 }
@@ -116,7 +185,34 @@ impl Runner for GamescopeRunner {
         for (key, val) in self.shared_env.iter() {
             mangoapp_cmd.env(key, val);
         }
-        
+
+        // TODO: gamescope won't start unless we do the following:
+        //if read -r -t 5 response_x_display response_wl_display <>"$socket"; then
+        //    export DISPLAY="$response_x_display"
+        //    export GAMESCOPE_WAYLAND_DISPLAY="$response_wl_display"
+        //
+
+        let file = std::fs::File::open(&self.socket).unwrap();
+        let mut reader = BufReader::new(file);
+
+        let mut response = String::new();
+        let (response_x_display, response_wl_display) = match reader.read_to_string(&mut response) {
+            Ok(read_result) => {
+                println!("Read response ({read_result}): {response}");
+
+                let split = response.split_whitespace().into_iter().map(|w| String::from(w)).collect::<Vec<String>>();
+
+                if split.len() != 2 {
+                    panic!("Invalid read from socket!");
+                }
+
+                (split[0].clone(), split[1].clone())
+            },
+            Err(err) => {
+                panic!("Error reading read_wl_display_result: {err}")
+            }
+        };
+
         let mangoapp_should_exit = should_exit.clone();
         let mangoapp_spawner = thread::spawn(move || {
             loop {
@@ -124,6 +220,9 @@ impl Runner for GamescopeRunner {
                 if *should_exit_guard.deref() {
                     break;
                 }
+
+                mangoapp_cmd.env("DISPLAY", &response_x_display);
+                mangoapp_cmd.env("GAMESCOPE_WAYLAND_DISPLAY", &response_wl_display);
 
                 match mangoapp_cmd.spawn() {
                     Ok(mut mangoapp_child) => match mangoapp_child.wait() {
