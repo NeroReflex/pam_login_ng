@@ -1,7 +1,7 @@
-use std::process::Command;
-use std::thread;
 use std::cell::RefCell;
 use std::os::raw::c_int;
+use std::process::Command;
+use std::thread;
 
 use crate::runner::Runner;
 
@@ -40,10 +40,14 @@ thread_local! {
 }
 
 extern "C" fn sigterm_handler(signal: c_int) {
-    println!("Received SIGTERM signal: {signal}");
-    // You can add cleanup code here if needed
+    let pid = STARTPLASMA_PID.take();
+    let result = unsafe { libc::kill(pid as i32, signal) };
 
-    unsafe { libc::kill(STARTPLASMA_PID.take() as i32, libc::SIGTERM) };
+    if result == 0 {
+        // TODO: to avoid issue do not do I/O here
+    } else {
+        eprintln!("Error propagating signal {signal} to PID {pid}: {result}");
+    }
 }
 
 impl Runner for PlasmaRunner {
@@ -51,12 +55,18 @@ impl Runner for PlasmaRunner {
         let mut child = self.command.spawn()?;
         STARTPLASMA_PID.set(child.id());
 
-        unsafe {
-            // Set the signal handler for SIGTERM
-            let result = libc::signal(libc::SIGTERM, sigterm_handler as *const () as *const libc::c_void as libc::sighandler_t);
-            if result == 0 {
-                eprintln!("Failed to set signal handler");
-            }
+        // Set the signal handler for SIGTERM
+        let result = unsafe {
+            libc::signal(
+                libc::SIGTERM,
+                sigterm_handler as *const () as libc::sighandler_t,
+            )
+        };
+        match result {
+            libc::SIG_ERR => eprintln!("Failed to set signal handler: {}", unsafe {
+                *libc::__errno_location()
+            }),
+            _ => println!("signal handler setup correctly, was previously {result}"),
         }
 
         let result = child.wait()?;
