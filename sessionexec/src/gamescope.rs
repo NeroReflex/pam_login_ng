@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::{path::PathBuf, process::Command};
 use std::thread;
 use crate::runner::Runner;
-use signal_hook::{consts::SIGTERM, iterator::Signals};
+use signal_hook::{consts::{SIGTERM, SIGKILL}, iterator::Signals};
 
 pub struct GamescopeRunner {
     command: Command,
@@ -175,9 +175,22 @@ impl Runner for GamescopeRunner {
 
         let should_exit = Arc::new(Mutex::new(false));
 
+        let mangoapp_pid = Arc::new(Mutex::new(None));
+
+        let mangoapp_pid_clone = mangoapp_pid.clone();
         thread::spawn(move || {
             for sig in signals.forever() {
                 println!("Received signal {:?}", sig);
+
+                // kill the running mangoapp
+                let mut mangoapp_pid_guard = mangoapp_pid_clone.lock().unwrap();
+                match mangoapp_pid_guard.deref() {
+                    Some(pid) => unsafe { libc::kill(*pid as i32, SIGKILL as i32); },
+                    None => {},
+                }
+                *mangoapp_pid_guard = None;
+
+                // gracefully terminate gamescope
                 unsafe { libc::kill(pid as i32, SIGTERM as i32)};
             }
         });
@@ -214,6 +227,9 @@ impl Runner for GamescopeRunner {
             }
         };
 
+        
+
+        let mangoapp_pid_clone = mangoapp_pid.clone();
         let mangoapp_should_exit = should_exit.clone();
         let mangoapp_spawner = thread::spawn(move || {
             loop {
@@ -226,10 +242,17 @@ impl Runner for GamescopeRunner {
                 mangoapp_cmd.env("GAMESCOPE_WAYLAND_DISPLAY", &response_wl_display);
 
                 match mangoapp_cmd.spawn() {
-                    Ok(mut mangoapp_child) => match mangoapp_child.wait() {
-                        Ok(mangoapp_result) => {},
-                        Err(err) => {
-                            eprint!("Error in mangoapp: {err}")
+                    Ok(mut mangoapp_child) => 
+                    {
+                        let mut pid_guard = mangoapp_pid_clone.lock().unwrap();
+                        *pid_guard = Some(mangoapp_child.id());
+                        match mangoapp_child.wait() {
+                            Ok(mangoapp_result) => {
+                                
+                            },
+                            Err(err) => {
+                                eprint!("Error in mangoapp: {err}")
+                            }
                         }
                     },
                     Err(err) => {
@@ -246,6 +269,14 @@ impl Runner for GamescopeRunner {
             // make other threads exit
             let mut should_exit_guard = should_exit.lock().unwrap();
             *should_exit_guard = true;
+
+            // kill the running mangoapp
+            let mut mangoapp_pid_guard = mangoapp_pid.lock().unwrap();
+            match mangoapp_pid_guard.deref() {
+                Some(pid) => unsafe { libc::kill(*pid as i32, SIGKILL as i32); },
+                None => {},
+            }
+            *mangoapp_pid_guard = None;
         }
 
         if !result.success() {
