@@ -70,14 +70,28 @@ impl Runner for PlasmaRunner {
             _ => println!("signal handler setup correctly, was previously {result}"),
         }
 
-        let result = child.wait()?;
-        if !result.success() {
-            panic!("plasma failed with {result}")
-        } else {
-            println!("plasma exited with {result}")
-        }
+        let mut exit_status = None; 
+        loop {
+            match child.try_wait() {
+                Ok(res) => match res {
+                    Some(result) => {
+                        if !result.success() {
+                            panic!("plasma failed with {result}")
+                        } else {
+                            println!("plasma exited with {result}")
+                        }
 
-        let exit_status = result.code();
+                        exit_status = result.code();
+                        break;
+                    },
+                    None => {
+                        std::thread::sleep(std::time::Duration::from_millis(750));
+                        continue
+                    },
+                },
+                Err(err) => eprintln!("Error waiting for termination: {err}"),
+            }
+        };
 
         // wait for the drm to be free (safeguard to avoid gamescope to fail)
         loop {
