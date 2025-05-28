@@ -1,8 +1,9 @@
-use signal_hook::{consts::SIGTERM, iterator::Signals};
 use std::process::Command;
 use std::thread;
+use std::cell::RefCell;
+use std::os::raw::c_int;
 
-use crate::{find_program_path, runner::Runner};
+use crate::runner::Runner;
 
 pub struct PlasmaRunner {
     command: Command,
@@ -34,29 +35,40 @@ impl PlasmaRunner {
     }
 }
 
+thread_local! {
+    static STARTPLASMA_PID: RefCell<u32> = RefCell::new(0);
+}
+
+extern "C" fn sigterm_handler(signal: c_int) {
+    println!("Received SIGTERM signal: {signal}");
+    // You can add cleanup code here if needed
+
+    unsafe { libc::kill(STARTPLASMA_PID.take() as i32, libc::SIGTERM) };
+}
+
 impl Runner for PlasmaRunner {
     fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut child = self.command.spawn()?;
-        let pid = child.id();
+        STARTPLASMA_PID.set(child.id());
 
-        let mut signals = Signals::new([SIGTERM])?;
-
-        thread::spawn(move || {
-            for sig in signals.forever() {
-                println!("Received signal {:?}", sig);
-                unsafe { libc::kill(pid as i32, SIGTERM as i32) };
+        unsafe {
+            // Set the signal handler for SIGTERM
+            let result = libc::signal(libc::SIGTERM, sigterm_handler as *const () as *const libc::c_void as libc::sighandler_t);
+            if result == 0 {
+                eprintln!("Failed to set signal handler");
             }
-        });
+        }
 
         let result = child.wait()?;
-
         if !result.success() {
-            panic!("plasma exited with {result}")
+            panic!("plasma failed with {result}")
+        } else {
+            println!("plasma exited with {result}")
         }
 
         let exit_status = result.code();
 
-        // Main application loop
+        // wait for the drm to be free (safeguard to avoid gamescope to fail)
         loop {
             let wait_cmd = "kwin_wayland";
             println!("Awaiting {wait_cmd} to exit...");
@@ -66,7 +78,7 @@ impl Runner for PlasmaRunner {
             // Check if the command is running
             let output = Command::new("pgrep")
                 .arg("-u")
-                .arg(whoami::username()) // Get the current username
+                .arg(whoami::username())
                 .arg(wait_cmd)
                 .output()
                 .expect("Failed to execute pgrep");

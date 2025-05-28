@@ -1,8 +1,4 @@
 use crate::{execve_wrapper, find_program_path, runner::Runner};
-use signal_hook::{
-    consts::{SIGKILL, SIGTERM},
-    iterator::Signals,
-};
 use std::ffi::{CString, OsStr};
 use std::io::{BufReader, Read};
 use std::ops::Deref;

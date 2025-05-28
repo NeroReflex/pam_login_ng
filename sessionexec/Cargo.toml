@@ -7,7 +7,6 @@ license = "GPL-2.0-or-later"
 [dependencies]
 rust-ini = { version = "*" }
 libc = { version = "*", features = [] }
-signal-hook = { version = "*" }
 whoami = { version = "*" }
 
 [package.metadata.deb]
