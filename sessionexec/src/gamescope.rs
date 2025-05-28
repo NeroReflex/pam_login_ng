@@ -83,7 +83,7 @@ pub struct GamescopeExecveRunner {
     gamescope_envp_data: Vec<CString>,
     shared_env: Vec<(String, String)>,
     socket: PathBuf,
-    stats: PathBuf,
+    _stats: PathBuf,
 }
 
 impl GamescopeExecveRunner {
@@ -182,7 +182,7 @@ impl GamescopeExecveRunner {
             gamescope_envp_data,
             shared_env,
             socket,
-            stats,
+            _stats: stats,
         }
     }
 
