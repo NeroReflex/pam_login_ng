@@ -1,6 +1,6 @@
 use std::ffi::CString;
 
-use crate::{find_program_path, runner::Runner};
+use crate::{execve_wrapper, find_program_path, runner::Runner};
 
 pub struct ExecveRunner {
     prog: CString,
@@ -48,26 +48,10 @@ impl ExecveRunner {
 
 impl Runner for ExecveRunner {
     fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let prog = self.prog.as_ptr();
-
-        let argv = self.argv_data
-            .iter()
-            .map(|e| e.as_ptr())
-            .chain(std::iter::once(std::ptr::null()))
-            .collect::<Vec<*const libc::c_char>>();
-
-        let envp = self.envp_data
-            .iter()
-            .map(|e| e.as_ptr())
-            .chain(std::iter::once(std::ptr::null()))
-            .collect::<Vec<*const libc::c_char>>();
-
-        let execve_err = unsafe { libc::execve(prog, argv.as_ptr(), envp.as_ptr()) };
-
-        if execve_err == -1 {
-            return Err(format!("execve failed: {}", std::io::Error::last_os_error()).into());
-        }
-
-        unreachable!()
+        execve_wrapper(
+            self.prog.clone(),
+            self.argv_data.clone(),
+            self.envp_data.clone(),
+        )
     }
 }

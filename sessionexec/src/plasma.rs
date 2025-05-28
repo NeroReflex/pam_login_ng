@@ -1,6 +1,6 @@
+use signal_hook::{consts::SIGTERM, iterator::Signals};
 use std::process::Command;
 use std::thread;
-use signal_hook::{consts::SIGTERM, iterator::Signals};
 
 use crate::{find_program_path, runner::Runner};
 
@@ -30,9 +30,7 @@ impl PlasmaRunner {
             command.env(key, val);
         }
 
-        Self {
-            command
-        }
+        Self { command }
     }
 }
 
@@ -46,7 +44,7 @@ impl Runner for PlasmaRunner {
         thread::spawn(move || {
             for sig in signals.forever() {
                 println!("Received signal {:?}", sig);
-                unsafe { libc::kill(pid as i32, SIGTERM as i32)};
+                unsafe { libc::kill(pid as i32, SIGTERM as i32) };
             }
         });
 
@@ -81,7 +79,7 @@ impl Runner for PlasmaRunner {
         }
 
         match exit_status {
-            Some(exit_code) =>  unsafe { libc::exit(exit_code) },
+            Some(exit_code) => unsafe { libc::exit(exit_code) },
             None => Ok(()),
         }
     }

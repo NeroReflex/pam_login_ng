@@ -1,6 +1,6 @@
 use ini::Ini;
 use sessionexec::execve::ExecveRunner;
-use sessionexec::gamescope::GamescopeRunner;
+use sessionexec::gamescope::{GamescopeExecveRunner, GamescopeRunner};
 use sessionexec::plasma::PlasmaRunner;
 use sessionexec::runner::Runner;
 use std::error::Error;
@@ -56,7 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut executor: Box<dyn Runner> = if splitted[0].contains("startplasma-wayland") {
         Box::new(PlasmaRunner::new(splitted))
     } else if splitted[0].contains("gamescope") {
-        Box::new(GamescopeRunner::new(splitted))
+        Box::new(GamescopeExecveRunner::new(splitted))
     } else {
         Box::new(ExecveRunner::new(splitted))
     };
