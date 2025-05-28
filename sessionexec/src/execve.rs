@@ -11,7 +11,7 @@ pub struct ExecveRunner {
 impl ExecveRunner {
     pub fn new(splitted: Vec<String>) -> Self {
         let mut argv_data: Vec<CString> = vec![];
-        let mut prog = CString::new("false").unwrap();
+        let mut prog = CString::new(splitted[0].clone()).unwrap();
 
         for (idx, val) in splitted.iter().enumerate() {
             let c_string = CString::new(val.as_str()).expect("CString::new failed");
@@ -19,21 +19,18 @@ impl ExecveRunner {
                 prog = match find_program_path(val.as_str()) {
                     Ok(program_path) => CString::new(program_path.as_str()).unwrap(),
                     Err(err) => {
-                        println!("Error searching for the specified program: {err}");
+                        eprintln!("Error searching for the specified program: {err}");
                         c_string.clone()
                     }
                 }
             }
 
-            println!("argv[{idx}]: {val}");
-
             argv_data.push(c_string);
         }
 
         let mut envp_data: Vec<CString> = vec![];
-        for (idx, (key, value)) in std::env::vars().enumerate() {
+        for (key, value) in std::env::vars() {
             let env_var = format!("{}={}", key, value);
-            println!("envp[{idx}]: {env_var}");
             let c_string = CString::new(env_var).unwrap();
             envp_data.push(c_string);
         }

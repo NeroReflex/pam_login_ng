@@ -416,16 +416,14 @@ impl GamescopeExecveRunner {
         }
 
         let mut gamescope_envp_data: Vec<CString> = vec![];
-        for (idx, (key, value)) in std::env::vars().enumerate() {
+        for (key, value) in std::env::vars() {
             let env_var = format!("{}={}", key, value);
-            println!("envp(private)[{idx}]: {env_var}");
             let c_string = CString::new(env_var).unwrap();
             gamescope_envp_data.push(c_string);
         }
 
-        for (idx, (key, val)) in shared_env.iter().enumerate() {
+        for (key, val) in shared_env.iter() {
             let env_var = format!("{}={}", key, val);
-            println!("envp(shared)[{idx}]: {env_var}");
             let c_string = CString::new(env_var).unwrap();
             gamescope_envp_data.push(c_string);
         }
