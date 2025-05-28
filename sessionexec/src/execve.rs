@@ -46,9 +46,9 @@ impl ExecveRunner {
 impl Runner for ExecveRunner {
     fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         execve_wrapper(
-            self.prog.clone(),
-            self.argv_data.clone(),
-            self.envp_data.clone(),
+            &self.prog,
+            &self.argv_data,
+            &self.envp_data,
         )
     }
 }

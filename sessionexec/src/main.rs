@@ -1,3 +1,5 @@
+#![no_main]
+
 use ini::Ini;
 use sessionexec::execve::ExecveRunner;
 use sessionexec::gamescope::GamescopeExecveRunner;
@@ -6,6 +8,8 @@ use sessionexec::runner::Runner;
 use std::error::Error;
 use std::path::PathBuf;
 
+#[no_mangle]
+#[inline(never)]
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
 

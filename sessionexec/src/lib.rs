@@ -17,9 +17,9 @@ pub(crate) fn find_program_path(program: &str) -> Result<String, Box<dyn Error>>
 }
 
 pub(crate) fn execve_wrapper(
-    prog: CString,
-    argv_data: Vec<CString>,
-    envp_data: Vec<CString>,
+    prog: &CString,
+    argv_data: &Vec<CString>,
+    envp_data: &Vec<CString>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let prog = prog.as_ptr();
 

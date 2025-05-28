@@ -242,14 +242,14 @@ impl GamescopeExecveRunner {
             CString::new(format!("GAMESCOPE_WAYLAND_DISPLAY={response_wl_display}")).unwrap(),
         );
 
-        execve_wrapper(mangoapp_prog, mangoapp_argv_data, mangoapp_envp_data)
+        execve_wrapper(&mangoapp_prog, &mangoapp_argv_data, &mangoapp_envp_data)
     }
 
     fn start_gamescope(&self) -> Result<(), Box<dyn std::error::Error>> {
         execve_wrapper(
-            self.gamescope_prog.clone(),
-            self.gamescope_argv_data.clone(),
-            self.gamescope_envp_data.clone(),
+            &self.gamescope_prog,
+            &self.gamescope_argv_data,
+            &self.gamescope_envp_data,
         )
     }
 }
