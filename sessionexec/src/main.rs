@@ -1,6 +1,6 @@
 use ini::Ini;
 use sessionexec::execve::ExecveRunner;
-use sessionexec::gamescope::{GamescopeExecveRunner, GamescopeRunner};
+use sessionexec::gamescope::GamescopeExecveRunner;
 use sessionexec::plasma::PlasmaRunner;
 use sessionexec::runner::Runner;
 use std::error::Error;
