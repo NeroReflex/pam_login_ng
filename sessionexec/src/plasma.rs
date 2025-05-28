@@ -45,6 +45,7 @@ extern "C" fn sigterm_handler(signal: c_int) {
 
     if result == 0 {
         // TODO: to avoid issue do not do I/O here
+        print!("Signal {signal} propagated to PID {pid}: {result}");
     } else {
         eprintln!("Error propagating signal {signal} to PID {pid}: {result}");
     }
