@@ -1,9 +1,6 @@
 use crate::{execve_wrapper, find_program_path, runner::Runner};
 use std::ffi::{CString, OsStr};
 use std::io::{BufReader, Read};
-use std::ops::Deref;
-use std::sync::{Arc, Mutex};
-use std::thread;
 use std::{path::PathBuf, process::Command};
 
 pub fn mktemp<S>(n: S) -> String
