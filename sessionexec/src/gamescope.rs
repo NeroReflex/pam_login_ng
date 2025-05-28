@@ -115,6 +115,7 @@ impl GamescopeRunner {
 
         // These are copied from gamescope-session-plus
         let shared_env = vec![
+            (String::from("GAMESCOPE_STATS"), String::from(stats.to_string_lossy())),
             (String::from("RADV_FORCE_VRS_CONFIG_FILE"), radv_force_vrs_config_filec),
             (String::from("MANGOHUD_CONFIGFILE"), mangohud_configfile),
             // Force Qt applications to run under xwayland
