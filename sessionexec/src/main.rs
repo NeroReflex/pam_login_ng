@@ -46,11 +46,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             let section = conf.section(Some("Desktop Entry")).unwrap();
             let exec = section.get("Exec").unwrap();
 
-            exec
-                .split_whitespace()
+            exec.split_whitespace()
                 .map(|a| a.to_string())
                 .collect::<Vec<String>>()
-        },
+        }
         false => vec![String::from("startplasma-wayland")],
     };
 
