@@ -177,6 +177,11 @@ impl SessionNode {
     pub async fn run(node: Arc<SessionNode>, main: bool) -> RunResult {
         assert_send_sync::<Arc<SessionNode>>();
 
+        // Store environments at the beginning and reuse them later to ensure no bad env is carried over
+        let environment = std::env::vars()
+            .map(|(key, val)| (key, val))
+            .collect::<Vec<_>>();
+
         let name = node.name.clone();
 
         let mut restarted: u64 = 0;
@@ -202,8 +207,13 @@ impl SessionNode {
                 // TODO: what if there is an error?
             }
 
+            // Prepare the command to execute: use the old set of environment variables
             let mut command = Command::new(node.cmd.as_str());
             command.args(node.args.as_slice());
+            command.env_clear();
+            for (key, val) in environment.iter() {
+                command.env(key, val);
+            }
 
             let mut node_status = node.status.write().await;
 
@@ -225,6 +235,7 @@ impl SessionNode {
             };
 
             let Some(pid) = child.id() else {
+                // The PID cannot be found: kill the process by its handle
                 eprintln!("Error fetching pid for {name}");
                 child.kill().await.unwrap();
 
