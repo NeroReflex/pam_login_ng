@@ -58,7 +58,7 @@ where
     }
 }
 
-pub fn mkfifo<S>(n: S) -> ()
+pub fn mkfifo<S>(n: S)
 where
     S: AsRef<OsStr>,
 {
@@ -71,7 +71,7 @@ where
 
     // Check if the command was successful
     if output.status.success() {
-        return ();
+        return
     }
 
     // Handle the error
@@ -105,7 +105,7 @@ impl GamescopeExecveRunner {
         mkfifo(&socket);
         mkfifo(&stats);
 
-        let mangohud_configfile = mktemp(&xdg_runtime_dir.join("mangohud.XXXXXXXX"));
+        let mangohud_configfile = mktemp(xdg_runtime_dir.join("mangohud.XXXXXXXX"));
         std::fs::write(PathBuf::from(&mangohud_configfile), b"no_display").unwrap();
 
         let radv_force_vrs_config_filec = mktemp(xdg_runtime_dir.join("radv_vrs.XXXXXXXX"));
@@ -182,8 +182,7 @@ impl GamescopeExecveRunner {
 
                 let split = response
                     .split_whitespace()
-                    .into_iter()
-                    .map(|w| String::from(w))
+                    .map(String::from)
                     .collect::<Vec<String>>();
 
                 if split.len() != 2 {

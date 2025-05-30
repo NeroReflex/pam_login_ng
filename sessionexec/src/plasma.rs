@@ -36,7 +36,7 @@ impl PlasmaRunner {
 }
 
 thread_local! {
-    static STARTPLASMA_PID: RefCell<u32> = RefCell::new(0);
+    static STARTPLASMA_PID: RefCell<u32> = const { RefCell::new(0) };
 }
 
 extern "C" fn sigterm_handler(signal: c_int) {

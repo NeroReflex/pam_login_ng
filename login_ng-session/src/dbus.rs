@@ -91,7 +91,7 @@ impl SessionManagerDBus {
 
                 match &err {
                     crate::errors::SessionManagerError::ZbusError(error) => (1, format!("{error}")),
-                    crate::errors::SessionManagerError::NotFound(error) => (2, format!("{error}")),
+                    crate::errors::SessionManagerError::NotFound(error) => (2, error.to_string()),
                     crate::errors::SessionManagerError::ManualActionError(error) => {
                         (3, format!("{error}"))
                     }

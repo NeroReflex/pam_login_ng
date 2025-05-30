@@ -179,7 +179,6 @@ impl SessionNode {
 
         // Store environments at the beginning and reuse them later to ensure no bad env is carried over
         let environment = std::env::vars()
-            .map(|(key, val)| (key, val))
             .collect::<Vec<_>>();
 
         let name = node.name.clone();
