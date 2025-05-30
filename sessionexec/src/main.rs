@@ -8,6 +8,14 @@ use sessionexec::runner::Runner;
 use std::error::Error;
 use std::path::PathBuf;
 
+#[cfg(test)]
+#[no_mangle]
+#[inline(never)]
+fn main() -> Result<(), Box<dyn Error>> {
+    Ok(())
+}
+
+#[cfg(not(test))]
 #[no_mangle]
 #[inline(never)]
 fn main() -> Result<(), Box<dyn Error>> {

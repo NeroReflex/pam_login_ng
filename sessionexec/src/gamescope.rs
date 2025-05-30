@@ -16,13 +16,13 @@ where
     // Check if the command was successful
     if output.status.success() {
         // Convert the output to a string
-        let temp_file_path = str::from_utf8(&output.stdout).expect("Invalid UTF-8 output");
+        let temp_file_path = std::str::from_utf8(&output.stdout).expect("Invalid UTF-8 output");
 
         // Print the path of the temporary file
         String::from(temp_file_path.trim())
     } else {
         // Handle the error
-        let error_message = str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
+        let error_message = std::str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
         panic!("Error: {}", error_message)
     }
 }
@@ -45,13 +45,13 @@ where
     // Check if the command was successful
     if output.status.success() {
         // Convert the output to a string
-        let temp_file_path = str::from_utf8(&output.stdout).expect("Invalid UTF-8 output");
+        let temp_file_path = std::str::from_utf8(&output.stdout).expect("Invalid UTF-8 output");
 
         // Print the path of the temporary file
         String::from(temp_file_path.trim())
     } else {
         // Handle the error
-        let error_message = str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
+        let error_message = std::str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
         panic!("Error: {}", error_message)
     }
 }
@@ -73,7 +73,7 @@ where
     }
 
     // Handle the error
-    let error_message = str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
+    let error_message = std::str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
     panic!("Error in mkfifo: {}", error_message)
 }
 
