@@ -70,7 +70,7 @@ impl Runner for PlasmaRunner {
             _ => println!("signal handler setup correctly, was previously {result}"),
         }
 
-        let mut exit_status = None; 
+        let mut exit_status = None;
         loop {
             match child.try_wait() {
                 Ok(res) => match res {
@@ -83,15 +83,15 @@ impl Runner for PlasmaRunner {
 
                         exit_status = result.code();
                         break;
-                    },
+                    }
                     None => {
                         std::thread::sleep(std::time::Duration::from_millis(750));
-                        continue
-                    },
+                        continue;
+                    }
                 },
                 Err(err) => eprintln!("Error waiting for termination: {err}"),
             }
-        };
+        }
 
         // wait for the drm to be free (safeguard to avoid gamescope to fail)
         loop {

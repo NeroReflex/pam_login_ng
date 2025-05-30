@@ -22,7 +22,8 @@ where
         String::from(temp_file_path.trim())
     } else {
         // Handle the error
-        let error_message = std::str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
+        let error_message =
+            std::str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
         panic!("Error: {}", error_message)
     }
 }
@@ -51,7 +52,8 @@ where
         String::from(temp_file_path.trim())
     } else {
         // Handle the error
-        let error_message = std::str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
+        let error_message =
+            std::str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
         panic!("Error: {}", error_message)
     }
 }
@@ -78,12 +80,11 @@ where
 }
 
 pub struct GamescopeExecveRunner {
-    gamescope_prog: CString,
-    gamescope_argv_data: Vec<CString>,
-    gamescope_envp_data: Vec<CString>,
+    gamescope_cmd: String,
+    gamescope_args: Vec<String>,
     shared_env: Vec<(String, String)>,
     socket: PathBuf,
-    _stats: PathBuf,
+    stats: PathBuf,
 }
 
 impl GamescopeExecveRunner {
@@ -110,6 +111,33 @@ impl GamescopeExecveRunner {
         let radv_force_vrs_config_filec = mktemp(xdg_runtime_dir.join("radv_vrs.XXXXXXXX"));
         std::fs::write(PathBuf::from(&radv_force_vrs_config_filec), b"1x1").unwrap();
 
+        let mut gamescope_cmd = String::new();
+        let mut gamescope_args = vec![];
+        for (idx, val) in splitted.iter().enumerate() {
+            let argument = String::from(val.as_str());
+            if idx == 0 {
+                gamescope_cmd = match find_program_path(val.as_str()) {
+                    Ok(program_path) => String::from(program_path.as_str()),
+                    Err(err) => {
+                        println!("Error searching for the specified program: {err}");
+                        gamescope_cmd.clone()
+                    }
+                };
+
+                gamescope_args.push(argument);
+                gamescope_args.push(String::from("-R"));
+                gamescope_args.push(String::from(
+                    socket.as_os_str().to_string_lossy().to_string().as_str(),
+                ));
+                gamescope_args.push(String::from("-T"));
+                gamescope_args.push(String::from(
+                    stats.as_os_str().to_string_lossy().to_string().as_str(),
+                ));
+            } else {
+                gamescope_args.push(argument);
+            }
+        }
+
         // These are copied from gamescope-session-plus
         let shared_env = vec![
             (
@@ -133,56 +161,12 @@ impl GamescopeExecveRunner {
             //(String::from("GAMESCOPE_DISABLE_ASYNC_FLIPS"), String::from("1")),
         ];
 
-        // here build the gamescope command
-        let mut gamescope_argv_data: Vec<CString> = vec![];
-        let mut gamescope_prog = CString::new("false").unwrap();
-
-        for (idx, val) in splitted.iter().enumerate() {
-            let c_string = CString::new(val.as_str()).expect("CString::new failed");
-            if idx == 0 {
-                gamescope_prog = match find_program_path(val.as_str()) {
-                    Ok(program_path) => CString::new(program_path.as_str()).unwrap(),
-                    Err(err) => {
-                        println!("Error searching for the specified program: {err}");
-                        c_string.clone()
-                    }
-                };
-
-                gamescope_argv_data.push(c_string);
-                gamescope_argv_data.push(CString::new("-R").unwrap());
-                gamescope_argv_data.push(
-                    CString::new(socket.as_os_str().to_string_lossy().to_string().as_str())
-                        .unwrap(),
-                );
-                gamescope_argv_data.push(CString::new("-T").unwrap());
-                gamescope_argv_data.push(
-                    CString::new(stats.as_os_str().to_string_lossy().to_string().as_str()).unwrap(),
-                );
-            } else {
-                gamescope_argv_data.push(c_string);
-            }
-        }
-
-        let mut gamescope_envp_data: Vec<CString> = vec![];
-        for (key, value) in std::env::vars() {
-            let env_var = format!("{}={}", key, value);
-            let c_string = CString::new(env_var).unwrap();
-            gamescope_envp_data.push(c_string);
-        }
-
-        for (key, val) in shared_env.iter() {
-            let env_var = format!("{}={}", key, val);
-            let c_string = CString::new(env_var).unwrap();
-            gamescope_envp_data.push(c_string);
-        }
-
         Self {
-            gamescope_prog,
-            gamescope_argv_data,
-            gamescope_envp_data,
+            gamescope_cmd,
+            gamescope_args,
             shared_env,
             socket,
-            _stats: stats,
+            stats,
         }
     }
 
@@ -246,11 +230,22 @@ impl GamescopeExecveRunner {
     }
 
     fn start_gamescope(&self) -> Result<(), Box<dyn std::error::Error>> {
-        execve_wrapper(
-            &self.gamescope_prog,
-            &self.gamescope_argv_data,
-            &self.gamescope_envp_data,
-        )
+        let gamescope_prog = CString::new(self.gamescope_cmd.as_str()).unwrap();
+        let gamescope_argv_data = self
+            .gamescope_args
+            .iter()
+            .map(|argv| CString::new(argv.as_str()).unwrap())
+            .collect::<Vec<_>>();
+        let gamescope_envp_data: Vec<CString> = std::env::vars()
+            .map(|(key, value)| CString::new(format!("{key}={value}").as_str()).unwrap())
+            .chain(
+                self.shared_env
+                    .iter()
+                    .map(|(key, val)| CString::new(format!("{key}={val}").as_str()).unwrap()),
+            )
+            .collect::<Vec<_>>();
+
+        execve_wrapper(&gamescope_prog, &gamescope_argv_data, &gamescope_envp_data)
     }
 }
 
