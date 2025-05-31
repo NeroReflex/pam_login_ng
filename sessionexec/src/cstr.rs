@@ -6,9 +6,11 @@ pub struct CStr {
 
 impl Drop for CStr {
     fn drop(&mut self) {
+        /*
         if !self.data.is_null() {
             unsafe { libc::free(self.data as *mut libc::c_void) }
         }
+        */
     }
 }
 
