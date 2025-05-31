@@ -1,7 +1,6 @@
 use crate::{execve_wrapper, find_program_path, runner::Runner};
 use std::ffi::{CString, OsStr};
 use std::io::{BufReader, Read};
-use std::thread::spawn;
 use std::{path::PathBuf, process::Command};
 
 pub fn mktemp<S>(n: S) -> String
@@ -80,7 +79,6 @@ where
     panic!("Error in mkfifo: {}", error_message)
 }
 
-#[derive(Clone, Debug)]
 pub struct GamescopeExecveRunner {
     gamescope_cmd: String,
     gamescope_args: Vec<String>,
@@ -198,23 +196,36 @@ impl GamescopeExecveRunner {
             }
         };
 
-        let mut cmd = Command::new("mangoapp");
-        for (key, val) in std::env::vars() {
-            cmd.env(key, val);
+        let mut mangoapp_envp_data: Vec<CString> = vec![];
+        let mut mangoapp_argv_data: Vec<CString> = vec![];
+        let mangoapp_prog = match find_program_path("mangoapp") {
+            Ok(program_path) => CString::new(program_path.as_str()).unwrap(),
+            Err(err) => {
+                println!("Error searching for the specified program: {err}");
+                CString::new("mangoapp").unwrap()
+            }
+        };
+
+        mangoapp_argv_data.push(mangoapp_prog.clone());
+
+        for (key, value) in std::env::vars() {
+            let env_var = format!("{}={}", key, value);
+            let c_string = CString::new(env_var).unwrap();
+            mangoapp_envp_data.push(c_string);
         }
 
         for (key, val) in self.shared_env.iter() {
-            cmd.env(key, val);
+            let env_var = format!("{}={}", key, val);
+            let c_string = CString::new(env_var).unwrap();
+            mangoapp_envp_data.push(c_string);
         }
 
-        cmd.env("DISPLAY", response_x_display);
-        cmd.env("GAMESCOPE_WAYLAND_DISPLAY", response_wl_display);
+        mangoapp_envp_data.push(CString::new(format!("DISPLAY={response_x_display}")).unwrap());
+        mangoapp_envp_data.push(
+            CString::new(format!("GAMESCOPE_WAYLAND_DISPLAY={response_wl_display}")).unwrap(),
+        );
 
-        let mut child = cmd.spawn()?;
-
-        child.wait()?;
-
-        Ok(())
+        execve_wrapper(&mangoapp_prog, &mangoapp_argv_data, &mangoapp_envp_data)
     }
 
     fn start_gamescope(&self) -> Result<(), Box<dyn std::error::Error>> {
@@ -263,18 +274,13 @@ impl Runner for GamescopeExecveRunner {
             mangoapp_cmd.env(key, val);
         }
 
-        let a = self.clone();
-        let mangoapp = spawn(move || {
-            a.start_mangoapp().unwrap()
-        });
-        let b = self.clone();
-        let gamescope = spawn(move || {
-            b.start_gamescope().unwrap()
-        });
-
-        mangoapp.join().unwrap();
-        gamescope.join().unwrap();
-
-        Ok(())
+        let fork_res = unsafe { libc::fork() };
+        if fork_res < 0 {
+            panic!("Could not fork the process");
+        } else if fork_res == 0 {
+            self.start_mangoapp()
+        } else {
+            self.start_gamescope()
+        }
     }
 }
