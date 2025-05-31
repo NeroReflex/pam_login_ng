@@ -90,27 +90,26 @@ pub struct GamescopeExecveRunner {
 
 impl GamescopeExecveRunner {
     pub fn new(splitted: Vec<String>) -> Self {
-        let xdg_runtime_dir = PathBuf::from(match std::env::var("XDG_RUNTIME_DIR") {
-            Ok(env) => env,
+        let tmp_dir = PathBuf::from(match std::env::var("XDG_RUNTIME_DIR") {
+            Ok(env) => PathBuf::from(env),
             Err(err) => {
                 eprint!("Error in fetching XDG_RUNTIME_DIR: {err}");
 
-                String::from("/tmp/")
+                PathBuf::from(mktemp_dir("/tmp/", "gamescope.XXXXXXX"))
             }
         });
 
-        let tmp_dir = PathBuf::from(mktemp_dir(&xdg_runtime_dir, "gamescope.XXXXXXX"));
         let socket = tmp_dir.join("startup.socket");
         let stats = tmp_dir.join("stats.pipe");
 
         mkfifo(&socket);
         mkfifo(&stats);
 
-        let mangohud_configfile = mktemp(xdg_runtime_dir.join("mangohud.XXXXXXXX"));
+        let mangohud_configfile = mktemp(tmp_dir.join("mangohud.XXXXXXXX"));
         std::fs::write(PathBuf::from(&mangohud_configfile), b"no_display").unwrap();
 
-        let radv_force_vrs_config_filec = mktemp(xdg_runtime_dir.join("radv_vrs.XXXXXXXX"));
-        std::fs::write(PathBuf::from(&radv_force_vrs_config_filec), b"1x1").unwrap();
+        let radv_vrs = mktemp(tmp_dir.join("radv_vrs.XXXXXXXX"));
+        std::fs::write(PathBuf::from(&radv_vrs), b"1x1").unwrap();
 
         let mut gamescope_cmd = String::new();
         let mut gamescope_args = vec![];
@@ -127,13 +126,9 @@ impl GamescopeExecveRunner {
 
                 gamescope_args.push(argument);
                 gamescope_args.push(String::from("-R"));
-                gamescope_args.push(String::from(
-                    socket.to_string_lossy().deref(),
-                ));
+                gamescope_args.push(String::from(socket.to_string_lossy().deref()));
                 gamescope_args.push(String::from("-T"));
-                gamescope_args.push(String::from(
-                    stats.to_string_lossy().deref(),
-                ));
+                gamescope_args.push(String::from(stats.to_string_lossy().deref()));
             } else {
                 gamescope_args.push(argument);
             }
@@ -145,10 +140,7 @@ impl GamescopeExecveRunner {
                 String::from("GAMESCOPE_STATS"),
                 String::from(stats.to_string_lossy()),
             ),
-            (
-                String::from("RADV_FORCE_VRS_CONFIG_FILE"),
-                radv_force_vrs_config_filec,
-            ),
+            //(String::from("RADV_FORCE_VRS_CONFIG_FILE"), radv_vrs),
             (String::from("MANGOHUD_CONFIGFILE"), mangohud_configfile),
             // Force Qt applications to run under xwayland
             (String::from("QT_QPA_PLATFORM"), String::from("xcb")),
