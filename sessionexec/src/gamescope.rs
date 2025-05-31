@@ -29,6 +29,36 @@ where
     }
 }
 
+pub fn mktemp_dir<S, Q>(path: S, dir: Q) -> String
+where
+    S: AsRef<OsStr>,
+    Q: AsRef<OsStr>,
+{
+    // Call the mktemp command
+    let output = Command::new("mktemp")
+        .arg("-p")
+        .arg(path)
+        .arg("-d")
+        .arg("-t")
+        .arg(dir)
+        .output()
+        .expect("Failed to execute mktemp");
+
+    // Check if the command was successful
+    if output.status.success() {
+        // Convert the output to a string
+        let temp_file_path = std::str::from_utf8(&output.stdout).expect("Invalid UTF-8 output");
+
+        // Print the path of the temporary file
+        String::from(temp_file_path.trim())
+    } else {
+        // Handle the error
+        let error_message =
+            std::str::from_utf8(&output.stderr).expect("Invalid UTF-8 error output");
+        panic!("Error: {}", error_message)
+    }
+}
+
 pub fn mkfifo<S>(n: S)
 where
     S: AsRef<OsStr>,
@@ -74,9 +104,11 @@ impl GamescopeExecveRunner {
             }
         });
 
+        let tmp_dir = PathBuf::from(mktemp_dir(&xdg_runtime_dir, "gamescope.XXXXXXX"));
+
         let socket = match mangohud {
             true => {
-                let socket = xdg_runtime_dir.join("startup.socket");
+                let socket = tmp_dir.join("startup.socket");
                 mkfifo(&socket);
                 Some(socket)
             }
@@ -85,15 +117,18 @@ impl GamescopeExecveRunner {
 
         let stats = match stats {
             true => {
-                let stats = xdg_runtime_dir.join("stats.pipe");
+                let stats = tmp_dir.join("stats.pipe");
                 mkfifo(&stats);
                 Some(stats.to_string_lossy().to_string())
             }
             false => None,
         };
 
-        //let radv_vrs = mktemp(xdg_runtime_dir.join("radv_vrs.XXXXXXXX"));
-        //std::fs::write(PathBuf::from(&radv_vrs), b"1x1").unwrap();
+        let mangohud_configfile = mktemp(xdg_runtime_dir.join("mangohud.XXXXXXXX"));
+        std::fs::write(PathBuf::from(&mangohud_configfile), b"no_display").unwrap();
+
+        let radv_vrs = mktemp(xdg_runtime_dir.join("radv_vrs.XXXXXXXX"));
+        std::fs::write(PathBuf::from(&radv_vrs), b"1x1").unwrap();
 
         let mut gamescope_cmd = String::new();
         let mut gamescope_args = vec![];
@@ -129,7 +164,8 @@ impl GamescopeExecveRunner {
         }
 
         let shared_env = [
-            //("RADV_FORCE_VRS_CONFIG_FILE", radv_vrs.as_str()),
+            ("RADV_FORCE_VRS_CONFIG_FILE", radv_vrs.as_str()),
+            ("MANGOHUD_CONFIGFILE", mangohud_configfile.as_str()),
             // Force Qt applications to run under xwayland
             ("QT_QPA_PLATFORM", "xcb"),
             // Expose vram info from radv
@@ -146,16 +182,11 @@ impl GamescopeExecveRunner {
             .collect::<Vec<_>>();
 
         match &stats {
-            Some(stats) => environment.push((String::from("GAMESCOPE_STATS"), stats.clone())),
+            Some(stats) => {
+                environment.push((String::from("GAMESCOPE_STATS"), stats.clone()));
+            }
             None => {}
         };
-
-        if mangohud {
-            let mangohud_configfile = mktemp(xdg_runtime_dir.join("mangohud.XXXXXXXX"));
-            std::fs::write(PathBuf::from(&mangohud_configfile), b"no_display").unwrap();
-
-            environment.push((String::from("MANGOHUD_CONFIGFILE"), mangohud_configfile));
-        }
 
         for (key, val) in env.iter() {
             environment.push((val.clone(), key.clone()));
