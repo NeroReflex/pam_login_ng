@@ -1,12 +1,5 @@
 #![no_main]
-
-use ini::Ini;
-use sessionexec::execve::ExecveRunner;
-use sessionexec::gamescope::GamescopeExecveRunner;
-use sessionexec::plasma::PlasmaRunner;
-use sessionexec::runner::Runner;
 use std::error::Error;
-use std::path::PathBuf;
 
 #[cfg(test)]
 #[no_mangle]
@@ -19,6 +12,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 #[no_mangle]
 #[inline(never)]
 fn main() -> Result<(), Box<dyn Error>> {
+    use ini::Ini;
+    use sessionexec::execve::ExecveRunner;
+    use sessionexec::gamescope::GamescopeExecveRunner;
+    use sessionexec::plasma::PlasmaRunner;
+    use sessionexec::runner::Runner;
+    use std::path::PathBuf;
+
     let args: Vec<String> = std::env::args().collect();
 
     let param = if args.len() < 2 {
@@ -69,6 +69,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("No command specified!");
     }
 
+    let environment = std::env::vars()
+        .map(|(key, val)| (key, val))
+        .collect::<Vec<_>>();
+
     let mut executor: Box<dyn Runner> = if (splitted[0].contains("startplasma-wayland"))
         || (splitted[0].contains("plasma-dbus-run-session-if-needed"))
     {
@@ -76,7 +80,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         Box::new(PlasmaRunner::new(splitted))
     } else if splitted[0].contains("gamescope") {
         println!("Using GamescopeExecveRunner session executor");
-        Box::new(GamescopeExecveRunner::new(splitted))
+        Box::new(GamescopeExecveRunner::new(
+            splitted,
+            false,
+            false,
+            environment,
+        ))
     } else {
         println!("Using ExecveRunner session executor");
         Box::new(ExecveRunner::new(splitted))
