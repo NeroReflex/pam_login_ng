@@ -128,6 +128,7 @@ impl GamescopeExecveRunner {
             }
         }
 
+        /*
         let shared_env = [
             //("RADV_FORCE_VRS_CONFIG_FILE", radv_vrs.as_str()),
             // Force Qt applications to run under xwayland
@@ -144,7 +145,9 @@ impl GamescopeExecveRunner {
             .iter()
             .map(|(a, b)| (String::from(*a), String::from(*b)))
             .collect::<Vec<_>>();
+        */
 
+        let mut environment = vec![];
         match &stats {
             Some(stats) => environment.push((String::from("GAMESCOPE_STATS"), stats.clone())),
             None => {}
