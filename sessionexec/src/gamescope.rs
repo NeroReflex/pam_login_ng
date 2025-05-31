@@ -1,6 +1,7 @@
 use crate::{cstr::CStr, execve_wrapper, find_program_path, runner::Runner};
 use std::ffi::OsStr;
 use std::io::{BufReader, Read};
+use std::ops::Deref;
 use std::{path::PathBuf, process::Command};
 
 pub fn mktemp<S>(n: S) -> String
@@ -127,11 +128,11 @@ impl GamescopeExecveRunner {
                 gamescope_args.push(argument);
                 gamescope_args.push(String::from("-R"));
                 gamescope_args.push(String::from(
-                    socket.as_os_str().to_string_lossy().to_string().as_str(),
+                    socket.to_string_lossy().deref(),
                 ));
                 gamescope_args.push(String::from("-T"));
                 gamescope_args.push(String::from(
-                    stats.as_os_str().to_string_lossy().to_string().as_str(),
+                    stats.to_string_lossy().deref(),
                 ));
             } else {
                 gamescope_args.push(argument);
@@ -234,7 +235,7 @@ impl GamescopeExecveRunner {
             .iter()
             .map(|argv| CStr::new(argv.as_str()).unwrap())
             .collect::<Vec<_>>();
-        let gamescope_envp_data: Vec<CStr> = std::env::vars()
+        let gamescope_envp_data = std::env::vars()
             .map(|(key, value)| CStr::new(format!("{key}={value}").as_str()).unwrap())
             .chain(
                 self.shared_env
