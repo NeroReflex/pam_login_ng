@@ -158,7 +158,7 @@ impl GamescopeExecveRunner {
         }
 
         for (key, val) in env.iter() {
-            environment.push((val.clone(), key.clone()));
+            environment.push((key.clone(), val.clone()));
         }
 
         Self {
