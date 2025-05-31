@@ -1,12 +1,6 @@
 #![no_main]
 
-use ini::Ini;
-use sessionexec::execve::ExecveRunner;
-use sessionexec::gamescope::GamescopeExecveRunner;
-use sessionexec::plasma::PlasmaRunner;
-use sessionexec::runner::Runner;
 use std::error::Error;
-use std::path::PathBuf;
 
 #[cfg(test)]
 #[no_mangle]
@@ -19,6 +13,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 #[no_mangle]
 #[inline(never)]
 fn main() -> Result<(), Box<dyn Error>> {
+    use ini::Ini;
+    use sessionexec::execve::ExecveRunner;
+    use sessionexec::gamescope::GamescopeExecveRunner;
+    use sessionexec::plasma::PlasmaRunner;
+    use sessionexec::runner::Runner;
+    use std::path::PathBuf;
+
     let args: Vec<String> = std::env::args().collect();
 
     let param = if args.len() < 2 {

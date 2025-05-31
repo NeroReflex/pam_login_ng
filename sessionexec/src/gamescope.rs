@@ -1,5 +1,5 @@
-use crate::{execve_wrapper, find_program_path, runner::Runner, cstr::CStr};
-use std::ffi::{OsStr};
+use crate::{cstr::CStr, execve_wrapper, find_program_path, runner::Runner};
+use std::ffi::OsStr;
 use std::io::{BufReader, Read};
 use std::{path::PathBuf, process::Command};
 
@@ -71,7 +71,7 @@ where
 
     // Check if the command was successful
     if output.status.success() {
-        return
+        return;
     }
 
     // Handle the error
@@ -218,7 +218,8 @@ impl GamescopeExecveRunner {
             mangoapp_envp_data.push(c_string);
         }
 
-        mangoapp_envp_data.push(CStr::new(format!("DISPLAY={response_x_display}").as_str()).unwrap());
+        mangoapp_envp_data
+            .push(CStr::new(format!("DISPLAY={response_x_display}").as_str()).unwrap());
         mangoapp_envp_data.push(
             CStr::new(format!("GAMESCOPE_WAYLAND_DISPLAY={response_wl_display}").as_str()).unwrap(),
         );

@@ -1,4 +1,4 @@
-use std::{error::Error, ffi::CString, process::Command};
+use std::{error::Error, process::Command};
 
 use cstr::CStr;
 
