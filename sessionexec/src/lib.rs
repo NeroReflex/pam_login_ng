@@ -1,5 +1,8 @@
 use std::{error::Error, ffi::CString, process::Command};
 
+use cstr::CStr;
+
+pub(crate) mod cstr;
 pub mod execve;
 pub mod gamescope;
 pub mod plasma;
@@ -17,21 +20,21 @@ pub(crate) fn find_program_path(program: &str) -> Result<String, Box<dyn Error>>
 }
 
 pub(crate) fn execve_wrapper(
-    prog: &CString,
-    argv_data: &Vec<CString>,
-    envp_data: &Vec<CString>,
+    prog: &CStr,
+    argv_data: &Vec<CStr>,
+    envp_data: &Vec<CStr>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let prog = prog.as_ptr();
+    let prog = prog.inner();
 
     let argv = argv_data
         .iter()
-        .map(|e| e.as_ptr())
+        .map(|e| e.inner())
         .chain(std::iter::once(std::ptr::null()))
         .collect::<Vec<*const libc::c_char>>();
 
     let envp = envp_data
         .iter()
-        .map(|e| e.as_ptr())
+        .map(|e| e.inner())
         .chain(std::iter::once(std::ptr::null()))
         .collect::<Vec<*const libc::c_char>>();
 
