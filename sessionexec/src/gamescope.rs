@@ -229,7 +229,6 @@ impl GamescopeExecveRunner {
     }
 
     fn start_gamescope(&self) -> Result<(), Box<dyn std::error::Error>> {
-/*
         let gamescope_prog = CString::new(self.gamescope_cmd.as_str()).unwrap();
         let gamescope_argv_data = self
             .gamescope_args
@@ -246,24 +245,6 @@ impl GamescopeExecveRunner {
             .collect::<Vec<_>>();
 
         execve_wrapper(&gamescope_prog, &gamescope_argv_data, &gamescope_envp_data)
-*/
-
-        let mut cmd = Command::new(self.gamescope_cmd.as_str());
-        cmd.args(self.gamescope_args.iter());
-        
-        for (key, val) in std::env::vars() {
-            cmd.env(key, val);
-        }
-
-        for (key, val) in self.shared_env.iter() {
-            cmd.env(key, val);
-        }
-
-        let mut child = cmd.spawn()?;
-
-        child.wait()?;
-
-        Ok(())
     }
 }
 
