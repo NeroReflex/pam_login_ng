@@ -12,14 +12,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 #[no_mangle]
 #[inline(never)]
 fn main() -> Result<(), Box<dyn Error>> {
+    use ini::Ini;
     use sessionexec::execve::ExecveRunner;
     use sessionexec::gamescope::GamescopeExecveRunner;
     use sessionexec::plasma::PlasmaRunner;
     use sessionexec::runner::Runner;
     use std::path::PathBuf;
-/*
-    use ini::Ini;
-    
 
     let args: Vec<String> = std::env::args().collect();
 
@@ -70,18 +68,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     if splitted.is_empty() {
         panic!("No command specified!");
     }
-*/
-
-    let splitted = vec![
-        String::from("gamescope"),
-        String::from("-e"),
-        String::from("--steam"),
-        String::from("--"),
-        String::from("steam"),
-        String::from("-steampal"),
-        String::from("-steamdeck"),
-        String::from("-gamepadui"),
-    ];
 
     let environment = std::env::vars()
         .map(|(key, val)| (key, val))
