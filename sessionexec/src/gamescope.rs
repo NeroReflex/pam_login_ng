@@ -91,7 +91,7 @@ pub struct GamescopeExecveRunner {
 impl GamescopeExecveRunner {
     pub fn new(splitted: Vec<String>) -> Self {
         let tmp_dir = PathBuf::from(match std::env::var("XDG_RUNTIME_DIR") {
-            Ok(env) => PathBuf::from(env),
+            Ok(env) => PathBuf::from(mktemp_dir(env, "gamescope.XXXXXXX")),
             Err(err) => {
                 eprint!("Error in fetching XDG_RUNTIME_DIR: {err}");
 
