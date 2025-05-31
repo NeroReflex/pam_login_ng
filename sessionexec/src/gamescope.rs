@@ -1,5 +1,5 @@
-use crate::{find_program_path, runner::Runner};
-use std::ffi::OsStr;
+use crate::{execve_wrapper, find_program_path, runner::Runner};
+use std::ffi::{CString, OsStr};
 use std::io::{BufReader, Read};
 use std::thread::spawn;
 use std::{path::PathBuf, process::Command};
@@ -72,7 +72,7 @@ where
 
     // Check if the command was successful
     if output.status.success() {
-        return;
+        return
     }
 
     // Handle the error
@@ -84,17 +84,13 @@ where
 pub struct GamescopeExecveRunner {
     gamescope_cmd: String,
     gamescope_args: Vec<String>,
-    environment: Vec<(String, String)>,
-    socket: Option<PathBuf>,
+    shared_env: Vec<(String, String)>,
+    socket: PathBuf,
+    stats: PathBuf,
 }
 
 impl GamescopeExecveRunner {
-    pub fn new(
-        splitted: Vec<String>,
-        mangohud: bool,
-        stats: bool,
-        env: Vec<(String, String)>,
-    ) -> Self {
+    pub fn new(splitted: Vec<String>) -> Self {
         let xdg_runtime_dir = PathBuf::from(match std::env::var("XDG_RUNTIME_DIR") {
             Ok(env) => env,
             Err(err) => {
@@ -105,30 +101,17 @@ impl GamescopeExecveRunner {
         });
 
         let tmp_dir = PathBuf::from(mktemp_dir(&xdg_runtime_dir, "gamescope.XXXXXXX"));
+        let socket = tmp_dir.join("startup.socket");
+        let stats = tmp_dir.join("stats.pipe");
 
-        let socket = match mangohud {
-            true => {
-                let socket = tmp_dir.join("startup.socket");
-                mkfifo(&socket);
-                Some(socket)
-            }
-            false => None,
-        };
-
-        let stats = match stats {
-            true => {
-                let stats = tmp_dir.join("stats.pipe");
-                mkfifo(&stats);
-                Some(stats.to_string_lossy().to_string())
-            }
-            false => None,
-        };
+        mkfifo(&socket);
+        mkfifo(&stats);
 
         let mangohud_configfile = mktemp(xdg_runtime_dir.join("mangohud.XXXXXXXX"));
         std::fs::write(PathBuf::from(&mangohud_configfile), b"no_display").unwrap();
 
-        let radv_vrs = mktemp(xdg_runtime_dir.join("radv_vrs.XXXXXXXX"));
-        std::fs::write(PathBuf::from(&radv_vrs), b"1x1").unwrap();
+        let radv_force_vrs_config_filec = mktemp(xdg_runtime_dir.join("radv_vrs.XXXXXXXX"));
+        std::fs::write(PathBuf::from(&radv_force_vrs_config_filec), b"1x1").unwrap();
 
         let mut gamescope_cmd = String::new();
         let mut gamescope_args = vec![];
@@ -144,68 +127,54 @@ impl GamescopeExecveRunner {
                 };
 
                 gamescope_args.push(argument);
-                match &socket {
-                    Some(s) => {
-                        gamescope_args.push(String::from("-R"));
-                        gamescope_args.push(String::from(s.to_string_lossy().to_string().as_str()));
-                    }
-                    None => {}
-                }
-                match &stats {
-                    Some(stats) => {
-                        gamescope_args.push(String::from("-T"));
-                        gamescope_args.push(String::from(stats.as_str()));
-                    }
-                    None => {}
-                };
+                gamescope_args.push(String::from("-R"));
+                gamescope_args.push(String::from(
+                    socket.as_os_str().to_string_lossy().to_string().as_str(),
+                ));
+                gamescope_args.push(String::from("-T"));
+                gamescope_args.push(String::from(
+                    stats.as_os_str().to_string_lossy().to_string().as_str(),
+                ));
             } else {
                 gamescope_args.push(argument);
             }
         }
 
-        let shared_env = [
-            ("RADV_FORCE_VRS_CONFIG_FILE", radv_vrs.as_str()),
-            ("MANGOHUD_CONFIGFILE", mangohud_configfile.as_str()),
+        // These are copied from gamescope-session-plus
+        let shared_env = vec![
+            (
+                String::from("GAMESCOPE_STATS"),
+                String::from(stats.to_string_lossy()),
+            ),
+            (
+                String::from("RADV_FORCE_VRS_CONFIG_FILE"),
+                radv_force_vrs_config_filec,
+            ),
+            (String::from("MANGOHUD_CONFIGFILE"), mangohud_configfile),
             // Force Qt applications to run under xwayland
-            ("QT_QPA_PLATFORM", "xcb"),
+            (String::from("QT_QPA_PLATFORM"), String::from("xcb")),
             // Expose vram info from radv
-            ("WINEDLLOVERRIDES", "dxgi=n"),
-            ("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS", "0"),
+            (String::from("WINEDLLOVERRIDES"), String::from("dxgi=n")),
+            (
+                String::from("SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS"),
+                String::from("0"),
+            ),
             // Temporary crutch until dummy plane interactions / etc are figured out
             //(String::from("GAMESCOPE_DISABLE_ASYNC_FLIPS"), String::from("1")),
         ];
 
-        // These are copied from gamescope-session-plus
-        let mut environment = shared_env
-            .iter()
-            .map(|(a, b)| (String::from(*a), String::from(*b)))
-            .collect::<Vec<_>>();
-
-        match &stats {
-            Some(stats) => {
-                environment.push((String::from("GAMESCOPE_STATS"), stats.clone()));
-            }
-            None => {}
-        };
-
-        for (key, val) in env.iter() {
-            environment.push((val.clone(), key.clone()));
-        }
-
         Self {
             gamescope_cmd,
             gamescope_args,
-            environment,
+            shared_env,
             socket,
+            stats,
         }
     }
 
-    fn start_mangoapp<T>(&self, socket: T) -> Result<(), Box<dyn std::error::Error>>
-    where
-        T: AsRef<std::path::Path>,
-    {
+    fn start_mangoapp(&self) -> Result<(), Box<dyn std::error::Error>> {
         // gamescope won't start unless we read data from the socket:
-        let file = std::fs::File::open(&socket).unwrap();
+        let file = std::fs::File::open(&self.socket).unwrap();
         let mut reader = BufReader::new(file);
 
         let mut response = String::new();
@@ -230,8 +199,14 @@ impl GamescopeExecveRunner {
         };
 
         let mut cmd = Command::new("mangoapp");
-        cmd.env_clear();
-        cmd.envs(self.environment.clone());
+        for (key, val) in std::env::vars() {
+            cmd.env(key, val);
+        }
+
+        for (key, val) in self.shared_env.iter() {
+            cmd.env(key, val);
+        }
+
         cmd.env("DISPLAY", response_x_display);
         cmd.env("GAMESCOPE_WAYLAND_DISPLAY", response_wl_display);
 
@@ -243,10 +218,35 @@ impl GamescopeExecveRunner {
     }
 
     fn start_gamescope(&self) -> Result<(), Box<dyn std::error::Error>> {
+/*
+        let gamescope_prog = CString::new(self.gamescope_cmd.as_str()).unwrap();
+        let gamescope_argv_data = self
+            .gamescope_args
+            .iter()
+            .map(|argv| CString::new(argv.as_str()).unwrap())
+            .collect::<Vec<_>>();
+        let gamescope_envp_data: Vec<CString> = std::env::vars()
+            .map(|(key, value)| CString::new(format!("{key}={value}").as_str()).unwrap())
+            .chain(
+                self.shared_env
+                    .iter()
+                    .map(|(key, val)| CString::new(format!("{key}={val}").as_str()).unwrap()),
+            )
+            .collect::<Vec<_>>();
+
+        execve_wrapper(&gamescope_prog, &gamescope_argv_data, &gamescope_envp_data)
+*/
+
         let mut cmd = Command::new(self.gamescope_cmd.as_str());
         cmd.args(self.gamescope_args.iter());
-        cmd.env_clear();
-        cmd.envs(self.environment.clone());
+        
+        for (key, val) in std::env::vars() {
+            cmd.env(key, val);
+        }
+
+        for (key, val) in self.shared_env.iter() {
+            cmd.env(key, val);
+        }
 
         let mut child = cmd.spawn()?;
 
@@ -258,20 +258,22 @@ impl GamescopeExecveRunner {
 
 impl Runner for GamescopeExecveRunner {
     fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let mangoapp_handle = match &self.socket {
-            Some(s) => {
-                let a = self.clone();
-                let s = s.clone();
-                spawn(move || a.start_mangoapp(s).unwrap())
-            }
-            None => spawn(move || {}),
-        };
+        let mut mangoapp_cmd = Command::new("mangoapp");
+        for (key, val) in self.shared_env.iter() {
+            mangoapp_cmd.env(key, val);
+        }
 
+        let a = self.clone();
+        let mangoapp = spawn(move || {
+            a.start_mangoapp().unwrap()
+        });
         let b = self.clone();
-        let gamescope_handle = spawn(move || b.start_gamescope().unwrap());
+        let gamescope = spawn(move || {
+            b.start_gamescope().unwrap()
+        });
 
-        mangoapp_handle.join().unwrap();
-        gamescope_handle.join().unwrap();
+        mangoapp.join().unwrap();
+        gamescope.join().unwrap();
 
         Ok(())
     }
