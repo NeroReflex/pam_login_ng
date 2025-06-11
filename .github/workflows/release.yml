@@ -162,7 +162,7 @@ jobs:
 
   make-release:
     runs-on: ubuntu-latest
-    needs: [prepare, sources-package, bookworm_build, archlinux_build]
+    needs: [prepare, sources_collect, bookworm_build, archlinux_build]
     steps:
       - name: Download debian bookworm artifacts
         uses: actions/download-artifact@v4
