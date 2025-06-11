@@ -24,6 +24,68 @@ jobs:
     - name: Build
       run: cargo build --verbose
 
+  archlinux_build:
+    runs-on: ubuntu-latest
+    container: 
+      image: archlinux:latest
+      volumes:
+        - /usr:/usr-host
+        - /opt:/opt-host
+      options: --privileged
+    steps:
+    - name: Maximize build space
+      run: |
+        df -h
+        rm -rf /usr-host/share/dotnet
+        rm -rf /usr-host/share/swift
+        rm -rf /usr-host/share/java
+        rm -rf /usr-host/local/lib/android
+        rm -rf /opt-host/ghc
+        rm -rf /opt-host/hostedtoolcache
+        rm -rf /opt-host/az
+        df -h
+    - uses: actions/checkout@v4
+    - name: Update system
+      run: |
+        pacman -Syu --noconfirm
+    - name: Install Basic Software
+      run: pacman -S sudo curl
+    - name: Install Build Dependencies
+      run: pacman -S base-devel
+    - name: Install clang-sys Dependencies
+      run: pacman -S clang llvm lld
+    - name: Install Rust toolchain
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y
+    - name: Install rust compiler
+      run: |
+        . $HOME/.cargo/env
+        export PATH="$HOME/.cargo/bin:$PATH"
+        rustup target add x86_64-unknown-linux-musl
+        rustup default x86_64-unknown-linux-musl
+    - name: Compile software
+      run: |
+        . $HOME/.cargo/env
+        export PATH="$HOME/.cargo/bin:$PATH"
+        make all
+    - name: Create package
+      run: |
+        . $HOME/.cargo/env
+        export PATH="$HOME/.cargo/bin:$PATH"
+        mkdir rootfs
+        make PREFIX=rootfs install
+        tar -cjf login_ng.tar.bz2 -C rootfs .
+    - name: Move debs
+      run: |
+        for file in *.tar.bz2; do mv "$file" "${file%.tar.bz2}.tar.bz2"; done
+    - name: Upload package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: archlinux-package
+        path: |
+          *.tar.bz2
+        if-no-files-found: error
+
   bookworm_build:
     runs-on: ubuntu-latest
     container: 
@@ -80,13 +142,17 @@ jobs:
 
   make-release:
     runs-on: ubuntu-latest
-    
-    needs: [prepare, bookworm_build]
+    needs: [prepare, bookworm_build, archlinux_build]
     steps:
       - name: Download debian bookworm artifacts
         uses: actions/download-artifact@v4
         with:
           name: bookworm-package
+          path: ${{ env.PKGDEST }}
+      - name: Download archlinux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: archlinux-package
           path: ${{ env.PKGDEST }}
       - name: Set env
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
@@ -99,4 +165,4 @@ jobs:
           prerelease: true
           fail_on_unmatched_files: true
           files: |
-            *.deb
+            *.deb *.tar.bz2
