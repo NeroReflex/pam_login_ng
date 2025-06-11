@@ -63,7 +63,7 @@ jobs:
       run: |
         mkdir prefix
         make PREFIX=prefix install
-        tar -cjf login_ng.tar.bz2 -C prefix
+        cd prefix && tar -cjf ../login_ng.tar.bz2 . && cd ..
     - name: Move build artifact
       run: |
         for file in *.tar.bz2; do mv "$file" "${file%.tar.bz2}.tar.bz2"; done

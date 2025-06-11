@@ -15,7 +15,7 @@ install: build
 	install -D -m 755 rootfs/usr/share/wayland-sessions/game-mode.desktop $(PREFIX)/usr/share/wayland-sessions/game-mode.desktop
 	install -D -m 755 rootfs/usr/share/applications/org.sessionexec.session-return.desktop $(PREFIX)/usr/share/applications/org.sessionexec.session-return.desktop
 	rm -f $(PREFIX)/usr/share/wayland-sessions/default.desktop
-	ln -s /usr/share/wayland-sessions/game-mode.desktop $(PREFIX)/usr/share/wayland-sessions/default.desktop
+	ln -s game-mode.desktop $(PREFIX)/usr/share/wayland-sessions/default.desktop
 	install -D -m 755 rootfs/usr/bin/start-login_ng-session $(PREFIX)/usr/bin/start-login_ng-session
 	install -D -m 644 rootfs/usr/lib/systemd/system/pam_login_ng.service $(PREFIX)/usr/lib/systemd/system/pam_login_ng.service
 	install -D -m 644 rootfs/usr/lib/systemd/system/login_ng@.service $(PREFIX)/usr/lib/systemd/system/login_ng@.service
