@@ -155,7 +155,9 @@ jobs:
     - name: Install Basic Software
       run: pacman -S --noconfirm tar bzip2
     - name: Collect sources
-      run: tar -cjf login_ng.src.tar.bz2 .
+      run: |
+        tar -cjf ../login_ng.src.tar.bz2 .
+        mv ../login_ng.src.tar.bz2 .
     - name: Upload package artifact
       uses: actions/upload-artifact@v4
       with:
