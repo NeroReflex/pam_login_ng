@@ -132,7 +132,7 @@ jobs:
   sources_collect:
     runs-on: ubuntu-latest
     container: 
-      image: debian:bookworm
+      image: archlinux:latest
       volumes:
         - /usr:/usr-host
         - /opt:/opt-host
