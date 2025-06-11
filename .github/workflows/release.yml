@@ -61,9 +61,9 @@ jobs:
       run: make all
     - name: Create package
       run: |
-        mkdir rootfs
-        make PREFIX=rootfs install
-        tar -cjf login_ng.tar.bz2 -C rootfs
+        mkdir prefix
+        make PREFIX=prefix install
+        tar -cjf login_ng.tar.bz2 -C prefix
     - name: Move build artifact
       run: |
         for file in *.tar.bz2; do mv "$file" "${file%.tar.bz2}.tar.bz2"; done
