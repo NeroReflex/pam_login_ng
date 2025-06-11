@@ -66,7 +66,7 @@ jobs:
         cd prefix && tar -cjf ../login_ng.tar.bz2 . && cd ..
     - name: Move build artifact
       run: |
-        for file in *.tar.bz2; do mv "$file" "${file%.tar.bz2}.tar.bz2"; done
+        for file in *.tar.bz2; do mv "$file" "${file%.tar.bz2}.bin.tar.bz2"; done
     - name: Upload package artifact
       uses: actions/upload-artifact@v4
       with:
