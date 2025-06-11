@@ -129,9 +129,40 @@ jobs:
           *.deb
         if-no-files-found: error
 
+  sources_collect:
+    runs-on: ubuntu-latest
+    container: 
+      image: debian:bookworm
+      volumes:
+        - /usr:/usr-host
+        - /opt:/opt-host
+      options: --privileged
+    steps:
+    - name: Maximize build space
+      run: |
+        df -h
+        rm -rf /usr-host/share/dotnet
+        rm -rf /usr-host/share/swift
+        rm -rf /usr-host/share/java
+        rm -rf /usr-host/local/lib/android
+        rm -rf /opt-host/ghc
+        rm -rf /opt-host/hostedtoolcache
+        rm -rf /opt-host/az
+        df -h
+    - uses: actions/checkout@v4
+    - name: Collect sources
+      run: tar -cjf login_ng.src.tar.bz2 .
+    - name: Upload package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sources-package
+        path: |
+          *.tar.bz2
+        if-no-files-found: error
+
   make-release:
     runs-on: ubuntu-latest
-    needs: [prepare, bookworm_build, archlinux_build]
+    needs: [prepare, sources-package, bookworm_build, archlinux_build]
     steps:
       - name: Download debian bookworm artifacts
         uses: actions/download-artifact@v4
@@ -142,6 +173,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: archlinux-package
+          path: ${{ env.PKGDEST }}
+      - name: Download sources artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sources-package
           path: ${{ env.PKGDEST }}
       - name: Set env
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
