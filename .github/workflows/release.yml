@@ -150,6 +150,10 @@ jobs:
         rm -rf /opt-host/az
         df -h
     - uses: actions/checkout@v4
+    - name: Update system
+      run: pacman -Syu --noconfirm
+    - name: Install Basic Software
+      run: pacman -S --noconfirm tar bzip2
     - name: Collect sources
       run: tar -cjf login_ng.src.tar.bz2 .
     - name: Upload package artifact
