@@ -46,32 +46,23 @@ jobs:
         df -h
     - uses: actions/checkout@v4
     - name: Update system
-      run: |
-        pacman -Syu --noconfirm
+      run: pacman -Syu --noconfirm
     - name: Install Basic Software
-      run: pacman -S sudo curl
+      run: pacman -S --noconfirm sudo curl
     - name: Install Build Dependencies
-      run: pacman -S base-devel
+      run: pacman -S --noconfirm base-devel
     - name: Install clang-sys Dependencies
-      run: pacman -S clang llvm lld
+      run: pacman -S --noconfirm clang llvm lld
     - name: Install Rust toolchain
-      run: |
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y
+      run: pacman -S --noconfirm rustup
     - name: Install rust compiler
       run: |
-        . $HOME/.cargo/env
-        export PATH="$HOME/.cargo/bin:$PATH"
         rustup target add x86_64-unknown-linux-musl
         rustup default x86_64-unknown-linux-musl
     - name: Compile software
-      run: |
-        . $HOME/.cargo/env
-        export PATH="$HOME/.cargo/bin:$PATH"
-        make all
+      run: make all
     - name: Create package
       run: |
-        . $HOME/.cargo/env
-        export PATH="$HOME/.cargo/bin:$PATH"
         mkdir rootfs
         make PREFIX=rootfs install
         tar -cjf login_ng.tar.bz2 -C rootfs .
