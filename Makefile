@@ -1,18 +1,20 @@
 # Build variables
 BUILD_TYPE ?= release
+TARGET ?= $(shell rustc -vV | grep "host" | sed 's/host: //')
 
 .PHONY: install
 install: build
-	install -D -m 755 sessionexec/target/$(BUILD_TYPE)/sessionexec $(PREFIX)/usr/bin/sessionexec
-	install -D -m 755 login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl $(PREFIX)/usr/bin/login_ng-ctl
-	install -D -m 755 login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli $(PREFIX)/usr/bin/login_ng-cli
-	install -D -m 755 login_ng-session/target/$(BUILD_TYPE)/login_ng-session $(PREFIX)/usr/bin/login_ng-session
-	install -D -m 755 login_ng-session/target/$(BUILD_TYPE)/login_ng-sessionctl $(PREFIX)/usr/bin/login_ng-sessionctl
-	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service $(PREFIX)/usr/bin/pam_login_ng-service
-	install -D -m 755 pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so $(PREFIX)/usr/lib/security/pam_login_ng.so
+	install -D -m 755 sessionexec/target/$(TARGET)/$(BUILD_TYPE)/sessionexec $(PREFIX)/usr/bin/sessionexec
+	install -D -m 755 login_ng-ctl/target/$(TARGET)/$(BUILD_TYPE)/login_ng-ctl $(PREFIX)/usr/bin/login_ng-ctl
+	install -D -m 755 login_ng-cli/target/$(TARGET)/$(BUILD_TYPE)/login_ng-cli $(PREFIX)/usr/bin/login_ng-cli
+	install -D -m 755 login_ng-session/target/$(TARGET)/$(BUILD_TYPE)/login_ng-session $(PREFIX)/usr/bin/login_ng-session
+	install -D -m 755 login_ng-session/target/$(TARGET)/$(BUILD_TYPE)/login_ng-sessionctl $(PREFIX)/usr/bin/login_ng-sessionctl
+	install -D -m 755 pam_login_ng/target/$(TARGET)/$(BUILD_TYPE)/pam_login_ng-service $(PREFIX)/usr/bin/pam_login_ng-service
+	install -D -m 755 pam_login_ng/target/$(TARGET)/$(BUILD_TYPE)/libpam_login_ng.so $(PREFIX)/usr/lib/security/pam_login_ng.so
 	install -D -m 755 rootfs/usr/share/wayland-sessions/login_ng-session.desktop $(PREFIX)/usr/share/wayland-sessions/login_ng-session.desktop
 	install -D -m 755 rootfs/usr/share/wayland-sessions/game-mode.desktop $(PREFIX)/usr/share/wayland-sessions/game-mode.desktop
 	install -D -m 755 rootfs/usr/share/applications/org.sessionexec.session-return.desktop $(PREFIX)/usr/share/applications/org.sessionexec.session-return.desktop
+	rm -f $(PREFIX)/usr/share/wayland-sessions/default.desktop
 	ln -s /usr/share/wayland-sessions/game-mode.desktop $(PREFIX)/usr/share/wayland-sessions/default.desktop
 	install -D -m 755 rootfs/usr/bin/start-login_ng-session $(PREFIX)/usr/bin/start-login_ng-session
 	install -D -m 644 rootfs/usr/lib/systemd/system/pam_login_ng.service $(PREFIX)/usr/lib/systemd/system/pam_login_ng.service
@@ -27,35 +29,35 @@ install: build
 	install -D -m 644 rootfs/etc/login_ng-session/default.service $(PREFIX)/etc/login_ng-session/default.service
 
 .PHONY: build
-build: fetch login_ng-cli/target/$(BUILD_TYPE)/sessionexec login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl login_ng-gui/target/$(BUILD_TYPE)/login_ng-gui login_ng-session/target/$(BUILD_TYPE)/login_ng-session login_ng-session/target/$(BUILD_TYPE)/login_ng-sessionctl pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so
+build: fetch login_ng-cli/target/$(TARGET)/$(BUILD_TYPE)/sessionexec login_ng-cli/target/$(TARGET)/$(BUILD_TYPE)/login_ng-cli login_ng-ctl/target/$(TARGET)/$(BUILD_TYPE)/login_ng-ctl login_ng-gui/target/$(TARGET)/$(BUILD_TYPE)/login_ng-gui login_ng-session/target/$(TARGET)/$(BUILD_TYPE)/login_ng-session login_ng-session/target/$(TARGET)/$(BUILD_TYPE)/login_ng-sessionctl pam_login_ng/target/$(TARGET)/$(BUILD_TYPE)/pam_login_ng-service pam_login_ng/target/$(TARGET)/$(BUILD_TYPE)/libpam_login_ng.so
 
 .PHONY: fetch
 fetch: Cargo.lock
 	cargo fetch --locked
 
-login_ng-cli/target/$(BUILD_TYPE)/sessionexec:
-	cd sessionexec && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target
+login_ng-cli/target/$(TARGET)/$(BUILD_TYPE)/sessionexec:
+	cd sessionexec && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target=$(TARGET) --target-dir target
 
-login_ng-cli/target/$(BUILD_TYPE)/login_ng-cli:
-	cd login_ng-cli && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target
+login_ng-cli/target/$(TARGET)/$(BUILD_TYPE)/login_ng-cli:
+	cd login_ng-cli && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target=$(TARGET) --target-dir target
 
-login_ng-ctl/target/$(BUILD_TYPE)/login_ng-ctl:
-	cd login_ng-ctl && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target
+login_ng-ctl/target/$(TARGET)/$(BUILD_TYPE)/login_ng-ctl:
+	cd login_ng-ctl && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target=$(TARGET) --target-dir target
 
-login_ng-gui/target/$(BUILD_TYPE)/login_ng-gui:
-	cd login_ng-gui && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target
+login_ng-gui/target/$(TARGET)/$(BUILD_TYPE)/login_ng-gui:
+	cd login_ng-gui && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target=$(TARGET) --target-dir target
 
-login_ng-session/target/$(BUILD_TYPE)/login_ng-session:
-	cd login_ng-session && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target
+login_ng-session/target/$(TARGET)/$(BUILD_TYPE)/login_ng-session:
+	cd login_ng-session && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target=$(TARGET) --target-dir target
 
-login_ng-session/target/$(BUILD_TYPE)/login_ng-sessionctl:
-	cd login_ng-session && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target-dir target --bin login_ng-sessionctl
+login_ng-session/target/$(TARGET)/$(BUILD_TYPE)/login_ng-sessionctl:
+	cd login_ng-session && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --target=$(TARGET) --target-dir target --bin login_ng-sessionctl
 
-pam_login_ng/target/$(BUILD_TYPE)/pam_login_ng-service: pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so
-	cd pam_login_ng && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --bin pam_login_ng-service --target-dir target
+pam_login_ng/target/$(TARGET)/$(BUILD_TYPE)/pam_login_ng-service: pam_login_ng/target/$(TARGET)/$(BUILD_TYPE)/libpam_login_ng.so
+	cd pam_login_ng && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --bin pam_login_ng-service --target=$(TARGET) --target-dir target
 
-pam_login_ng/target/$(BUILD_TYPE)/libpam_login_ng.so:
-	cd pam_login_ng && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --lib --target-dir target
+pam_login_ng/target/$(TARGET)/$(BUILD_TYPE)/libpam_login_ng.so:
+	cd pam_login_ng && cargo build --frozen --offline --all-features --$(BUILD_TYPE) --lib --target=$(TARGET) --target-dir target
 
 .PHONY: clean
 clean:
