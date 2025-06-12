@@ -43,7 +43,10 @@ async fn main() -> Result<(), ServiceError> {
 
     let private_key_file_name_str = "private_key_pkcs1.pem";
     let authorization_file_name_str = "authorized_mounts.json";
-    let dir_path_str = "/etc/login_ng/";
+    let dir_path_str = match std::fs::exists("/usr/lib/login_ng/").unwrap_or(false) {
+        true => "/usr/lib/login_ng/",
+        false => "/etc/login_ng/",
+    };
 
     create_directory(PathBuf::from(dir_path_str)).await?;
 

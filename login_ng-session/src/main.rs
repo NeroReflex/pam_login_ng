@@ -35,12 +35,13 @@ async fn main() -> Result<(), SessionManagerError> {
     let username = login_ng::users::get_current_username().unwrap();
 
     let user = get_user_by_name(username.as_os_str()).expect("Failed to get user information");
-    let load_directoried = vec![
+    let load_directories = vec![
         user.clone()
             .home_dir()
             .join(".config")
             .join("login_ng-session"),
         PathBuf::from("/etc/login_ng-session/"),
+        PathBuf::from("/usr/lib/login_ng-session/"),
     ];
 
     let default_service_name = String::from("default.service");
@@ -49,7 +50,7 @@ async fn main() -> Result<(), SessionManagerError> {
     match NodeServiceDescriptor::load_tree(
         &mut nodes,
         &default_service_name,
-        load_directoried.as_slice(),
+        load_directories.as_slice(),
     )
     .await
     {

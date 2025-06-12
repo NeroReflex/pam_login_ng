@@ -1,6 +1,7 @@
 # Build variables
 BUILD_TYPE ?= release
 TARGET ?= $(shell rustc -vV | grep "host" | sed 's/host: //')
+ETC_DIR ?= etc
 
 .PHONY: install
 install: build
@@ -22,11 +23,12 @@ install: build
 	install -D -m 644 rootfs/usr/lib/sysusers.d/login_ng.conf $(PREFIX)/usr/lib/sysusers.d/login_ng.conf
 	install -D -m 755 rootfs/usr/lib/sessionexec/session-return.sh $(PREFIX)/usr/lib/sessionexec/session-return.sh
 	install -D -m 755 rootfs/usr/lib/os-session-select $(PREFIX)/usr/lib/os-session-select
-	install -D -m 644 rootfs/etc/pam.d/login_ng $(PREFIX)/etc/pam.d/login_ng
-	install -D -m 644 rootfs/etc/pam.d/login_ng-autologin $(PREFIX)/etc/pam.d/login_ng-autologin
-	install -D -m 644 rootfs/etc/pam.d/login_ng-ctl $(PREFIX)/etc/pam.d/login_ng-ctl
-	install -D -m 644 rootfs/etc/login_ng-session/steamdeck.service $(PREFIX)/etc/login_ng-session/steamdeck.service
-	install -D -m 644 rootfs/etc/login_ng-session/default.service $(PREFIX)/etc/login_ng-session/default.service
+	install -D -m 644 rootfs/etc/pam.d/login_ng $(PREFIX)/$(ETC_DIR)/pam.d/login_ng
+	install -D -m 644 rootfs/etc/pam.d/login_ng-autologin $(PREFIX)/$(ETC_DIR)/pam.d/login_ng-autologin
+	install -D -m 644 rootfs/etc/pam.d/login_ng-ctl $(PREFIX)/$(ETC_DIR)/pam.d/login_ng-ctl
+	install -D -m 644 rootfs/usr/lib/login_ng-session/steamdeck.service $(PREFIX)/usr/lib/login_ng-session/steamdeck.service
+	install -D -m 644 rootfs/usr/lib/login_ng-session/default.service $(PREFIX)/usr/lib/login_ng-session/default.service
+	mkdir -p  $(PREFIX)/usr/lib/login_ng
 
 .PHONY: build
 build: fetch login_ng-cli/target/$(TARGET)/$(BUILD_TYPE)/sessionexec login_ng-cli/target/$(TARGET)/$(BUILD_TYPE)/login_ng-cli login_ng-ctl/target/$(TARGET)/$(BUILD_TYPE)/login_ng-ctl login_ng-gui/target/$(TARGET)/$(BUILD_TYPE)/login_ng-gui login_ng-session/target/$(TARGET)/$(BUILD_TYPE)/login_ng-session login_ng-session/target/$(TARGET)/$(BUILD_TYPE)/login_ng-sessionctl pam_login_ng/target/$(TARGET)/$(BUILD_TYPE)/pam_login_ng-service pam_login_ng/target/$(TARGET)/$(BUILD_TYPE)/libpam_login_ng.so

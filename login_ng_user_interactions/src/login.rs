@@ -93,19 +93,29 @@ pub(crate) fn load_session_from_conf(content: String) -> SessionCommand {
 }
 
 pub(crate) fn system_defined_with_crate_fallback() -> SessionCommand {
-    match std::fs::read_to_string(Path::new("/etc/login_ng/default_session.conf")) {
+    let dir_path_str = match std::fs::exists("/usr/lib/login_ng/").unwrap_or(false) {
+        true => "/usr/lib/login_ng/",
+        false => "/etc/login_ng/",
+    };
+
+    match std::fs::read_to_string(Path::new(dir_path_str).join("default_session.conf")) {
         Ok(content) => load_session_from_conf(content),
         Err(_) => SessionCommand::new(String::from(crate::DEFAULT_CMD)),
     }
 }
 
 pub(crate) fn user_default_command_with_system_fallback(username: &String) -> SessionCommand {
+    let dir_path_str = match std::fs::exists("/usr/lib/login_ng/").unwrap_or(false) {
+        true => "/usr/lib/login_ng/",
+        false => "/etc/login_ng/",
+    };
+
     match login_ng::users::get_user_by_name(username) {
         Some(logged_user) => match logged_user.shell().to_str() {
             Some(path_str) => SessionCommand::new(String::from(path_str)),
             None => match logged_user.name().to_str() {
                 Some(username_str) => match std::fs::read_to_string(Path::new(
-                    format!("/etc/login_ng/{}.conf", username_str).as_str(),
+                    format!("{dir_path_str}/{username_str}.conf").as_str(),
                 )) {
                     Ok(content) => load_session_from_conf(content),
                     Err(_) => system_defined_with_crate_fallback(),
