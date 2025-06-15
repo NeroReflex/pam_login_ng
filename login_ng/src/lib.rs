@@ -36,8 +36,11 @@ extern crate bytevec2;
 
 pub const DEFAULT_XATTR_NAME: &str = "user.login-ng";
 
+use std::ffi::OsString;
+
 use hkdf::*;
 use sha2::Sha256;
+use users::{os::unix::UserExt, User};
 
 pub const LIBRARY_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -65,4 +68,26 @@ pub(crate) fn vec_to_password(vec: &Vec<u8>) -> String {
 // this MUST be implemented and used because entering invalid strings can be a security hole (see lossy_utf8)
 pub(crate) fn is_valid_password(password: &String) -> bool {
     vec_to_password(password_to_vec(password).as_ref()) == password.clone()
+}
+
+pub fn valid_users() -> Vec<User> {
+    unsafe { crate::users::all_users() }
+        .into_iter()
+        .filter_map(|user| {
+            if user.name() == "nobody" {
+                return None;
+            }
+
+            if user.shell() == OsString::from("/bin/false") {
+                return None;
+            }
+
+            let uid = user.uid();
+            if uid == 0 || uid < 1000 || uid == crate::users::uid_t::MAX {
+                return None;
+            }
+
+            Some(user)
+        })
+        .collect()
 }

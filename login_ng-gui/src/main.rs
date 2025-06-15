@@ -4,14 +4,13 @@
 use std::{
     env,
     error::Error,
-    ffi::OsString,
     sync::{Arc, Mutex},
 };
 
 use login_ng::{
+    valid_users,
     storage::{load_user_auth_data, StorageSource},
     user::UserAuthData,
-    users::os::unix::UserExt,
 };
 use login_ng_user_interactions::login::{
     LoginExecutor, LoginUserInteractionHandler, SessionCommandRetrival,
@@ -86,20 +85,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Fetch the list of users (this is just a placeholder; replace with your actual user fetching logic)
     let users = slint::VecModel::<slint::SharedString>::default();
 
-    for user in unsafe { login_ng::users::all_users() } {
-        if user.name() == "nobody" {
-            continue;
-        }
-
-        if user.shell() == OsString::from("/bin/false") {
-            continue;
-        }
-
-        let uid = user.uid();
-        if uid == 0 || uid < 1000 || uid == login_ng::users::uid_t::MAX {
-            continue;
-        }
-
+    for user in valid_users() {
         users.push(slint::SharedString::from(
             user.name().to_string_lossy().to_string(),
         ));

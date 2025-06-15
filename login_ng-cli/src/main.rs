@@ -107,9 +107,23 @@ fn main() {
 
     let max_failures = args.failures.unwrap_or(5);
 
+    let autoselect_user = match &allow_autologin {
+        true => match &args.user {
+            Some(_) => args.user.clone(),
+            None => {
+                let valid_users = login_ng::valid_users();
+                match valid_users.len() {
+                    1 => Some(valid_users[0].name().to_string_lossy().to_string()),
+                    _ => None,
+                }
+            }
+        },
+        false => args.user.clone(),
+    };
+
     let prompter = Arc::new(Mutex::new(CommandLineLoginUserInteractionHandler::new(
         allow_autologin,
-        args.user.clone(),
+        autoselect_user,
         args.password.clone(),
     )));
 
