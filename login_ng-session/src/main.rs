@@ -79,7 +79,8 @@ async fn main() -> Result<(), SessionManagerError> {
                             vec![],
                             nix::sys::signal::Signal::SIGTERM,
                             SessionNodeRestart::no_restart(),
-                            vec![],
+                            Vec::new(),
+                            HashMap::new(),
                         )),
                     )])
                 } else {

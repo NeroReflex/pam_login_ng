@@ -8,9 +8,9 @@ use std::{
 };
 
 use login_ng::{
-    valid_users,
     storage::{load_user_auth_data, StorageSource},
     user::UserAuthData,
+    valid_users,
 };
 use login_ng_user_interactions::login::{
     LoginExecutor, LoginUserInteractionHandler, SessionCommandRetrival,

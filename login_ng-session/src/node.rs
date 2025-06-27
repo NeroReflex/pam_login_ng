@@ -17,7 +17,10 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{ops::Deref, path::PathBuf, process::ExitStatus, sync::Arc, time::Duration, u64};
+use std::{
+    collections::HashMap, ops::Deref, path::PathBuf, process::ExitStatus, sync::Arc,
+    time::Duration, u64,
+};
 
 use nix::{
     errno::Errno,
@@ -142,6 +145,7 @@ pub struct SessionNode {
     dependencies: Vec<Arc<SessionNode>>,
     status: Arc<RwLock<SessionNodeStatus>>,
     status_notify: Arc<Notify>,
+    environment: HashMap<String, String>,
 }
 
 fn assert_send_sync<T: Send + Sync>() {}
@@ -156,6 +160,7 @@ impl SessionNode {
         stop_signal: Signal,
         restart: SessionNodeRestart,
         dependencies: Vec<Arc<SessionNode>>,
+        environment: HashMap<String, String>,
     ) -> Self {
         let status = Arc::new(RwLock::new(SessionNodeStatus::Ready));
         let status_notify = Arc::new(Notify::new());
@@ -171,6 +176,7 @@ impl SessionNode {
             dependencies,
             status,
             status_notify,
+            environment,
         }
     }
 
@@ -210,6 +216,10 @@ impl SessionNode {
             command.args(node.args.as_slice());
             command.env_clear();
             for (key, val) in environment.iter() {
+                command.env(key, val);
+            }
+
+            for (key, val) in node.environment.iter() {
                 command.env(key, val);
             }
 

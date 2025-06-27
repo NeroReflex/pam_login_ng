@@ -44,6 +44,7 @@ pub struct NodeServiceDescriptor {
     max_restarts: u64,
     restart_delay_secs: u64,
     dependencies: Vec<String>,
+    environment: Option<HashMap<String, String>>,
 }
 
 impl NodeServiceDescriptor {
@@ -197,6 +198,10 @@ impl NodeServiceDescriptor {
             stop_signal,
             SessionNodeRestart::new(main.max_restarts(), main.delay()),
             dependencies,
+            match main.environment {
+                Some(env) => env,
+                None => HashMap::new(),
+            },
         );
 
         hashmap.insert(filename.clone(), Arc::new(node));
