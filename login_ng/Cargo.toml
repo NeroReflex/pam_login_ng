@@ -1,6 +1,6 @@
 [package]
 name = "login_ng"
-version = "0.6.11"
+version = "0.6.12"
 edition = "2021"
 license-file = "../LICENSE.md"
 
