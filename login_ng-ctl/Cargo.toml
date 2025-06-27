@@ -2,7 +2,7 @@
 name = "login_ng-ctl"
 authors = ["Denis Benato <benato.denis96@gmail.com>"]
 edition = "2021"
-license = "GPL-2.0-or-later"
+license-file = "../LICENSE.md"
 
 [dependencies]
 argh = "^0"

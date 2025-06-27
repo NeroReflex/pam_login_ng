@@ -3,7 +3,7 @@ name = "login_ng-gui"
 authors = ["Denis Benato <benato.denis96@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
-license = "GPL-2.0-or-later"
+license-file = "../LICENSE.md"
 
 [dependencies]
 slint = { version = "^1.8", default-features = false, features = [

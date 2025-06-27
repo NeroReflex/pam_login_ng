@@ -2,7 +2,7 @@
 name = "login_ng_user_interactions"
 edition = "2021"
 authors = ["Denis Benato <benato.denis96@gmail.com>"]
-license = "GPL-2.0-or-later"
+license-file = "../LICENSE.md"
 
 [lib]
 name = "login_ng_user_interactions"
