@@ -9,7 +9,7 @@ name = "login_ng-sessionctl"
 path = "src/sessionctl/main.rs"
 
 [dependencies]
-argh = "^0.1"
+argh = "^0"
 login_ng = { path = "../login_ng" }
 tokio = { version = "^1", features = ["macros", "rt-multi-thread", "sync", "signal", "process", "time", "fs", "io-util"] }
 thiserror = "^2"

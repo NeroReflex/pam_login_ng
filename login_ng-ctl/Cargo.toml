@@ -5,8 +5,8 @@ edition = "2021"
 license = "GPL-2.0-or-later"
 
 [dependencies]
-argh = "0.1.12"
-chrono = "0.4.38"
+argh = "^0"
+chrono = "^0"
 login_ng = { path = "../login_ng"}
 login_ng_user_interactions = { path = "../login_ng_user_interactions", features = []}
 
