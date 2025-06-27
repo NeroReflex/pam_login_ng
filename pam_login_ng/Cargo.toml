@@ -1,6 +1,6 @@
 [package]
 name = "pam_login_ng"
-version = "0.6.12"
+version = "0.6.11"
 description = "Additional pam module and service to login the user."
 homepage = "https://github.com/NeroReflex/login_ng"
 edition = "2021"
