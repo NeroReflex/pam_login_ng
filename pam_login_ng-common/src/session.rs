@@ -128,7 +128,7 @@ impl Sessions {
     name = "org.neroreflex.login_ng_session1",
     proxy(
         default_service = "org.neroreflex.login_ng_session",
-        default_path = "/org/zbus/login_ng_session"
+        default_path = "/org/neroreflex/login_ng_session"
     )
 )]
 impl Sessions {

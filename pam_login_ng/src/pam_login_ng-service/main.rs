@@ -72,7 +72,7 @@ async fn main() -> Result<(), ServiceError> {
         .name("org.neroreflex.login_ng_mount")
         .map_err(ServiceError::ZbusError)?
         .serve_at(
-            "/org/zbus/login_ng_mount",
+            "/org/neroreflex/login_ng_mount",
             MountAuthDBus::new(mounts_auth.clone()),
         )
         .map_err(ServiceError::ZbusError)?
@@ -85,7 +85,7 @@ async fn main() -> Result<(), ServiceError> {
         .name("org.neroreflex.login_ng_session")
         .map_err(ServiceError::ZbusError)?
         .serve_at(
-            "/org/zbus/login_ng_session",
+            "/org/neroreflex/login_ng_session",
             Sessions::new(
                 Path::new(dir_path_str).join(private_key_file_name_str),
                 mounts_auth,

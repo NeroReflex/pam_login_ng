@@ -297,7 +297,7 @@ impl MountAuthDBus {
     name = "org.neroreflex.login_ng_mount1",
     proxy(
         default_service = "org.neroreflex.login_ng_mount",
-        default_path = "/org/zbus/login_ng_mount"
+        default_path = "/org/neroreflex/login_ng_mount"
     )
 )]
 impl MountAuthDBus {

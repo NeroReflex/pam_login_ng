@@ -44,7 +44,7 @@ pub struct TargetStatus {
     name = "org.neroreflex.login_ng_service1",
     proxy(
         default_service = "org.neroreflex.login_ng_service",
-        default_path = "/org/zbus/login_ng_service"
+        default_path = "/org/neroreflex/login_ng_service"
     )
 )]
 impl SessionManagerDBus {
