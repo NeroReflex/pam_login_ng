@@ -1,6 +1,6 @@
 [package]
 name = "login_ng-gui"
-version = "0.6.10"
+version = "0.6.11"
 description = "A graphical utility to login into a user accounts."
 homepage = "https://github.com/NeroReflex/login_ng"
 authors = ["Denis Benato <benato.denis96@gmail.com>"]
