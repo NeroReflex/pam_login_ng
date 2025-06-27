@@ -1,6 +1,6 @@
 [package]
 name = "login_ng-ctl"
-version = "0.6.12"
+version = "0.6.13"
 description = "A command-line utility to manage authentication data on user accounts."
 homepage = "https://github.com/NeroReflex/login_ng"
 authors = ["Denis Benato <benato.denis96@gmail.com>"]
