@@ -105,12 +105,14 @@ jobs:
     - name: Install Build Dependencies
       run: apt-get install -y build-essential devscripts debhelper pkg-config libpam0g-dev libssl-dev cargo zip
     - name: Install cargo-bitbake
-      run: cargo install cargo-bitbake --locked
+      run: |
+        cargo install cargo-bitbake --locked
+        find / -name "cargo-bitbake"
     - name: Build bitbake
       run: |
         mkdir bitbake
         cd login_ng-cli
-        PATH="~/.cargo/bin:/bin:$PATH" cargo-bitbake bitbake
+        /github/home/.cargo/bin/cargo-bitbake bitbake
         mv *.bb ../bitbake
         cd ..
     - name: Build bitbake
