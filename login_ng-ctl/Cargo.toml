@@ -1,5 +1,8 @@
 [package]
 name = "login_ng-ctl"
+version = "0.6.9"
+description = "A command-line utility to manage authentication data on user accounts."
+homepage = "https://github.com/NeroReflex/login_ng"
 authors = ["Denis Benato <benato.denis96@gmail.com>"]
 edition = "2021"
 license-file = "../LICENSE.md"

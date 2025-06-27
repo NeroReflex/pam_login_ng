@@ -1,5 +1,8 @@
 [package]
 name = "login_ng-session"
+version = "0.6.9"
+description = "A manager for user sessions."
+homepage = "https://github.com/NeroReflex/login_ng"
 authors = ["Denis Benato <benato.denis96@gmail.com>"]
 edition = "2021"
 license-file = "../LICENSE.md"

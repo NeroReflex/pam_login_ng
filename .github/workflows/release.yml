@@ -75,6 +75,54 @@ jobs:
           *.tar.bz2
         if-no-files-found: error
 
+  bitbake_build:
+    runs-on: ubuntu-latest
+    container: 
+      image: debian:bookworm
+      volumes:
+        - /usr:/usr-host
+        - /opt:/opt-host
+      options: --privileged
+    steps:
+    - name: Maximize build space
+      run: |
+        df -h
+        rm -rf /usr-host/share/dotnet
+        rm -rf /usr-host/share/swift
+        rm -rf /usr-host/share/java
+        rm -rf /usr-host/local/lib/android
+        rm -rf /opt-host/ghc
+        rm -rf /opt-host/hostedtoolcache
+        rm -rf /opt-host/az
+        df -h
+    - uses: actions/checkout@v4
+    - name: Update system
+      run: |
+        apt-get update -y
+        apt-get upgrade -y
+    - name: Install Basic Software
+      run: apt-get install -y sudo curl
+    - name: Install Build Dependencies
+      run: apt-get install -y build-essential devscripts debhelper pkg-config libpam0g-dev libssl-dev cargo zip
+    - name: Install cargo-bitbake
+      run: cargo install cargo-bitbake --locked
+    - name: Build bitbake
+      run: |
+        mkdir bitbake
+        cd login_ng-cli
+        cargo-bitbake bitbake
+        mv *.bb ../bitbake
+        cd ..
+    - name: Build bitbake
+      run: zip -r bitbake.zip bitbake
+    - name: Upload package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: bitbake-package
+        path: |
+          *.zip
+        if-no-files-found: error
+
   bookworm_build:
     runs-on: ubuntu-latest
     container: 
@@ -168,8 +216,13 @@ jobs:
 
   make-release:
     runs-on: ubuntu-latest
-    needs: [prepare, sources_collect, bookworm_build, archlinux_build]
+    needs: [prepare, sources_collect, bookworm_build, archlinux_build, bitbake_build]
     steps:
+      - name: Download bitbake artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bitbake-package
+          path: ${{ env.PKGDEST }}
       - name: Download debian bookworm artifacts
         uses: actions/download-artifact@v4
         with:
@@ -198,3 +251,4 @@ jobs:
           files: |
             *.deb
             *.tar.bz2
+            *.zip
