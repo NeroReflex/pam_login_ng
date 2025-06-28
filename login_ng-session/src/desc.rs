@@ -26,7 +26,7 @@ use std::{
     time::Duration,
 };
 
-use nix::sys::signal::Signal;
+use crate::signal::Signal;
 use serde::{Deserialize, Serialize};
 
 use crate::{

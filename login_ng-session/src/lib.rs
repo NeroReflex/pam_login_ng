@@ -22,6 +22,7 @@ pub mod desc;
 pub mod errors;
 pub mod manager;
 pub mod node;
+pub mod signal;
 
 #[cfg(test)]
 pub(crate) mod tests;

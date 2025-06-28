@@ -2678,8 +2678,8 @@ name = "login_ng-session"
 version = "0.6.16"
 dependencies = [
  "argh",
+ "libc",
  "login_ng",
- "nix",
  "serde",
  "serde_json",
  "thiserror 2.0.12",

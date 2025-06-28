@@ -17,7 +17,7 @@ login_ng = { path = "../login_ng" }
 tokio = { version = "^1", features = ["macros", "rt-multi-thread", "sync", "signal", "process", "time", "fs", "io-util"] }
 thiserror = "^2"
 zbus = "^5"
-nix = { version = "^0", features = [ "signal" ] }
+libc = { version = "*" }
 serde = { version = "^1", features = ["derive"] }
 serde_json = "^1"
 

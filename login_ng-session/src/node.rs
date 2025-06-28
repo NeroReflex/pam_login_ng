@@ -22,13 +22,6 @@ use std::{
     time::Duration, u64,
 };
 
-use nix::{
-    errno::Errno,
-    libc::pid_t,
-    sys::signal::{self, Signal},
-    unistd::Pid,
-};
-
 use thiserror::Error;
 use tokio::{
     fs::File,
@@ -39,7 +32,10 @@ use tokio::{
     time::{self, sleep, Instant},
 };
 
-use crate::errors::{NodeDependencyError, NodeDependencyResult};
+use crate::{
+    errors::{NodeDependencyError, NodeDependencyResult},
+    signal::Signal,
+};
 
 #[derive(Debug)]
 pub struct SessionNodeRestart {
@@ -89,7 +85,7 @@ pub enum SessionNodeStopReason {
 pub enum SessionNodeStatus {
     Ready,
     Running {
-        pid: pid_t,
+        pid: i32,
         pending: Option<ManualAction>,
     },
     Stopped {
@@ -130,7 +126,7 @@ pub enum ManualActionIssueError {
     AlreadyPendingAction,
 
     #[error("Error sending the termination signal: {0}")]
-    CannotSendSignal(Errno),
+    CannotSendSignal(i32),
 }
 
 #[derive(Debug)]
@@ -477,7 +473,7 @@ impl SessionNode {
                         pending: Some(action),
                     };
 
-                    match signal::kill(Pid::from_raw(pid.try_into().unwrap()), node.stop_signal) {
+                    match node.stop_signal.send_to(pid) {
                         Ok(_) => Ok(()),
                         Err(err) => Err(ManualActionIssueError::CannotSendSignal(err)),
                     }

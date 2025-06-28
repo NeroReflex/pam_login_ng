@@ -27,6 +27,7 @@ use login_ng_session::desc::NodeServiceDescriptor;
 use login_ng_session::errors::SessionManagerError;
 use login_ng_session::manager::SessionManager;
 use login_ng_session::node::{SessionNode, SessionNodeRestart, SessionNodeType};
+use login_ng_session::signal::Signal;
 use std::time::{SystemTime, UNIX_EPOCH};
 use zbus::connection;
 
@@ -77,7 +78,7 @@ async fn main() -> Result<(), SessionManagerError> {
                             None,
                             shell.clone(),
                             vec![],
-                            nix::sys::signal::Signal::SIGTERM,
+                            Signal::SIGTERM,
                             SessionNodeRestart::no_restart(),
                             Vec::new(),
                             HashMap::new(),
