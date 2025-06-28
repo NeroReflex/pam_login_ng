@@ -2630,7 +2630,7 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "login_ng"
-version = "0.6.14"
+version = "0.6.15"
 dependencies = [
  "aes-gcm",
  "bcrypt",
@@ -2645,7 +2645,7 @@ dependencies = [
 
 [[package]]
 name = "login_ng-cli"
-version = "0.6.14"
+version = "0.6.15"
 dependencies = [
  "argh",
  "login_ng",
@@ -2654,7 +2654,7 @@ dependencies = [
 
 [[package]]
 name = "login_ng-ctl"
-version = "0.6.14"
+version = "0.6.15"
 dependencies = [
  "argh",
  "chrono",
@@ -2664,7 +2664,7 @@ dependencies = [
 
 [[package]]
 name = "login_ng-gui"
-version = "0.6.14"
+version = "0.6.15"
 dependencies = [
  "argh",
  "login_ng",
@@ -2675,7 +2675,7 @@ dependencies = [
 
 [[package]]
 name = "login_ng-session"
-version = "0.6.14"
+version = "0.6.15"
 dependencies = [
  "argh",
  "login_ng",
@@ -2689,7 +2689,7 @@ dependencies = [
 
 [[package]]
 name = "login_ng_user_interactions"
-version = "0.6.14"
+version = "0.6.15"
 dependencies = [
  "configparser",
  "greetd_ipc",
@@ -3481,7 +3481,7 @@ dependencies = [
 
 [[package]]
 name = "pam_login_ng"
-version = "0.6.14"
+version = "0.6.15"
 dependencies = [
  "argh",
  "pam",
@@ -4274,7 +4274,7 @@ dependencies = [
 
 [[package]]
 name = "sessionexec"
-version = "0.6.14"
+version = "0.6.15"
 dependencies = [
  "libc",
  "rust-ini",
