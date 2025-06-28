@@ -111,14 +111,13 @@ jobs:
     - name: Build bitbake
       run: |
         mkdir bitbake
-        cd login_ng-cli
         rm Cargo.lock
+        cd login_ng-cli
         cargo build
         /github/home/.cargo/bin/cargo-bitbake bitbake
         mv *.bb ../bitbake
         cd ..
         cd login_ng-ctl
-        rm Cargo.lock
         cargo build
         /github/home/.cargo/bin/cargo-bitbake bitbake
         mv *.bb ../bitbake
