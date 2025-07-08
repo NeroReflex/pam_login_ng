@@ -110,18 +110,11 @@ jobs:
         find / -name "cargo-bitbake"
     - name: Build bitbake
       run: |
-        mkdir bitbake
+        mkdir ../bitbake
         rm Cargo.lock
-        cd login_ng-cli
         cargo build
         /github/home/.cargo/bin/cargo-bitbake bitbake
         mv *.bb ../bitbake
-        cd ..
-        cd login_ng-ctl
-        cargo build
-        /github/home/.cargo/bin/cargo-bitbake bitbake
-        mv *.bb ../bitbake
-        cd ..
     - name: Build bitbake
       run: zip -r bitbake.zip bitbake
     - name: Upload package artifact
