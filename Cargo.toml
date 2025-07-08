@@ -5,6 +5,7 @@ description = "Additional pam module and service to login the user."
 homepage = "https://github.com/NeroReflex/login_ng"
 edition = "2021"
 authors = ["Denis Benato <benato.denis96@gmail.com>"]
+license-file = "LICENSE.md"
 
 [lib]
 name = "pam_login_ng"
