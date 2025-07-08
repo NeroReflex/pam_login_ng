@@ -21,12 +21,11 @@ extern crate tokio;
 
 use std::path::PathBuf;
 
-use pam_login_ng_common::login_ng::storage::{load_user_mountpoints, StorageSource};
-use pam_login_ng_common::mount::MountAuthDBusProxy;
-use pam_login_ng_common::result::ServiceOperationResult;
-use pam_login_ng_common::zbus::Connection;
-
-use pam_login_ng_common::ServiceError;
+use login_ng::pam::mount::MountAuthDBusProxy;
+use login_ng::pam::result::ServiceOperationResult;
+use login_ng::pam::ServiceError;
+use login_ng::storage::{load_user_mountpoints, StorageSource};
+use login_ng::zbus::Connection;
 
 use argh::FromArgs;
 
@@ -84,7 +83,7 @@ async fn main() -> Result<(), ServiceError> {
 
     match args.command {
         Command::Info(_) => {
-            let version = pam_login_ng_common::login_ng::LIBRARY_VERSION;
+            let version = login_ng::LIBRARY_VERSION;
             println!("login-ng version {version}, Copyright (C) 2024 Denis Benato");
             println!("login-ng comes with ABSOLUTELY NO WARRANTY;");
             println!("This is free software, and you are welcome to redistribute it");

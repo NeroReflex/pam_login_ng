@@ -17,26 +17,23 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-extern crate pam_login_ng_common;
-
-use pam_login_ng_common::{
-    login_ng::{
-        pam_binding::{
-            self,
-            constants::{PamFlag, *},
-            conv::Conv,
-            error::{ErrorCode, PamResult},
-            module::{PamHandle, PamHooks},
-            pam_hooks,
-        },
-        storage::{load_user_auth_data, StorageSource},
-        user::UserAuthData,
-        users::{gid_t, uid_t},
+use login_ng::{
+    pam::{
+        result::ServiceOperationResult, security::SessionPrelude, session::SessionsProxy,
+        XDG_RUNTIME_DIR_PATH,
     },
-    result::ServiceOperationResult,
-    security::SessionPrelude,
+    pam_binding::{
+        self,
+        constants::{PamFlag, PamMessageStyle},
+        conv::Conv,
+        error::{ErrorCode, PamResult},
+        module::{PamHandle, PamHooks},
+        pam_hooks,
+    },
     serde_json,
-    session::SessionsProxy,
+    storage::{load_user_auth_data, StorageSource},
+    user::UserAuthData,
+    users::{gid_t, uid_t},
     zbus::{Connection, Result as ZResult},
 };
 
@@ -257,7 +254,7 @@ impl PamHooks for PamQuickEmbedded {
                                     let uid = result.1;
                                     let _gid = result.2;
 
-                                    let xdg_user_path = PathBuf::from(pam_login_ng_common::XDG_RUNTIME_DIR_PATH).join(format!("{uid}"));
+                                    let xdg_user_path = PathBuf::from(XDG_RUNTIME_DIR_PATH).join(format!("{uid}"));
                                     match pamh.env_set(Cow::from("XDG_RUNTIME_DIR"), xdg_user_path.to_string_lossy()) {
                                         Ok(_) => pamh.log(
                                                 pam_binding::module::LogLevel::Info,
@@ -322,15 +319,12 @@ impl PamHooks for PamQuickEmbedded {
         }
     */
     fn sm_authenticate(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
-        let username = match pamh.get_user(None).map_err(|err| {
-
-            err
-        })? {
+        let username = match pamh.get_user(None).map_err(|err| err)? {
             Some(res) => res,
             None => match pamh.get_item::<pam_binding::items::User>()? {
                 Some(username) => username.to_string_lossy().to_string(),
                 None => return Err(ErrorCode::AUTH_ERR),
-            }
+            },
         };
 
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
@@ -357,10 +351,10 @@ impl PamHooks for PamQuickEmbedded {
         // if the empty password was not valid then continue and ask for a password
         let conv = match pamh.get_item::<Conv>().map_err(|err| {
             pamh.log(
-                    pam_binding::module::LogLevel::Error,
-                    format!("Couldn't get pam_conv: pam error {err}"),
-                );
-            
+                pam_binding::module::LogLevel::Error,
+                format!("Couldn't get pam_conv: pam error {err}"),
+            );
+
             err
         })? {
             Some(conv) => conv,
@@ -374,7 +368,8 @@ impl PamHooks for PamQuickEmbedded {
             }
         };
 
-        match conv.send(PamMessageStyle::PAM_PROMPT_ECHO_OFF, "Password: ")?
+        match conv
+            .send(PamMessageStyle::PAM_PROMPT_ECHO_OFF, "Password: ")?
             .map(|cstr| cstr.to_str().map(|s| s.to_string()))
         {
             Some(Ok(password)) => {
@@ -386,7 +381,7 @@ impl PamHooks for PamQuickEmbedded {
 
                     ErrorCode::AUTH_ERR
                 })?;
-                
+
                 if let Err(err) = pamh.set_data(cred_data.as_str(), Box::new(main_password)) {
                     pamh.log(
                         pam_binding::module::LogLevel::Error,
@@ -396,7 +391,7 @@ impl PamHooks for PamQuickEmbedded {
                     return Err(err);
                 }
                 Ok(())
-            },
+            }
             Some(Err(_err)) => Err(ErrorCode::CRED_INSUFFICIENT),
             None => Err(ErrorCode::CRED_INSUFFICIENT),
         }

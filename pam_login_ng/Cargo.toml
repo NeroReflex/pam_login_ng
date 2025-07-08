@@ -19,7 +19,7 @@ name = "pam_login_ng-mount"
 path = "src/pam_login_ng-mount/main.rs"
 
 [dependencies]
-pam_login_ng_common = { path = "../pam_login_ng-common" }
+login_ng = { git = "https://github.com/NeroReflex/login_ng.git", rev = "170f6664ab71d0d933507e0f33c057116f5e66f8" }
 argh = "^0"
 tokio = { version = "^1", features = ["macros", "rt-multi-thread", "sync", "signal"] }
 thiserror = "^2"

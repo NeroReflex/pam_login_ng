@@ -19,13 +19,15 @@
 
 extern crate tokio;
 
-use pam_login_ng_common::{
-    disk::create_directory,
-    login_ng::users,
-    mount::{MountAuthDBus, MountAuthOperations},
-    session::Sessions,
+use login_ng::{
+    pam::{
+        disk::create_directory,
+        mount::{MountAuthDBus, MountAuthOperations},
+        session::Sessions,
+        ServiceError,
+    },
+    users,
     zbus::connection,
-    ServiceError,
 };
 
 use tokio::signal::unix::{signal, SignalKind};
