@@ -7,13 +7,7 @@ codegen-units = 1
 
 [workspace]
 members = [
-    "login_ng",
-    "login_ng_user_interactions",
+    "pam_login_ng-common",
     "pam_login_ng",
-    "login_ng-cli",
-    "login_ng-ctl",
-    "login_ng-gui",
-    "login_ng-session",
-    "sessionexec"
 ]
 resolver = "2"

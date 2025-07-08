@@ -1,8 +1,0 @@
-{
-  "kind": "service",
-  "cmd": "./../test_data/test_restart/test_software.sh",
-  "args": [],
-  "max_restarts": 0,
-  "restart_delay_secs": 5,
-  "dependencies": [  ]
-}

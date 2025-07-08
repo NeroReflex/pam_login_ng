@@ -17,17 +17,18 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-extern crate pam;
 extern crate pam_login_ng_common;
 
-use pam::{
-    constants::{PamFlag, PamResultCode, *},
-    conv::Conv,
-    module::{PamHandle, PamHooks},
-    pam_try,
-};
 use pam_login_ng_common::{
     login_ng::{
+        pam_binding::{
+            self,
+            constants::{PamFlag, *},
+            conv::Conv,
+            error::{ErrorCode, PamResult},
+            module::{PamHandle, PamHooks},
+            pam_hooks,
+        },
         storage::{load_user_auth_data, StorageSource},
         user::UserAuthData,
         users::{gid_t, uid_t},
@@ -46,25 +47,23 @@ static INIT: Once = Once::new();
 static mut RUNTIME: Option<Runtime> = None;
 
 struct PamQuickEmbedded;
-pam::pam_hooks!(PamQuickEmbedded);
+pam_hooks!(PamQuickEmbedded);
 
 impl PamQuickEmbedded {
-    pub(crate) fn load_user_auth_data_from_username(
-        username: &String,
-    ) -> Result<UserAuthData, PamResultCode> {
+    pub(crate) fn load_user_auth_data_from_username(username: &String) -> PamResult<UserAuthData> {
         match username.as_str() {
-            "" => Err(PamResultCode::PAM_USER_UNKNOWN),
-            "root" => Err(PamResultCode::PAM_USER_UNKNOWN),
+            "" => Err(ErrorCode::USER_UNKNOWN),
+            "root" => Err(ErrorCode::USER_UNKNOWN),
             // load login-ng data and skip the user if it's not set
             _ => match load_user_auth_data(&StorageSource::Username(username.clone())) {
                 Ok(load_res) => match load_res {
                     Some(auth_data) => match auth_data.has_main() {
                         true => Ok(auth_data),
-                        false => Err(PamResultCode::PAM_USER_UNKNOWN),
+                        false => Err(ErrorCode::USER_UNKNOWN),
                     },
-                    None => Err(PamResultCode::PAM_USER_UNKNOWN),
+                    None => Err(ErrorCode::USER_UNKNOWN),
                 },
-                Err(_err) => Err(PamResultCode::PAM_USER_UNKNOWN),
+                Err(_err) => Err(ErrorCode::USER_UNKNOWN),
             },
         }
     }
@@ -110,15 +109,15 @@ impl PamQuickEmbedded {
 }
 
 impl PamHooks for PamQuickEmbedded {
-    fn sm_close_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
+    fn sm_close_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
             Ok(value) => pamh.log(
-                pam::module::LogLevel::Debug,
+                pam_binding::module::LogLevel::Debug,
                 format!("Starting dbus service on socket {value}"),
             ),
             Err(err) => {
                 pamh.log(
-                    pam::module::LogLevel::Debug,
+                    pam_binding::module::LogLevel::Debug,
                     format!("Couldn't read dbus socket address: {err} - using default..."),
                 );
                 std::env::set_var(
@@ -136,23 +135,18 @@ impl PamHooks for PamQuickEmbedded {
         });
 
         let username = match pamh.get_user(None) {
-            Ok(res) => res,
+            Ok(Some(res)) => res,
+            Ok(None) => match pamh.get_item::<pam_binding::items::User>() {
+                Ok(Some(username)) => username.to_string_lossy().to_string(),
+                Ok(None) => return Err(ErrorCode::AUTH_ERR),
+                Err(err) => return Err(err),
+            },
             Err(err) => {
-                // If the error is PAM_SUCCESS, we should not return an error
-                if err != PamResultCode::PAM_SUCCESS {
-                    pamh.log(
-                        pam::module::LogLevel::Error,
-                        format!("login_ng: open_session: get_user failed: {err}"),
-                    );
-                    return err;
-                }
-
-                // Attempt to get the user item
-                match pamh.get_item::<pam::items::User>() {
-                    Ok(Some(username)) => username.to_string_lossy(),
-                    Ok(None) => return PamResultCode::PAM_AUTH_ERR,
-                    Err(err) => return err,
-                }
+                pamh.log(
+                    pam_binding::module::LogLevel::Error,
+                    format!("login_ng: open_session: get_user failed: {err}"),
+                );
+                return Err(err);
             }
         };
 
@@ -161,31 +155,31 @@ impl PamHooks for PamQuickEmbedded {
                 Some(runtime) => runtime.block_on(async {
                     match PamQuickEmbedded::close_session_for_user(&String::from(username)).await {
                         Ok(result) => match ServiceOperationResult::from(result) {
-                            ServiceOperationResult::Ok => PamResultCode::PAM_SUCCESS,
-                            _ => PamResultCode::PAM_SERVICE_ERR,
+                            ServiceOperationResult::Ok => Ok(()),
+                            _ => Err(ErrorCode::SERVICE_ERR),
                         },
-                        Err(_) => PamResultCode::PAM_SERVICE_ERR,
+                        Err(_) => Err(ErrorCode::SERVICE_ERR),
                     }
                 }),
-                None => PamResultCode::PAM_SERVICE_ERR,
+                None => Err(ErrorCode::SERVICE_ERR),
             }
         }
     }
 
-    fn sm_open_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
+    fn sm_open_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
         pamh.log(
-            pam::module::LogLevel::Debug,
+            pam_binding::module::LogLevel::Debug,
             "login_ng: open_session: enter".to_string(),
         );
 
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
             Ok(value) => pamh.log(
-                pam::module::LogLevel::Info,
+                pam_binding::module::LogLevel::Info,
                 format!("Starting dbus service on socket {value}"),
             ),
             Err(err) => {
                 pamh.log(
-                    pam::module::LogLevel::Debug,
+                    pam_binding::module::LogLevel::Debug,
                     format!("Couldn't read dbus socket address: {err} - using default..."),
                 );
                 std::env::set_var(
@@ -203,33 +197,28 @@ impl PamHooks for PamQuickEmbedded {
         });
 
         let username = match pamh.get_user(None) {
-            Ok(res) => res,
+            Ok(Some(res)) => res,
+            Ok(None) => match pamh.get_item::<pam_binding::items::User>() {
+                Ok(Some(username)) => username.to_string_lossy().to_string(),
+                Ok(None) => return Err(ErrorCode::AUTH_ERR),
+                Err(err) => return Err(err),
+            },
             Err(err) => {
-                // If the error is PAM_SUCCESS, we should not return an error
-                if err != PamResultCode::PAM_SUCCESS {
-                    pamh.log(
-                        pam::module::LogLevel::Error,
-                        "login_ng: open_session: get_user failed".to_string(),
-                    );
-                    return err;
-                }
-
-                // Attempt to get the user item
-                match pamh.get_item::<pam::items::User>() {
-                    Ok(Some(username)) => username.to_string_lossy(),
-                    Ok(None) => return PamResultCode::PAM_AUTH_ERR,
-                    Err(err) => return err,
-                }
+                pamh.log(
+                    pam_binding::module::LogLevel::Error,
+                    "login_ng: open_session: get_user failed".to_string(),
+                );
+                return Err(err);
             }
         };
 
         pamh.log(
-            pam::module::LogLevel::Debug,
+            pam_binding::module::LogLevel::Debug,
             format!("login_ng: open_session: user {username}"),
         );
 
         pamh.log(
-            pam::module::LogLevel::Debug,
+            pam_binding::module::LogLevel::Debug,
             format!("login_ng: open_session: loaded data for user {username}"),
         );
 
@@ -241,13 +230,13 @@ impl PamHooks for PamQuickEmbedded {
                         Ok(main_password) => main_password.clone(),
                         Err(err) => {
                             pamh.log(
-                                pam::module::LogLevel::Error,
+                                pam_binding::module::LogLevel::Error,
                                 format!(
                                     "login_ng: open_session: get_data error: {err}"
                                 ),
                             );
 
-                            return err
+                            return Err(err)
                         },
                     };
 
@@ -261,7 +250,7 @@ impl PamHooks for PamQuickEmbedded {
                             match result.0 {
                                 ServiceOperationResult::Ok => {
                                     pamh.log(
-                                        pam::module::LogLevel::Info,
+                                        pam_binding::module::LogLevel::Info,
                                         "login_ng: open_session: pam_login_ng-service was successful".to_string(),
                                     );
 
@@ -271,72 +260,59 @@ impl PamHooks for PamQuickEmbedded {
                                     let xdg_user_path = PathBuf::from(pam_login_ng_common::XDG_RUNTIME_DIR_PATH).join(format!("{uid}"));
                                     match pamh.env_set(Cow::from("XDG_RUNTIME_DIR"), xdg_user_path.to_string_lossy()) {
                                         Ok(_) => pamh.log(
-                                                pam::module::LogLevel::Info,
+                                                pam_binding::module::LogLevel::Info,
                                                 "login_ng: open_session: session opened and XDG_RUNTIME_DIR set".to_string(),
                                             ),
                                         Err(err) => pamh.log(
-                                                pam::module::LogLevel::Warning,
+                                                pam_binding::module::LogLevel::Warning,
                                                 format!("login_ng: open_session: could not set XDG_RUNTIME_DIR: {err}"),
                                             ),
                                     }
 
-                                    PamResultCode::PAM_SUCCESS
+                                    Ok(())
                                 },
                                 err => {
                                     pamh.log(
-                                        pam::module::LogLevel::Error,
+                                        pam_binding::module::LogLevel::Error,
                                         format!(
                                             "login_ng: open_session: pam_login_ng-service errored: {err}"
                                         ),
                                     );
 
-                                    PamResultCode::PAM_SERVICE_ERR
+                                    Err(ErrorCode::SERVICE_ERR)
                                 },
                             }
                         }
                         Err(err) => {
                             pamh.log(
-                                pam::module::LogLevel::Error,
+                                pam_binding::module::LogLevel::Error,
                                 format!(
                                     "login_ng: open_session: pam_login_ng-service dbus error: {err}"
                                 ),
                             );
 
-                            PamResultCode::PAM_SERVICE_ERR
+                            Err(ErrorCode::SERVICE_ERR)
                         }
                     }
                 }),
-                None => PamResultCode::PAM_SERVICE_ERR,
+                None => Err(ErrorCode::SERVICE_ERR),
             }
         }
     }
 
-    fn sm_setcred(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
-        let username = match pamh.get_user(None) {
-            Ok(res) => res,
-            Err(err) => {
-                // If the error is PAM_SUCCESS, we should not return an error
-                if err != PamResultCode::PAM_SUCCESS {
-                    return err;
-                }
-
-                // Attempt to get the user item
-                match pamh.get_item::<pam::items::User>() {
-                    Ok(Some(username)) => username.to_string_lossy(),
-                    Ok(None) => return PamResultCode::PAM_AUTH_ERR,
-                    Err(err) => return err,
-                }
-            }
+    fn sm_setcred(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
+        let username = match pamh.get_user(None)? {
+            Some(res) => res,
+            None => match pamh.get_item::<pam_binding::items::User>()? {
+                Some(username) => username.to_string_lossy().to_string(),
+                None => return Err(ErrorCode::AUTH_ERR),
+            },
         };
 
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
-        let user_cfg =
-            match PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string()) {
-                Ok(user_cfg) => user_cfg,
-                Err(pam_err_code) => return pam_err_code,
-            };
+        let user_cfg = PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string())?;
 
-        PamResultCode::PAM_SUCCESS
+        Ok(())
     }
 
     /*
@@ -345,30 +321,20 @@ impl PamHooks for PamQuickEmbedded {
             PamResultCode::PAM_SUCCESS
         }
     */
-    fn sm_authenticate(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
-        let username = match pamh.get_user(None) {
-            Ok(res) => res,
-            Err(err) => {
-                // If the error is PAM_SUCCESS, we should not return an error
-                if err != PamResultCode::PAM_SUCCESS {
-                    return err;
-                }
+    fn sm_authenticate(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
+        let username = match pamh.get_user(None).map_err(|err| {
 
-                // Attempt to get the user item
-                match pamh.get_item::<pam::items::User>() {
-                    Ok(Some(username)) => username.to_string_lossy(),
-                    Ok(None) => return PamResultCode::PAM_AUTH_ERR,
-                    Err(err) => return err,
-                }
+            err
+        })? {
+            Some(res) => res,
+            None => match pamh.get_item::<pam_binding::items::User>()? {
+                Some(username) => username.to_string_lossy().to_string(),
+                None => return Err(ErrorCode::AUTH_ERR),
             }
         };
 
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
-        let user_cfg =
-            match PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string()) {
-                Ok(user_cfg) => user_cfg,
-                Err(pam_err_code) => return pam_err_code,
-            };
+        let user_cfg = PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string())?;
 
         let cred_data = format!("{}-login_ng", username);
 
@@ -378,63 +344,61 @@ impl PamHooks for PamQuickEmbedded {
         if let Ok(main_password) = user_cfg.main_by_auth(&Some(String::new())) {
             if let Err(err) = pamh.set_data(cred_data.as_str(), Box::new(main_password)) {
                 pamh.log(
-                    pam::module::LogLevel::Error,
+                    pam_binding::module::LogLevel::Error,
                     format!("login_ng: sm_authenticate: set_data error {err}"),
                 );
 
-                return err;
+                return Err(err);
             }
 
-            return PamResultCode::PAM_SUCCESS;
+            return Ok(());
         }
 
         // if the empty password was not valid then continue and ask for a password
-        let conv = match pamh.get_item::<Conv>() {
-            Ok(Some(conv)) => conv,
-            Ok(None) => {
+        let conv = match pamh.get_item::<Conv>().map_err(|err| {
+            pamh.log(
+                    pam_binding::module::LogLevel::Error,
+                    format!("Couldn't get pam_conv: pam error {err}"),
+                );
+            
+            err
+        })? {
+            Some(conv) => conv,
+            None => {
                 pamh.log(
-                    pam::module::LogLevel::Critical,
+                    pam_binding::module::LogLevel::Critical,
                     "No conv available".to_string(),
                 );
 
-                return PamResultCode::PAM_SERVICE_ERR;
-            }
-            Err(err) => {
-                pamh.log(
-                    pam::module::LogLevel::Error,
-                    format!("Couldn't get pam_conv: pam error {err}"),
-                );
-
-                return err;
+                return Err(ErrorCode::SERVICE_ERR);
             }
         };
 
-        match pam_try!(conv.send(PAM_PROMPT_ECHO_OFF, "Password: "))
+        match conv.send(PamMessageStyle::PAM_PROMPT_ECHO_OFF, "Password: ")?
             .map(|cstr| cstr.to_str().map(|s| s.to_string()))
         {
-            Some(Ok(password)) => match user_cfg.main_by_auth(&Some(password)) {
-                Ok(main_password) => {
-                    if let Err(err) = pamh.set_data(cred_data.as_str(), Box::new(main_password)) {
-                        pamh.log(
-                            pam::module::LogLevel::Error,
-                            format!("login_ng: sm_authenticate: set_data error {err}"),
-                        );
-
-                        return err;
-                    }
-                    PamResultCode::PAM_SUCCESS
-                }
-                Err(err) => {
+            Some(Ok(password)) => {
+                let main_password = user_cfg.main_by_auth(&Some(password)).map_err(|err| {
                     pamh.log(
-                        pam::module::LogLevel::Error,
+                        pam_binding::module::LogLevel::Error,
                         format!("login_ng: sm_authenticate: authentication error: {err}"),
                     );
 
-                    PamResultCode::PAM_AUTH_ERR
+                    ErrorCode::AUTH_ERR
+                })?;
+                
+                if let Err(err) = pamh.set_data(cred_data.as_str(), Box::new(main_password)) {
+                    pamh.log(
+                        pam_binding::module::LogLevel::Error,
+                        format!("login_ng: sm_authenticate: set_data error {err}"),
+                    );
+
+                    return Err(err);
                 }
+                Ok(())
             },
-            Some(Err(_err)) => PamResultCode::PAM_CRED_INSUFFICIENT,
-            None => PamResultCode::PAM_CRED_INSUFFICIENT,
+            Some(Err(_err)) => Err(ErrorCode::CRED_INSUFFICIENT),
+            None => Err(ErrorCode::CRED_INSUFFICIENT),
         }
     }
 }
