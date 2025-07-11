@@ -21,11 +21,11 @@ extern crate tokio;
 
 use std::path::PathBuf;
 
-use login_ng::pam::mount::MountAuthDBusProxy;
-use login_ng::pam::result::ServiceOperationResult;
-use login_ng::pam::ServiceError;
-use login_ng::storage::{load_user_mountpoints, StorageSource};
-use login_ng::zbus::Connection;
+use login_ng::{
+    pam::{mount::MountAuthDBusProxy, result::ServiceOperationResult, ServiceError},
+    storage::{load_user_mountpoints, StorageSource},
+    zbus::Connection,
+};
 
 use argh::FromArgs;
 

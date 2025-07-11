@@ -33,8 +33,10 @@ use login_ng::{
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::RwLock;
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 #[tokio::main]
 async fn main() -> Result<(), ServiceError> {
