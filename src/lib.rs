@@ -214,11 +214,6 @@ impl PamHooks for PamQuickEmbedded {
             format!("login_ng: open_session: user {username}"),
         );
 
-        pamh.log(
-            pam_binding::module::LogLevel::Debug,
-            format!("login_ng: open_session: loaded data for user {username}"),
-        );
-
         unsafe {
             match &RUNTIME {
                 Some(runtime) => runtime.block_on(async {
@@ -318,13 +313,22 @@ impl PamHooks for PamQuickEmbedded {
             PamResultCode::PAM_SUCCESS
         }
     */
+
     fn sm_authenticate(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
-        let username = match pamh.get_user(None).map_err(|err| err)? {
-            Some(res) => res,
-            None => match pamh.get_item::<pam_binding::items::User>()? {
-                Some(username) => username.to_string_lossy().to_string(),
-                None => return Err(ErrorCode::AUTH_ERR),
-            },
+        let username = match pamh.get_user(None).map_err(|err| {
+            pamh.log(
+                login_ng::pam_binding::module::LogLevel::Error,
+                format!("login_ng: open_session: get_user failed: {err}"),
+            );
+
+            err
+        })? {
+            Some(username) => username,
+            None => pamh
+                .get_item::<login_ng::pam_binding::items::User>()?
+                .ok_or(ErrorCode::AUTH_ERR)?
+                .to_string_lossy()
+                .to_string(),
         };
 
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
@@ -336,64 +340,60 @@ impl PamHooks for PamQuickEmbedded {
         // there is no need to check if the returned main password is the same as the stored one.
         // This will also used below for the user-provided string.
         if let Ok(main_password) = user_cfg.main_by_auth(&Some(String::new())) {
-            if let Err(err) = pamh.set_data(cred_data.as_str(), Box::new(main_password)) {
-                pamh.log(
-                    pam_binding::module::LogLevel::Error,
-                    format!("login_ng: sm_authenticate: set_data error {err}"),
-                );
+            pamh.set_data(cred_data.as_str(), Box::new(main_password))
+                .map_err(|err| {
+                    pamh.log(
+                        login_ng::pam_binding::module::LogLevel::Error,
+                        format!("login_ng: sm_authenticate: set_data error {err}"),
+                    );
 
-                return Err(err);
-            }
+                    err
+                })?;
 
             return Ok(());
         }
 
         // if the empty password was not valid then continue and ask for a password
-        let conv = match pamh.get_item::<Conv>().map_err(|err| {
-            pamh.log(
-                pam_binding::module::LogLevel::Error,
-                format!("Couldn't get pam_conv: pam error {err}"),
-            );
-
-            err
-        })? {
-            Some(conv) => conv,
-            None => {
+        let conv = pamh
+            .get_item::<Conv>()
+            .map_err(|err| {
                 pamh.log(
-                    pam_binding::module::LogLevel::Critical,
+                    login_ng::pam_binding::module::LogLevel::Error,
+                    format!("Couldn't get pam_conv: pam error {err}"),
+                );
+
+                err
+            })?
+            .ok_or({
+                pamh.log(
+                    login_ng::pam_binding::module::LogLevel::Critical,
                     "No conv available".to_string(),
                 );
 
-                return Err(ErrorCode::SERVICE_ERR);
-            }
-        };
+                ErrorCode::SERVICE_ERR
+            })?;
 
-        match conv
-            .send(PamMessageStyle::PAM_PROMPT_ECHO_OFF, "Password: ")?
-            .map(|cstr| cstr.to_str().map(|s| s.to_string()))
-        {
-            Some(Ok(password)) => {
-                let main_password = user_cfg.main_by_auth(&Some(password)).map_err(|err| {
-                    pamh.log(
-                        pam_binding::module::LogLevel::Error,
-                        format!("login_ng: sm_authenticate: authentication error: {err}"),
-                    );
+        let password = conv
+            .send(PamMessageStyle::PAM_PROMPT_ECHO_OFF, "Password: ")
+            .map(|cstr| cstr.map(|a| a.to_string_lossy()).map(|s| s.to_string()))?
+            .ok_or(ErrorCode::CRED_INSUFFICIENT)?;
 
-                    ErrorCode::AUTH_ERR
-                })?;
+        let main_password = user_cfg.main_by_auth(&Some(password)).map_err(|err| {
+            pamh.log(
+                login_ng::pam_binding::module::LogLevel::Error,
+                format!("login_ng: sm_authenticate: authentication error: {err}"),
+            );
 
-                if let Err(err) = pamh.set_data(cred_data.as_str(), Box::new(main_password)) {
-                    pamh.log(
-                        pam_binding::module::LogLevel::Error,
-                        format!("login_ng: sm_authenticate: set_data error {err}"),
-                    );
+            ErrorCode::AUTH_ERR
+        })?;
+        pamh.set_data(cred_data.as_str(), Box::new(main_password))
+            .map_err(|err| {
+                pamh.log(
+                    login_ng::pam_binding::module::LogLevel::Error,
+                    format!("login_ng: sm_authenticate: set_data error {err}"),
+                );
 
-                    return Err(err);
-                }
-                Ok(())
-            }
-            Some(Err(_err)) => Err(ErrorCode::CRED_INSUFFICIENT),
-            None => Err(ErrorCode::CRED_INSUFFICIENT),
-        }
+                err
+            })
     }
 }

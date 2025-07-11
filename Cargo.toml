@@ -20,10 +20,9 @@ name = "pam_login_ng-mount"
 path = "src/pam_login_ng-mount/main.rs"
 
 [dependencies]
-login_ng = { git = "https://github.com/NeroReflex/login_ng.git", rev = "170f6664ab71d0d933507e0f33c057116f5e66f8" }
+login_ng = { git = "https://github.com/NeroReflex/login_ng.git", rev = "bd7a25fd3813987e0c91e491deba1a566c28e3fc" }
 argh = "^0"
 tokio = { version = "^1", features = ["macros", "rt-multi-thread", "sync", "signal"] }
-thiserror = "^2"
 
 [package.metadata.deb]
 license-file = ["LICENSE.md", "4"]
