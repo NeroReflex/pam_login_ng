@@ -1,6 +1,6 @@
 [package]
 name = "pam_login_ng"
-version = "0.7.1"
+version = "0.7.2"
 description = "Additional pam module and service to login the user."
 homepage = "https://github.com/NeroReflex/login_ng"
 edition = "2021"
@@ -20,7 +20,7 @@ name = "pam_login_ng-mount"
 path = "src/pam_login_ng-mount/main.rs"
 
 [dependencies]
-login_ng = { git = "https://github.com/NeroReflex/login_ng.git", rev = "d42d3cd30b91868d63ea5cf1ec67f6565cba26a3" }
+login_ng = { git = "https://github.com/NeroReflex/login_ng.git", rev = "52ca72f044bb67d7f6eb28746aef4359ace155e8" }
 argh = "^0"
 tokio = { version = "^1", features = ["macros", "rt-multi-thread", "sync", "signal"] }
 
