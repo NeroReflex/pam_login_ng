@@ -9,6 +9,8 @@ install_pam_login_ng: target/$(TARGET)/$(BUILD_TYPE)/pam_login_ng-service target
 	install -D -m 755 target/$(TARGET)/$(BUILD_TYPE)/pam_login_ng-mount $(PREFIX)/usr/bin/pam_login_ng-mount
 	install -D -m 755 target/$(TARGET)/$(BUILD_TYPE)/libpam_login_ng.so $(PREFIX)/usr/lib/security/pam_login_ng.so
 	install -D -m 644 rootfs/usr/lib/systemd/system/pam_login_ng.service $(PREFIX)/usr/lib/systemd/system/pam_login_ng.service
+	install -D -m 644 rootfs/usr/share/dbus-1/org.neroreflex.login_ng_mount.conf $(PREFIX)/usr/share/dbus-1/org.neroreflex.login_ng_mount.conf
+	install -D -m 644 rootfs/usr/share/dbus-1/org.neroreflex.login_ng_session.conf $(PREFIX)/usr/share/dbus-1/org.neroreflex.login_ng_session.conf
 
 .PHONY: install
 install: install_pam_login_ng
