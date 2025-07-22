@@ -107,6 +107,11 @@ impl PamQuickEmbedded {
 
 impl PamHooks for PamQuickEmbedded {
     fn sm_close_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
+        pamh.log(
+            pam_binding::module::LogLevel::Debug,
+            "login_ng: sm_close_session: enter".to_string(),
+        );
+        
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
             Ok(value) => pamh.log(
                 pam_binding::module::LogLevel::Debug,
@@ -293,6 +298,11 @@ impl PamHooks for PamQuickEmbedded {
     }
 
     fn sm_setcred(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
+        pamh.log(
+            login_ng::pam_binding::module::LogLevel::Debug,
+            format!("login_ng: sm_setcred: enter"),
+        );
+
         let username = match pamh.get_user(None)? {
             Some(res) => res,
             None => match pamh.get_item::<pam_binding::items::User>()? {
@@ -315,6 +325,11 @@ impl PamHooks for PamQuickEmbedded {
     */
 
     fn sm_authenticate(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
+        pamh.log(
+            login_ng::pam_binding::module::LogLevel::Error,
+            format!("login_ng: sm_authenticate: enter"),
+        );
+
         let username = match pamh.get_user(None).map_err(|err| {
             pamh.log(
                 login_ng::pam_binding::module::LogLevel::Error,
