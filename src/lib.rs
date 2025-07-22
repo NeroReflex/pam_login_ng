@@ -26,7 +26,7 @@ use login_ng::{
         self,
         constants::{PamFlag, PamMessageStyle},
         conv::Conv,
-        error::{ErrorCode, PamResult},
+        error::{PamErrorCode, PamResult},
         module::{PamHandle, PamHooks},
         pam_hooks,
     },
@@ -49,18 +49,18 @@ pam_hooks!(PamQuickEmbedded);
 impl PamQuickEmbedded {
     pub(crate) fn load_user_auth_data_from_username(username: &String) -> PamResult<UserAuthData> {
         match username.as_str() {
-            "" => Err(ErrorCode::USER_UNKNOWN),
-            "root" => Err(ErrorCode::USER_UNKNOWN),
+            "" => Err(PamErrorCode::USER_UNKNOWN),
+            "root" => Err(PamErrorCode::USER_UNKNOWN),
             // load login-ng data and skip the user if it's not set
             _ => match load_user_auth_data(&StorageSource::Username(username.clone())) {
                 Ok(load_res) => match load_res {
                     Some(auth_data) => match auth_data.has_main() {
                         true => Ok(auth_data),
-                        false => Err(ErrorCode::USER_UNKNOWN),
+                        false => Err(PamErrorCode::USER_UNKNOWN),
                     },
-                    None => Err(ErrorCode::USER_UNKNOWN),
+                    None => Err(PamErrorCode::USER_UNKNOWN),
                 },
-                Err(_err) => Err(ErrorCode::USER_UNKNOWN),
+                Err(_err) => Err(PamErrorCode::USER_UNKNOWN),
             },
         }
     }
@@ -135,7 +135,7 @@ impl PamHooks for PamQuickEmbedded {
             Ok(Some(res)) => res,
             Ok(None) => match pamh.get_item::<pam_binding::items::User>() {
                 Ok(Some(username)) => username.to_string_lossy().to_string(),
-                Ok(None) => return Err(ErrorCode::AUTH_ERR),
+                Ok(None) => return Err(PamErrorCode::AUTH_ERR),
                 Err(err) => return Err(err),
             },
             Err(err) => {
@@ -153,12 +153,12 @@ impl PamHooks for PamQuickEmbedded {
                     match PamQuickEmbedded::close_session_for_user(&String::from(username)).await {
                         Ok(result) => match ServiceOperationResult::from(result) {
                             ServiceOperationResult::Ok => Ok(()),
-                            _ => Err(ErrorCode::SERVICE_ERR),
+                            _ => Err(PamErrorCode::SERVICE_ERR),
                         },
-                        Err(_) => Err(ErrorCode::SERVICE_ERR),
+                        Err(_) => Err(PamErrorCode::SERVICE_ERR),
                     }
                 }),
-                None => Err(ErrorCode::SERVICE_ERR),
+                None => Err(PamErrorCode::SERVICE_ERR),
             }
         }
     }
@@ -197,7 +197,7 @@ impl PamHooks for PamQuickEmbedded {
             Ok(Some(res)) => res,
             Ok(None) => match pamh.get_item::<pam_binding::items::User>() {
                 Ok(Some(username)) => username.to_string_lossy().to_string(),
-                Ok(None) => return Err(ErrorCode::AUTH_ERR),
+                Ok(None) => return Err(PamErrorCode::AUTH_ERR),
                 Err(err) => return Err(err),
             },
             Err(err) => {
@@ -271,7 +271,7 @@ impl PamHooks for PamQuickEmbedded {
                                         ),
                                     );
 
-                                    Err(ErrorCode::SERVICE_ERR)
+                                    Err(PamErrorCode::SERVICE_ERR)
                                 },
                             }
                         }
@@ -283,11 +283,11 @@ impl PamHooks for PamQuickEmbedded {
                                 ),
                             );
 
-                            Err(ErrorCode::SERVICE_ERR)
+                            Err(PamErrorCode::SERVICE_ERR)
                         }
                     }
                 }),
-                None => Err(ErrorCode::SERVICE_ERR),
+                None => Err(PamErrorCode::SERVICE_ERR),
             }
         }
     }
@@ -297,7 +297,7 @@ impl PamHooks for PamQuickEmbedded {
             Some(res) => res,
             None => match pamh.get_item::<pam_binding::items::User>()? {
                 Some(username) => username.to_string_lossy().to_string(),
-                None => return Err(ErrorCode::AUTH_ERR),
+                None => return Err(PamErrorCode::AUTH_ERR),
             },
         };
 
@@ -326,7 +326,7 @@ impl PamHooks for PamQuickEmbedded {
             Some(username) => username,
             None => pamh
                 .get_item::<login_ng::pam_binding::items::User>()?
-                .ok_or(ErrorCode::AUTH_ERR)?
+                .ok_or(PamErrorCode::AUTH_ERR)?
                 .to_string_lossy()
                 .to_string(),
         };
@@ -370,13 +370,13 @@ impl PamHooks for PamQuickEmbedded {
                     "No conv available".to_string(),
                 );
 
-                ErrorCode::SERVICE_ERR
+                PamErrorCode::SERVICE_ERR
             })?;
 
         let password = conv
             .send(PamMessageStyle::PAM_PROMPT_ECHO_OFF, "Password: ")
             .map(|cstr| cstr.map(|a| a.to_string_lossy()).map(|s| s.to_string()))?
-            .ok_or(ErrorCode::CRED_INSUFFICIENT)?;
+            .ok_or(PamErrorCode::CRED_INSUFFICIENT)?;
 
         let main_password = user_cfg.main_by_auth(&Some(password)).map_err(|err| {
             pamh.log(
@@ -384,7 +384,7 @@ impl PamHooks for PamQuickEmbedded {
                 format!("login_ng: sm_authenticate: authentication error: {err}"),
             );
 
-            ErrorCode::AUTH_ERR
+            PamErrorCode::AUTH_ERR
         })?;
         pamh.set_data(cred_data.as_str(), Box::new(main_password))
             .map_err(|err| {
