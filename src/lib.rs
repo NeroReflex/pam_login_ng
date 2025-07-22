@@ -234,80 +234,72 @@ impl PamHooks for PamQuickEmbedded {
         );
 
         unsafe {
-            match &RUNTIME {
-                Some(runtime) => runtime.block_on(async {
-                    let cred_data = format!("{}-login_ng", username);
-                    let main_password = match pamh.get_data::<String>(cred_data.as_str()) {
-                        Ok(main_password) => main_password.clone(),
-                        Err(err) => {
-                            pamh.log(
-                                pam_binding::module::LogLevel::Error,
-                                format!(
-                                    "login_ng: sm_open_session: get_data error: {err}"
+            let runtime = RUNTIME.as_ref().ok_or(PamErrorCode::SERVICE_ERR)?;
+            runtime.block_on(async {
+                let cred_data = format!("{}-login_ng", username);
+                let main_password = pamh.get_data::<String>(cred_data.as_str()).map_err(|err| {
+                    pamh.log(
+                        pam_binding::module::LogLevel::Error,
+                        format!(
+                            "login_ng: sm_open_session: get_data error: {err}"
+                        ),
+                    );
+
+                    err
+                })?;
+
+                let (result, uid, gid) = PamQuickEmbedded::open_session_for_user(
+                    &String::from(username),
+                    main_password.clone(),
+                )
+                .await
+                .map_err(|err| {
+                    pamh.log(
+                        pam_binding::module::LogLevel::Error,
+                        format!(
+                            "login_ng: sm_open_session: pam_login_ng-service dbus error: {err}"
+                        ),
+                    );
+
+                    PamErrorCode::SERVICE_ERR
+                })?;
+
+                match result {
+                    ServiceOperationResult::Ok => {
+                        pamh.log(
+                            pam_binding::module::LogLevel::Info,
+                            "login_ng: sm_open_session: pam_login_ng-service was successful".to_string(),
+                        );
+
+                        let uid = uid;
+                        let _gid = gid;
+
+                        let xdg_user_path = PathBuf::from(XDG_RUNTIME_DIR_PATH).join(format!("{uid}"));
+                        match pamh.env_set(Cow::from("XDG_RUNTIME_DIR"), xdg_user_path.to_string_lossy()) {
+                            Ok(_) => pamh.log(
+                                    pam_binding::module::LogLevel::Info,
+                                    "login_ng: sm_open_session: session opened and XDG_RUNTIME_DIR set".to_string(),
                                 ),
-                            );
-
-                            return Err(err)
-                        },
-                    };
-
-                    match PamQuickEmbedded::open_session_for_user(
-                        &String::from(username),
-                        main_password,
-                    )
-                    .await
-                    {
-                        Ok(result) => {
-                            match result.0 {
-                                ServiceOperationResult::Ok => {
-                                    pamh.log(
-                                        pam_binding::module::LogLevel::Info,
-                                        "login_ng: sm_open_session: pam_login_ng-service was successful".to_string(),
-                                    );
-
-                                    let uid = result.1;
-                                    let _gid = result.2;
-
-                                    let xdg_user_path = PathBuf::from(XDG_RUNTIME_DIR_PATH).join(format!("{uid}"));
-                                    match pamh.env_set(Cow::from("XDG_RUNTIME_DIR"), xdg_user_path.to_string_lossy()) {
-                                        Ok(_) => pamh.log(
-                                                pam_binding::module::LogLevel::Info,
-                                                "login_ng: sm_open_session: session opened and XDG_RUNTIME_DIR set".to_string(),
-                                            ),
-                                        Err(err) => pamh.log(
-                                                pam_binding::module::LogLevel::Warning,
-                                                format!("login_ng: sm_open_session: could not set XDG_RUNTIME_DIR: {err}"),
-                                            ),
-                                    }
-
-                                    Ok(())
-                                },
-                                err => {
-                                    pamh.log(
-                                        pam_binding::module::LogLevel::Error,
-                                        format!(
-                                            "login_ng: sm_open_session: pam_login_ng-service errored: {err}"
-                                        ),
-                                    );
-
-                                    Err(PamErrorCode::SERVICE_ERR)
-                                },
-                            }
-                        }
-                        Err(err) => {
-                            pamh.log(
-                                pam_binding::module::LogLevel::Error,
-                                format!(
-                                    "login_ng: sm_open_session: pam_login_ng-service dbus error: {err}"
+                            Err(err) => pamh.log(
+                                    pam_binding::module::LogLevel::Warning,
+                                    format!("login_ng: sm_open_session: could not set XDG_RUNTIME_DIR: {err}"),
                                 ),
-                            );
-
-                            Err(PamErrorCode::SERVICE_ERR)
                         }
-                    }
-                }),
-                None => Err(PamErrorCode::SERVICE_ERR),
-            }
+
+                        Ok(())
+                    },
+                    err => {
+                        pamh.log(
+                            pam_binding::module::LogLevel::Error,
+                            format!(
+                                "login_ng: sm_open_session: pam_login_ng-service errored: {err}"
+                            ),
+                        );
+
+                        Err(PamErrorCode::SERVICE_ERR)
+                    },
+                }
+            })
         }
     }
 
