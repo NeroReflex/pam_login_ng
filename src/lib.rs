@@ -171,7 +171,7 @@ impl PamHooks for PamQuickEmbedded {
     fn sm_open_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
         pamh.log(
             pam_binding::module::LogLevel::Debug,
-            "login_ng: open_session: enter".to_string(),
+            "login_ng: sm_open_session: enter".to_string(),
         );
 
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
@@ -202,13 +202,27 @@ impl PamHooks for PamQuickEmbedded {
             Ok(Some(res)) => res,
             Ok(None) => match pamh.get_item::<pam_binding::items::User>() {
                 Ok(Some(username)) => username.to_string_lossy().to_string(),
-                Ok(None) => return Err(PamErrorCode::AUTH_ERR),
-                Err(err) => return Err(err),
+                Ok(None) => {
+                    pamh.log(
+                        pam_binding::module::LogLevel::Warning,
+                        "login_ng: sm_open_session: get_item<User> returned nothing but did not fail".to_string(),
+                    );
+
+                    return Err(PamErrorCode::AUTH_ERR)
+                },
+                Err(err) => {
+                    pamh.log(
+                        pam_binding::module::LogLevel::Warning,
+                        format!("login_ng: sm_open_session: get_item<User> failed {err}"),
+                    );
+
+                    return Err(err)
+                },
             },
             Err(err) => {
                 pamh.log(
                     pam_binding::module::LogLevel::Error,
-                    "login_ng: open_session: get_user failed".to_string(),
+                    "login_ng: sm_open_session: get_user failed".to_string(),
                 );
                 return Err(err);
             }
@@ -216,7 +230,7 @@ impl PamHooks for PamQuickEmbedded {
 
         pamh.log(
             pam_binding::module::LogLevel::Debug,
-            format!("login_ng: open_session: user {username}"),
+            format!("login_ng: sm_open_session: user {username}"),
         );
 
         unsafe {
@@ -229,7 +243,7 @@ impl PamHooks for PamQuickEmbedded {
                             pamh.log(
                                 pam_binding::module::LogLevel::Error,
                                 format!(
-                                    "login_ng: open_session: get_data error: {err}"
+                                    "login_ng: sm_open_session: get_data error: {err}"
                                 ),
                             );
 
@@ -248,7 +262,7 @@ impl PamHooks for PamQuickEmbedded {
                                 ServiceOperationResult::Ok => {
                                     pamh.log(
                                         pam_binding::module::LogLevel::Info,
-                                        "login_ng: open_session: pam_login_ng-service was successful".to_string(),
+                                        "login_ng: sm_open_session: pam_login_ng-service was successful".to_string(),
                                     );
 
                                     let uid = result.1;
@@ -258,11 +272,11 @@ impl PamHooks for PamQuickEmbedded {
                                     match pamh.env_set(Cow::from("XDG_RUNTIME_DIR"), xdg_user_path.to_string_lossy()) {
                                         Ok(_) => pamh.log(
                                                 pam_binding::module::LogLevel::Info,
-                                                "login_ng: open_session: session opened and XDG_RUNTIME_DIR set".to_string(),
+                                                "login_ng: sm_open_session: session opened and XDG_RUNTIME_DIR set".to_string(),
                                             ),
                                         Err(err) => pamh.log(
                                                 pam_binding::module::LogLevel::Warning,
-                                                format!("login_ng: open_session: could not set XDG_RUNTIME_DIR: {err}"),
+                                                format!("login_ng: sm_open_session: could not set XDG_RUNTIME_DIR: {err}"),
                                             ),
                                     }
 
@@ -272,7 +286,7 @@ impl PamHooks for PamQuickEmbedded {
                                     pamh.log(
                                         pam_binding::module::LogLevel::Error,
                                         format!(
-                                            "login_ng: open_session: pam_login_ng-service errored: {err}"
+                                            "login_ng: sm_open_session: pam_login_ng-service errored: {err}"
                                         ),
                                     );
 
@@ -284,7 +298,7 @@ impl PamHooks for PamQuickEmbedded {
                             pamh.log(
                                 pam_binding::module::LogLevel::Error,
                                 format!(
-                                    "login_ng: open_session: pam_login_ng-service dbus error: {err}"
+                                    "login_ng: sm_open_session: pam_login_ng-service dbus error: {err}"
                                 ),
                             );
 
@@ -307,7 +321,14 @@ impl PamHooks for PamQuickEmbedded {
             Some(res) => res,
             None => match pamh.get_item::<pam_binding::items::User>()? {
                 Some(username) => username.to_string_lossy().to_string(),
-                None => return Err(PamErrorCode::AUTH_ERR),
+                None => {
+                    pamh.log(
+                        pam_binding::module::LogLevel::Error,
+                        "login_ng: sm_setcred: get_item<User> returned nothing but did not fail".to_string(),
+                    );
+                    
+                    return Err(PamErrorCode::AUTH_ERR)
+                },
             },
         };
 
@@ -341,7 +362,14 @@ impl PamHooks for PamQuickEmbedded {
             Some(username) => username,
             None => pamh
                 .get_item::<login_ng::pam_binding::items::User>()?
-                .ok_or(PamErrorCode::AUTH_ERR)?
+                .ok_or({
+                    pamh.log(
+                        login_ng::pam_binding::module::LogLevel::Error,
+                        format!("login_ng: sm_authenticate: get_item<User> returned nothing"),
+                    );
+
+                    PamErrorCode::AUTH_ERR
+                })?
                 .to_string_lossy()
                 .to_string(),
         };
