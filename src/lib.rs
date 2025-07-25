@@ -155,12 +155,13 @@ impl PamHooks for PamQuickEmbedded {
         unsafe {
             match &RUNTIME {
                 Some(runtime) => runtime.block_on(async {
-                    match PamQuickEmbedded::close_session_for_user(&String::from(username)).await {
-                        Ok(result) => match ServiceOperationResult::from(result) {
-                            ServiceOperationResult::Ok => Ok(()),
-                            _ => Err(PamErrorCode::SERVICE_ERR),
-                        },
-                        Err(_) => Err(PamErrorCode::SERVICE_ERR),
+                    let Ok(result) = PamQuickEmbedded::close_session_for_user(&String::from(username)).await else {
+                        return Err(PamErrorCode::SERVICE_ERR);
+                    };
+
+                    match ServiceOperationResult::from(result) {
+                        ServiceOperationResult::Ok => Ok(()),
+                        _ => Err(PamErrorCode::SERVICE_ERR),
                     }
                 }),
                 None => Err(PamErrorCode::SERVICE_ERR),
