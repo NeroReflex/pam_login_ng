@@ -855,8 +855,8 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "login_ng"
-version = "0.8.3"
-source = "git+https://github.com/NeroReflex/login_ng.git?rev=0.8.3#9b098e4c5135922f55ecd8e8dccfde30246e0eb2"
+version = "0.8.4"
+source = "git+https://github.com/NeroReflex/login_ng.git?rev=0.8.4#b074982ab7c9d62ac41bf379b1f4e24dbac64b8a"
 dependencies = [
  "aes-gcm",
  "argh",
@@ -1039,7 +1039,7 @@ dependencies = [
 [[package]]
 name = "pam"
 version = "0.2.0"
-source = "git+https://github.com/NeroReflex/pam-rs.git?rev=044962b17012e381fba915943fa0f9c2573017fc#044962b17012e381fba915943fa0f9c2573017fc"
+source = "git+https://github.com/NeroReflex/pam-rs.git?rev=7e2d531db8f8b274e30121d1f65ca5aac6912adc#7e2d531db8f8b274e30121d1f65ca5aac6912adc"
 dependencies = [
  "bitflags",
  "libc",
