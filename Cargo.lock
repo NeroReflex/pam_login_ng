@@ -855,8 +855,8 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "login_ng"
-version = "0.8.4"
-source = "git+https://github.com/NeroReflex/login_ng.git?rev=0.8.4#b074982ab7c9d62ac41bf379b1f4e24dbac64b8a"
+version = "0.8.5"
+source = "git+https://github.com/NeroReflex/login_ng.git?rev=0.8.5#cda147494c9dfe43f34408201b597525b1198aca"
 dependencies = [
  "aes-gcm",
  "argh",
@@ -866,6 +866,7 @@ dependencies = [
  "configparser",
  "greetd_ipc",
  "hkdf",
+ "libc",
  "nix",
  "pam",
  "rand",
