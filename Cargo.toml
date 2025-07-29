@@ -20,7 +20,7 @@ name = "pam_login_ng-mount"
 path = "src/pam_login_ng-mount/main.rs"
 
 [dependencies]
-login_ng = { git = "https://github.com/NeroReflex/login_ng.git", rev = "0.8.5" }
+login_ng = { git = "https://github.com/NeroReflex/login_ng.git", rev = "0.8.6" }
 argh = "^0"
 tokio = { version = "^1", features = ["macros", "rt-multi-thread", "sync", "signal"] }
 
