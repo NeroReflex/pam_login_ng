@@ -67,7 +67,7 @@ async fn main() -> Result<(), ServiceError> {
     let args: Args = argh::from_env();
 
     match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
-        Ok(value) => println!("Starting dbus service on socket {value}"),
+        Ok(value) => println!("Connecting to dbus service on socket {value}"),
         Err(err) => {
             println!("Couldn't read dbus socket address: {err} - using default...");
             std::env::set_var(
