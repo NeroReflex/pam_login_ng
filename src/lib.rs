@@ -19,13 +19,13 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-pub mod user;
 pub mod auth;
 pub mod command;
 pub mod error;
-pub mod pam;
 pub mod mount;
+pub mod pam;
 pub mod storage;
+pub mod user;
 
 #[cfg(test)]
 pub mod tests;
@@ -172,7 +172,7 @@ impl PamHooks for PamQuickEmbedded {
             pam_binding::module::LogLevel::Debug,
             "polyauth: sm_close_session: enter".to_string(),
         );
-        
+
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
             Ok(value) => pamh.log(
                 pam_binding::module::LogLevel::Debug,
@@ -217,7 +217,9 @@ impl PamHooks for PamQuickEmbedded {
             let runtime_ptr = &raw const RUNTIME;
             match &*runtime_ptr {
                 Some(runtime) => runtime.block_on(async {
-                    let Ok(result) = PamQuickEmbedded::close_session_for_user(&String::from(username)).await else {
+                    let Ok(result) =
+                        PamQuickEmbedded::close_session_for_user(&String::from(username)).await
+                    else {
                         return Err(PamErrorCode::SERVICE_ERR);
                     };
 
@@ -271,16 +273,16 @@ impl PamHooks for PamQuickEmbedded {
                         "polyauth: sm_open_session: get_item<User> returned nothing but did not fail".to_string(),
                     );
 
-                    return Err(PamErrorCode::AUTH_ERR)
-                },
+                    return Err(PamErrorCode::AUTH_ERR);
+                }
                 Err(err) => {
                     pamh.log(
                         pam_binding::module::LogLevel::Warning,
                         format!("polyauth: sm_open_session: get_item<User> failed {err}"),
                     );
 
-                    return Err(err)
-                },
+                    return Err(err);
+                }
             },
             Err(err) => {
                 pamh.log(
@@ -404,11 +406,12 @@ impl PamHooks for PamQuickEmbedded {
                 None => {
                     pamh.log(
                         pam_binding::module::LogLevel::Error,
-                        "polyauth: sm_setcred: get_item<User> returned nothing but did not fail".to_string(),
+                        "polyauth: sm_setcred: get_item<User> returned nothing but did not fail"
+                            .to_string(),
                     );
-                    
-                    return Err(PamErrorCode::AUTH_ERR)
-                },
+
+                    return Err(PamErrorCode::AUTH_ERR);
+                }
             },
         };
 
@@ -417,7 +420,9 @@ impl PamHooks for PamQuickEmbedded {
             let runtime_ptr = &raw const RUNTIME;
             match &*runtime_ptr {
                 Some(runtime) => runtime.block_on(async {
-                    let Ok(result) = PamQuickEmbedded::is_user_polyauth_enabled(&String::from(username)).await else {
+                    let Ok(result) =
+                        PamQuickEmbedded::is_user_polyauth_enabled(&String::from(username)).await
+                    else {
                         return Err(PamErrorCode::SERVICE_ERR);
                     };
 

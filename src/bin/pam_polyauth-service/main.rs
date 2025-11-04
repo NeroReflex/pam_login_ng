@@ -21,19 +21,17 @@
 
 extern crate tokio;
 
-use pam_polyauth::{
-    pam::{
-        disk::create_directory,
-        mount::{MountAuthDBus, MountAuthOperations},
-        session::Sessions,
-        ServiceError,
-    },
+use pam_polyauth::pam::{
+    disk::create_directory,
+    mount::{MountAuthDBus, MountAuthOperations},
+    session::Sessions,
+    ServiceError,
 };
 
-use users;
-use zbus::connection;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::RwLock;
+use users;
+use zbus::connection;
 
 use std::{
     path::{Path, PathBuf},

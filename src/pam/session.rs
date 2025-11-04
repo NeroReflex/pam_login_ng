@@ -27,9 +27,7 @@ use zbus::interface;
 
 use sys_mount::{Mount, UnmountDrop};
 
-use crate::{
-    storage::{load_user_auth_data, load_user_mountpoints, StorageSource},
-};
+use crate::storage::{load_user_auth_data, load_user_mountpoints, StorageSource};
 
 use users::{get_user_by_name, gid_t, os::unix::UserExt, uid_t};
 
@@ -44,14 +42,12 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{
-    pam::{
-        disk::read_file_or_create_default,
-        mount::{mount_all, MountAuthOperations},
-        result::*,
-        security::*,
-        ServiceError,
-    },
+use crate::pam::{
+    disk::read_file_or_create_default,
+    mount::{mount_all, MountAuthOperations},
+    result::*,
+    security::*,
+    ServiceError,
 };
 
 use rsa::{
@@ -88,8 +84,8 @@ impl Sessions {
         let priv_key = Mutex::new(RsaPrivateKeyFetchOpStatus::InProgress(spawn(async {
             let default_key_gen_fn = || {
                 let mut rng = rand::thread_rng();
-                let priv_key = rsa::RsaPrivateKey::new(&mut rng, 4096)
-                    .expect("failed to generate a key");
+                let priv_key =
+                    rsa::RsaPrivateKey::new(&mut rng, 4096).expect("failed to generate a key");
 
                 Ok(priv_key.to_pkcs1_pem(LineEnding::CRLF).unwrap().to_string())
             };

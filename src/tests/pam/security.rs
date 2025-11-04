@@ -20,8 +20,8 @@
 */
 
 use crate::pam::security::{SessionPrelude, SessionPreludeError};
-use rsa::pkcs1::EncodeRsaPublicKey;
 use rand::rngs::OsRng;
+use rsa::pkcs1::EncodeRsaPublicKey;
 use rsa::{pkcs1::DecodeRsaPrivateKey, pkcs8::LineEnding, RsaPrivateKey, RsaPublicKey};
 use std::sync::Arc;
 

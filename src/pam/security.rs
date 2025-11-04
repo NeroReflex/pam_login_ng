@@ -192,7 +192,9 @@ impl SessionPrelude {
         }
 
         // Extract the nonce (first 12 bytes for AES-GCM)
-        let nonce_bytes: [u8; NONCE_LEN] = ciphertext[HEADER_SIZE..(HEADER_SIZE + NONCE_LEN)].try_into().unwrap();
+        let nonce_bytes: [u8; NONCE_LEN] = ciphertext[HEADER_SIZE..(HEADER_SIZE + NONCE_LEN)]
+            .try_into()
+            .unwrap();
         let nonce = Nonce::from(nonce_bytes);
 
         // Extract the RSA-encrypted key (next 256 bytes)
@@ -206,7 +208,9 @@ impl SessionPrelude {
             .decrypt(Pkcs1v15Encrypt, rsa_encrypted_key)
             .map_err(SessionPreludeError::RSAError)?;
 
-        let key_bytes: [u8; 32] = serialized_key.as_slice().try_into()
+        let key_bytes: [u8; 32] = serialized_key
+            .as_slice()
+            .try_into()
             .map_err(|_| SessionPreludeError::KeyTooLong)?;
         let key = Key::<Aes256Gcm>::from(key_bytes);
 

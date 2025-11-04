@@ -18,6 +18,7 @@
 */
 
 use std::fmt::Debug;
+use std::os::unix::fs::chown;
 use std::path::PathBuf;
 
 use chrono::Local;
@@ -34,6 +35,9 @@ use pam_polyauth::storage::{load_user_auth_data, remove_user_data, store_user_au
 use pam_polyauth::user::UserAuthData;
 
 use rpassword::prompt_password;
+use users::get_user_by_name;
+#[allow(unused_imports)]
+use users::os::unix::UserExt;
 
 use argh::FromArgs;
 use zbus::Connection;
@@ -207,9 +211,17 @@ struct MountAuthorizeCommand {}
 async fn main() {
     let args: Args = argh::from_env();
 
-    let (storage_source, maybe_main_password) = match args.config_file {
-        Some(path) => (StorageSource::File(path), args.password),
-        None => (StorageSource::Username(users::get_current_username().unwrap().to_string_lossy().to_string()), args.password),
+    let (storage_source, maybe_main_password) = match &args.config_file {
+        Some(path) => (StorageSource::File(path.clone()), args.password.clone()),
+        None => (
+            StorageSource::Username(
+                users::get_current_username()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string(),
+            ),
+            args.password.clone(),
+        ),
     };
 
     let mut user_cfg = match load_user_auth_data(&storage_source) {
@@ -218,8 +230,14 @@ async fn main() {
             None => UserAuthData::new(),
         },
         Err(err) => {
-            eprintln!("❌ There is a problem loading your configuration file: {err}.\nAborting.");
-            std::process::exit(-1)
+            if let Command::Setup(_) = &args.command {
+                eprintln!(
+                    "❌ There is a problem loading your configuration file: {err}.\nAborting."
+                );
+                std::process::exit(-1)
+            }
+
+            UserAuthData::new()
         }
     };
 
@@ -261,15 +279,21 @@ async fn main() {
                     std::process::exit(-1)
                 };
 
-                let connection = Connection::system().await.map_err(|err| {
-                    eprintln!("❌ Error connecting to system bus: {err}");
-                    std::process::exit(-1)
-                }).unwrap();
+                let connection = Connection::system()
+                    .await
+                    .map_err(|err| {
+                        eprintln!("❌ Error connecting to system bus: {err}");
+                        std::process::exit(-1)
+                    })
+                    .unwrap();
 
-                let proxy = MountAuthDBusProxy::new(&connection).await.map_err(|err| {
-                    eprintln!("❌ Error creating mount auth proxy: {err}");
-                    std::process::exit(-1)
-                }).unwrap();
+                let proxy = MountAuthDBusProxy::new(&connection)
+                    .await
+                    .map_err(|err| {
+                        eprintln!("❌ Error creating mount auth proxy: {err}");
+                        std::process::exit(-1)
+                    })
+                    .unwrap();
 
                 let reply = proxy
                     .authorize(username.as_str(), loaded_mounts.hash())
@@ -341,6 +365,51 @@ async fn main() {
                 std::process::exit(-1)
             }
 
+            // Check if username is specified and exists
+            let setup_username = match &args.username {
+                Some(user) => user.clone(),
+                None => {
+                    eprintln!("❌ Username must be specified for setup command.\nAborting.");
+                    std::process::exit(-1)
+                }
+            };
+
+            let user_info = get_user_by_name(&setup_username);
+            if user_info.is_none() {
+                eprintln!(
+                    "❌ Username '{}' does not exist in the system.\nAborting.",
+                    setup_username
+                );
+                std::process::exit(-1)
+            }
+            let user_info = user_info.unwrap();
+
+            // Determine the correct storage source for setup
+            let setup_storage_source = match &args.config_file {
+                Some(path) => {
+                    // If config_file is specified, enforce it
+                    StorageSource::File(path.clone())
+                }
+                None => {
+                    // If no config_file specified, use the location that will be searched by the service
+                    StorageSource::Username(setup_username.clone())
+                }
+            };
+
+            // Load existing config from the setup storage source
+            let mut setup_user_cfg = match load_user_auth_data(&setup_storage_source) {
+                Ok(load_res) => match load_res {
+                    Some(auth_data) => auth_data,
+                    None => UserAuthData::new(),
+                },
+                Err(err) => {
+                    eprintln!(
+                        "❌ There is a problem loading the configuration file: {err}.\nAborting."
+                    );
+                    std::process::exit(-1)
+                }
+            };
+
             let intermediate_key = match s.intermediate {
                 Some(ik) => ik.clone(),
                 None => {
@@ -361,11 +430,95 @@ async fn main() {
                 None => prompt_password("main password:").unwrap(),
             };
 
-            user_cfg = UserAuthData::new();
-            match user_cfg.set_main(&password, &intermediate_key) {
+            setup_user_cfg = UserAuthData::new();
+            match setup_user_cfg.set_main(&password, &intermediate_key) {
                 Ok(_) => {
-                    // Force the write of the populated User structure
-                    write_file = Some(true);
+                    // Save the setup configuration
+                    if let Err(err) = store_user_auth_data(setup_user_cfg, &setup_storage_source) {
+                        eprintln!(
+                            "❌ Error saving the user authentication data: {err}.\nAborting."
+                        );
+                        std::process::exit(-1)
+                    }
+
+                    // Load mounts for authorization
+                    let setup_user_mounts = match load_user_mountpoints(&setup_storage_source) {
+                        Ok(existing_data) => existing_data,
+                        Err(err) => {
+                            eprintln!("❌ Error in loading user mounts data: {err}.\nAborting.");
+                            std::process::exit(-1)
+                        }
+                    };
+
+                    // Save mounts if any
+                    if let Err(err) =
+                        store_user_mountpoints(setup_user_mounts.clone(), &setup_storage_source)
+                    {
+                        eprintln!("❌ Error saving the user mount data: {err}.\nAborting.");
+                        std::process::exit(-1)
+                    }
+
+                    // Get the config file path to change ownership
+                    let config_path = match &setup_storage_source {
+                        StorageSource::Username(username) => {
+                            PathBuf::from("/etc/polyauth").join(format!("{}.json", username))
+                        }
+                        StorageSource::File(path) => path.clone(),
+                    };
+
+                    // Change ownership to the setup username (user exists)
+                    let uid = user_info.uid();
+                    let gid = user_info.primary_group_id();
+
+                    if let Err(err) = chown(&config_path, Some(uid), Some(gid)) {
+                        eprintln!("⚠️  Warning: Could not change ownership of config file: {err}");
+                    }
+
+                    // If config_file was not specified, authorize default mount
+                    if args.config_file.is_none() {
+                        // Authorize mount if mounts are configured
+                        if let Some(mounts) = setup_user_mounts {
+                            match Connection::system().await {
+                                Ok(connection) => {
+                                    match MountAuthDBusProxy::new(&connection).await {
+                                        Ok(proxy) => {
+                                            match proxy
+                                                .authorize(setup_username.as_str(), mounts.hash())
+                                                .await
+                                            {
+                                                Ok(reply) => {
+                                                    let result =
+                                                        ServiceOperationResult::from(reply);
+                                                    if result != ServiceOperationResult::Ok {
+                                                        eprintln!("⚠️  Warning: Could not authorize mount: {result}");
+                                                    } else {
+                                                        println!("✅ Default mount authorized for user '{}'", setup_username);
+                                                    }
+                                                }
+                                                Err(err) => {
+                                                    eprintln!("⚠️  Warning: Error authorizing mount: {err}");
+                                                }
+                                            }
+                                        }
+                                        Err(err) => {
+                                            eprintln!("⚠️  Warning: Error creating mount auth proxy: {err}");
+                                        }
+                                    }
+                                }
+                                Err(err) => {
+                                    eprintln!("⚠️  Warning: Error connecting to system bus: {err}");
+                                }
+                            }
+                        }
+                    }
+
+                    println!(
+                        "✅ Setup completed successfully for user '{}'",
+                        setup_username
+                    );
+
+                    // Prevent the normal file write at the end since we already wrote it
+                    write_file = Some(false);
                 }
                 Err(err) => {
                     eprintln!("❌ Error in initializing the user authentication data: {err}");
@@ -380,7 +533,9 @@ async fn main() {
                     write_file = Some(false)
                 }
                 Err(err) => {
-                    eprintln!("❌ Error in resetting user additional authentication methods: {err}");
+                    eprintln!(
+                        "❌ Error in resetting user additional authentication methods: {err}"
+                    );
                     std::process::exit(-1)
                 }
             }

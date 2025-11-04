@@ -35,5 +35,3 @@ impl SessionCommand {
         self.command.clone()
     }
 }
-
-

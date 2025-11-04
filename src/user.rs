@@ -244,8 +244,7 @@ impl MainPassword {
         }
 
         let temp: [u8; 32] = self.intermediate_key_salt.into();
-        let intermediate_derived_key =
-            crate::derive_key(intermediate_key.as_str(), &temp);
+        let intermediate_derived_key = crate::derive_key(intermediate_key.as_str(), &temp);
 
         let key = Key::<Aes256Gcm>::from(intermediate_derived_key);
 

@@ -19,19 +19,19 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use users;
 use sys_mount::{Mount, Unmount, UnmountDrop, UnmountFlags};
+use users;
 
 use crate::mount::MountPoints;
 use tokio::sync::RwLock;
 
 use std::collections::HashMap;
 use std::fs::{self, File};
+use std::os::unix::fs as unix_fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::{fs::create_dir, path::Path};
-use std::os::unix::fs as unix_fs;
 
 use std::io::{self, Write};
 
@@ -138,7 +138,7 @@ pub(crate) fn mount_xdg(
             }
 
             Some(mount.into_unmount_drop(UnmountFlags::DETACH))
-        },
+        }
         Err(err) => {
             eprintln!(
                 "❌ Error mounting the xdg path for user {username} ({}): {err}",

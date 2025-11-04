@@ -19,11 +19,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{
-    collections::HashMap,
-    fs,
-    path::PathBuf,
-};
+use std::{collections::HashMap, fs, path::PathBuf};
 
 use crate::{
     auth::{SecondaryAuth, SecondaryAuthMethod, SecondaryPassword},
@@ -160,11 +156,11 @@ fn config_path_from_source(source: &StorageSource) -> PathBuf {
 
 fn load_config_from_source(source: &StorageSource) -> Result<Option<UserConfig>, StorageError> {
     let config_path = config_path_from_source(source);
-    
+
     if !config_path.exists() {
         return Ok(None);
     }
-    
+
     let contents = fs::read_to_string(&config_path)?;
     let config: UserConfig = serde_json::from_str(&contents)?;
     Ok(Some(config))
@@ -172,14 +168,14 @@ fn load_config_from_source(source: &StorageSource) -> Result<Option<UserConfig>,
 
 fn save_config_to_source(source: &StorageSource, config: &UserConfig) -> Result<(), StorageError> {
     let config_path = config_path_from_source(source);
-    
+
     // Create parent directory if it doesn't exist
     if let Some(parent) = config_path.parent() {
         if !parent.exists() {
             fs::create_dir_all(parent)?;
         }
     }
-    
+
     let contents = serde_json::to_string_pretty(config)?;
     fs::write(&config_path, contents)?;
     Ok(())
@@ -204,54 +200,55 @@ pub fn store_user_session_command(
 
 pub fn load_user_auth_data(source: &StorageSource) -> Result<Option<UserAuthData>, StorageError> {
     let config = load_config_from_source(source)?;
-    
+
     let Some(config) = config else {
         return Ok(None);
     };
-    
+
     let Some(auth_data_ser) = config.auth_data else {
         return Ok(None);
     };
-    
+
     let mut auth_data = UserAuthData::new();
-    
+
     // Deserialize main password from base64
     if let Some(main_b64) = auth_data_ser.main {
-        let main_bytes = BASE64.decode(&main_b64).map_err(|_| StorageError::DeserializationError)?;
+        let main_bytes = BASE64
+            .decode(&main_b64)
+            .map_err(|_| StorageError::DeserializationError)?;
         let main = MainPassword::decode::<u16>(&main_bytes)?;
         auth_data.push_main(main);
     } else {
         return Ok(None);
     }
-    
+
     // Deserialize secondary auth
     for item in auth_data_ser.secondary {
-        let password_bytes = BASE64.decode(&item.password).map_err(|_| StorageError::DeserializationError)?;
+        let password_bytes = BASE64
+            .decode(&item.password)
+            .map_err(|_| StorageError::DeserializationError)?;
         let password = SecondaryPassword::decode::<u16>(&password_bytes)?;
-        
+
         match item.auth_type {
             0 => {
-                let secondary_auth = SecondaryAuth::new_password(
-                    &item.name,
-                    Some(item.creation_date),
-                    password,
-                );
+                let secondary_auth =
+                    SecondaryAuth::new_password(&item.name, Some(item.creation_date), password);
                 auth_data.push_secondary(secondary_auth);
             }
             _ => return Err(StorageError::DeserializationError),
         }
     }
-    
+
     Ok(Some(auth_data))
 }
 
 pub fn remove_user_data(source: &StorageSource) -> Result<(), StorageError> {
     let config_path = config_path_from_source(source);
-    
+
     if config_path.exists() {
         fs::remove_file(config_path)?;
     }
-    
+
     Ok(())
 }
 
@@ -260,7 +257,7 @@ pub fn store_user_auth_data(
     source: &StorageSource,
 ) -> Result<(), StorageError> {
     let mut config = load_config_from_source(source)?.unwrap_or_else(UserConfig::new);
-    
+
     // Serialize main password to base64
     let main_b64 = match auth_data.main_password() {
         Some(m) => {
@@ -269,20 +266,20 @@ pub fn store_user_auth_data(
         }
         None => None,
     };
-    
+
     // Serialize secondary auth
     let mut secondary = Vec::new();
     for val in auth_data.secondary() {
         let name = val.name();
         let creation_date = val.creation_date();
-        
+
         let (auth_type, password_b64) = match val.data() {
             SecondaryAuthMethod::Password(secondary_password) => {
                 let password_bytes = secondary_password.encode::<u16>()?;
                 (0, BASE64.encode(&password_bytes))
             }
         };
-        
+
         secondary.push(SecondaryAuthItem {
             name,
             creation_date,
@@ -290,45 +287,41 @@ pub fn store_user_auth_data(
             password: password_b64,
         });
     }
-    
+
     config.auth_data = Some(AuthDataSerialized {
         main: main_b64,
         secondary,
     });
-    
+
     save_config_to_source(source, &config)?;
     Ok(())
 }
 
 pub fn load_user_mountpoints(source: &StorageSource) -> Result<Option<MountPoints>, StorageError> {
     let config = load_config_from_source(source)?;
-    
+
     let Some(config) = config else {
         return Ok(None);
     };
-    
+
     let Some(mountpoints_cfg) = config.mountpoints else {
         return Ok(None);
     };
-    
+
     // Convert serialized home mount to MountParams
     let home_mount = MountParams::new(
         mountpoints_cfg.home.device,
         mountpoints_cfg.home.fstype,
         mountpoints_cfg.home.args,
     );
-    
+
     // Convert additional mounts
     let mut mounts = HashMap::new();
     for mount_ser in mountpoints_cfg.additional {
-        let mount_params = MountParams::new(
-            mount_ser.device,
-            mount_ser.fstype,
-            mount_ser.args,
-        );
+        let mount_params = MountParams::new(mount_ser.device, mount_ser.fstype, mount_ser.args);
         mounts.insert(mount_ser.directory, mount_params);
     }
-    
+
     Ok(Some(MountPoints::new(home_mount, mounts)))
 }
 
@@ -337,13 +330,13 @@ pub fn store_user_mountpoints(
     source: &StorageSource,
 ) -> Result<(), StorageError> {
     let mut config = load_config_from_source(source)?.unwrap_or_else(UserConfig::new);
-    
+
     let Some(mountpoints) = mountpoints_data else {
         config.mountpoints = None;
         save_config_to_source(source, &config)?;
         return Ok(());
     };
-    
+
     // Serialize home mount
     let home = MountPointSerialized {
         fstype: mountpoints.mount().fstype().clone(),
@@ -351,16 +344,15 @@ pub fn store_user_mountpoints(
         directory: String::new(),
         args: mountpoints.mount().flags().clone(),
     };
-    
+
     // Serialize additional mounts
-    let additional = mountpoints
-        .foreach(|dir, params| MountPointSerialized {
-            fstype: params.fstype().clone(),
-            device: params.device().clone(),
-            directory: dir.clone(),
-            args: params.flags().clone(),
-        });
-    
+    let additional = mountpoints.foreach(|dir, params| MountPointSerialized {
+        fstype: params.fstype().clone(),
+        device: params.device().clone(),
+        directory: dir.clone(),
+        args: params.flags().clone(),
+    });
+
     config.mountpoints = Some(MountPointsConfig { home, additional });
     save_config_to_source(source, &config)?;
     Ok(())
