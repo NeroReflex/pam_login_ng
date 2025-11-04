@@ -4,19 +4,20 @@ TARGET ?= $(shell rustc -vV | grep "host" | sed 's/host: //')
 ETC_DIR ?= etc
 
 .PHONY_: install_pam_polyauth
-install_pam_polyauth: target/$(TARGET)/$(BUILD_TYPE)/pam_polyauth-service target/$(TARGET)/$(BUILD_TYPE)/pam_polyauth-mount target/$(TARGET)/$(BUILD_TYPE)/libpam_polyauth.so
+install_pam_polyauth: target/$(TARGET)/$(BUILD_TYPE)/pam_polyauth-service target/$(TARGET)/$(BUILD_TYPE)/pam_polyauth-mount target/$(TARGET)/$(BUILD_TYPE)/polyauthctl target/$(TARGET)/$(BUILD_TYPE)/libpam_polyauth.so
 	install -D -m 755 target/$(TARGET)/$(BUILD_TYPE)/pam_polyauth-service $(PREFIX)/usr/bin/pam_polyauth-service
 	install -D -m 755 target/$(TARGET)/$(BUILD_TYPE)/pam_polyauth-mount $(PREFIX)/usr/bin/pam_polyauth-mount
+	install -D -m 755 target/$(TARGET)/$(BUILD_TYPE)/polyauthctl $(PREFIX)/usr/bin/polyauthctl
 	install -D -m 755 target/$(TARGET)/$(BUILD_TYPE)/libpam_polyauth.so $(PREFIX)/usr/lib/security/pam_polyauth.so
 	install -D -m 644 rootfs/usr/lib/systemd/system/pam_polyauth.service $(PREFIX)/usr/lib/systemd/system/pam_polyauth.service
-	install -D -m 644 rootfs/usr/share/dbus-1/system.d/org.neroreflex.login_ng_mount.conf $(PREFIX)/usr/share/dbus-1/system.d/org.neroreflex.login_ng_mount.conf
-	install -D -m 644 rootfs/usr/share/dbus-1/system.d/org.neroreflex.login_ng_session.conf $(PREFIX)/usr/share/dbus-1/system.d/org.neroreflex.login_ng_session.conf
+	install -D -m 644 rootfs/usr/share/dbus-1/system.d/org.neroreflex.polyauth_mount.conf $(PREFIX)/usr/share/dbus-1/system.d/org.neroreflex.polyauth_mount.conf
+	install -D -m 644 rootfs/usr/share/dbus-1/system.d/org.neroreflex.polyauth_session.conf $(PREFIX)/usr/share/dbus-1/system.d/org.neroreflex.polyauth_session.conf
 
 .PHONY: install
 install: install_pam_polyauth
 
 .PHONY: build
-build: target/$(TARGET)/$(BUILD_TYPE)/libpam_polyauth.so target/$(TARGET)/$(BUILD_TYPE)/pam_polyauth-service target/$(TARGET)/$(BUILD_TYPE)/pam_polyauth-mount
+build: target/$(TARGET)/$(BUILD_TYPE)/libpam_polyauth.so target/$(TARGET)/$(BUILD_TYPE)/pam_polyauth-service target/$(TARGET)/$(BUILD_TYPE)/pam_polyauth-mount target/$(TARGET)/$(BUILD_TYPE)/polyauthctl
 
 .PHONY: fetch
 fetch: Cargo.lock
@@ -27,6 +28,9 @@ target/$(TARGET)/$(BUILD_TYPE)/pam_polyauth-mount: target/$(TARGET)/$(BUILD_TYPE
 
 target/$(TARGET)/$(BUILD_TYPE)/pam_polyauth-service: target/$(TARGET)/$(BUILD_TYPE)/libpam_polyauth.so
 	cargo build --frozen --offline --all-features --$(BUILD_TYPE) --bin pam_polyauth-service --target=$(TARGET) --target-dir target
+
+target/$(TARGET)/$(BUILD_TYPE)/polyauthctl: target/$(TARGET)/$(BUILD_TYPE)/libpam_polyauth.so
+	cargo build --frozen --offline --all-features --$(BUILD_TYPE) --bin polyauthctl --target=$(TARGET) --target-dir target
 
 target/$(TARGET)/$(BUILD_TYPE)/libpam_polyauth.so: fetch
 	cargo build --frozen --offline --all-features --$(BUILD_TYPE) --lib --target=$(TARGET) --target-dir target

@@ -37,6 +37,6 @@ pub enum UserOperationError {
     #[error("Hashing error: {0}")]
     HashingError(#[from] bcrypt::BcryptError),
 
-    #[error("login-ng error: {0}")]
+    #[error("polyauth error: {0}")]
     User(#[from] UserAuthDataError),
 }

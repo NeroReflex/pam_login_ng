@@ -28,7 +28,7 @@ use zbus::interface;
 use sys_mount::{Mount, UnmountDrop};
 
 use crate::{
-    storage::{load_user_mountpoints, StorageSource},
+    storage::{load_user_auth_data, load_user_mountpoints, StorageSource},
 };
 
 use users::{get_user_by_name, gid_t, os::unix::UserExt, uid_t};
@@ -130,10 +130,10 @@ impl Sessions {
 }
 
 #[interface(
-    name = "org.neroreflex.login_ng_session1",
+    name = "org.neroreflex.polyauth_session1",
     proxy(
-        default_service = "org.neroreflex.login_ng_session",
-        default_path = "/org/neroreflex/login_ng_session"
+        default_service = "org.neroreflex.polyauth_session",
+        default_path = "/org/neroreflex/polyauth_session"
     )
 )]
 impl Sessions {
@@ -329,6 +329,44 @@ impl Sessions {
                 eprintln!("❌ Error closing session for user {username}: already closed");
 
                 ServiceOperationResult::SessionAlreadyClosed.into()
+            }
+        }
+    }
+
+    async fn is_user_polyauth_enabled(&self, username: &str) -> u32 {
+        println!("🔍 Checking if user '{username}' is polyauth-enabled");
+
+        // Check for empty username or root
+        if username.is_empty() {
+            eprintln!("❌ Empty username provided");
+            return ServiceOperationResult::CannotIdentifyUser.into();
+        }
+
+        if username == "root" {
+            eprintln!("❌ Root user is not allowed for polyauth");
+            return ServiceOperationResult::CannotIdentifyUser.into();
+        }
+
+        // Load polyauth data and check if the user has it configured
+        match load_user_auth_data(&StorageSource::Username(username.to_string())) {
+            Ok(load_res) => match load_res {
+                Some(auth_data) => {
+                    if auth_data.has_main() {
+                        println!("✅ User '{username}' is polyauth-enabled");
+                        ServiceOperationResult::Ok.into()
+                    } else {
+                        eprintln!("❌ User '{username}' has no main password configured");
+                        ServiceOperationResult::CannotIdentifyUser.into()
+                    }
+                }
+                None => {
+                    eprintln!("❌ User '{username}' has no polyauth configuration");
+                    ServiceOperationResult::CannotIdentifyUser.into()
+                }
+            },
+            Err(err) => {
+                eprintln!("❌ Error loading user auth data for '{username}': {err}");
+                ServiceOperationResult::CannotIdentifyUser.into()
             }
         }
     }

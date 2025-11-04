@@ -91,7 +91,6 @@ use crate::{
         XDG_RUNTIME_DIR_PATH,
     },
     storage::{load_user_auth_data, StorageSource},
-    user::UserAuthData,
 };
 
 pub(crate) extern crate pam as pam_binding;
@@ -118,24 +117,6 @@ struct PamQuickEmbedded;
 pam_hooks!(PamQuickEmbedded);
 
 impl PamQuickEmbedded {
-    pub(crate) fn load_user_auth_data_from_username(username: &String) -> PamResult<UserAuthData> {
-        match username.as_str() {
-            "" => Err(PamErrorCode::USER_UNKNOWN),
-            "root" => Err(PamErrorCode::USER_UNKNOWN),
-            // load polyauth data and skip the user if it's not set
-            _ => match load_user_auth_data(&StorageSource::Username(username.clone())) {
-                Ok(load_res) => match load_res {
-                    Some(auth_data) => match auth_data.has_main() {
-                        true => Ok(auth_data),
-                        false => Err(PamErrorCode::USER_UNKNOWN),
-                    },
-                    None => Err(PamErrorCode::USER_UNKNOWN),
-                },
-                Err(_err) => Err(PamErrorCode::USER_UNKNOWN),
-            },
-        }
-    }
-
     pub(crate) async fn open_session_for_user(
         user: &String,
         plain_main_password: String,
@@ -174,13 +155,22 @@ impl PamQuickEmbedded {
 
         Ok(reply)
     }
+
+    pub(crate) async fn is_user_polyauth_enabled(user: &String) -> ZResult<u32> {
+        let connection = Connection::session().await?;
+
+        let proxy = SessionsProxy::new(&connection).await?;
+        let reply = proxy.is_user_polyauth_enabled(user.as_str()).await?;
+
+        Ok(reply)
+    }
 }
 
 impl PamHooks for PamQuickEmbedded {
     fn sm_close_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
         pamh.log(
             pam_binding::module::LogLevel::Debug,
-            "login_ng: sm_close_session: enter".to_string(),
+            "polyauth: sm_close_session: enter".to_string(),
         );
         
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
@@ -217,7 +207,7 @@ impl PamHooks for PamQuickEmbedded {
             Err(err) => {
                 pamh.log(
                     pam_binding::module::LogLevel::Error,
-                    format!("login_ng: open_session: get_user failed: {err}"),
+                    format!("polyauth: open_session: get_user failed: {err}"),
                 );
                 return Err(err);
             }
@@ -244,7 +234,7 @@ impl PamHooks for PamQuickEmbedded {
     fn sm_open_session(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
         pamh.log(
             pam_binding::module::LogLevel::Debug,
-            "login_ng: sm_open_session: enter".to_string(),
+            "polyauth: sm_open_session: enter".to_string(),
         );
 
         match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
@@ -278,7 +268,7 @@ impl PamHooks for PamQuickEmbedded {
                 Ok(None) => {
                     pamh.log(
                         pam_binding::module::LogLevel::Warning,
-                        "login_ng: sm_open_session: get_item<User> returned nothing but did not fail".to_string(),
+                        "polyauth: sm_open_session: get_item<User> returned nothing but did not fail".to_string(),
                     );
 
                     return Err(PamErrorCode::AUTH_ERR)
@@ -286,7 +276,7 @@ impl PamHooks for PamQuickEmbedded {
                 Err(err) => {
                     pamh.log(
                         pam_binding::module::LogLevel::Warning,
-                        format!("login_ng: sm_open_session: get_item<User> failed {err}"),
+                        format!("polyauth: sm_open_session: get_item<User> failed {err}"),
                     );
 
                     return Err(err)
@@ -295,7 +285,7 @@ impl PamHooks for PamQuickEmbedded {
             Err(err) => {
                 pamh.log(
                     pam_binding::module::LogLevel::Error,
-                    "login_ng: sm_open_session: get_user failed".to_string(),
+                    "polyauth: sm_open_session: get_user failed".to_string(),
                 );
                 return Err(err);
             }
@@ -303,19 +293,19 @@ impl PamHooks for PamQuickEmbedded {
 
         pamh.log(
             pam_binding::module::LogLevel::Debug,
-            format!("login_ng: sm_open_session: user {username}"),
+            format!("polyauth: sm_open_session: user {username}"),
         );
 
         unsafe {
             let runtime_ptr = &raw const RUNTIME;
             let runtime = (&*runtime_ptr).as_ref().ok_or(PamErrorCode::SERVICE_ERR)?;
             runtime.block_on(async {
-                let cred_data = format!("{}-login_ng", username);
+                let cred_data = format!("{}-polyauth", username);
                 let main_password = pamh.get_data::<String>(cred_data.as_str()).map_err(|err| {
                     pamh.log(
                         pam_binding::module::LogLevel::Error,
                         format!(
-                            "login_ng: sm_open_session: get_data error: {err}"
+                            "polyauth: sm_open_session: get_data error: {err}"
                         ),
                     );
 
@@ -331,7 +321,7 @@ impl PamHooks for PamQuickEmbedded {
                     pamh.log(
                         pam_binding::module::LogLevel::Error,
                         format!(
-                            "login_ng: sm_open_session: pam_polyauth-service dbus error: {err}"
+                            "polyauth: sm_open_session: pam_polyauth-service dbus error: {err}"
                         ),
                     );
 
@@ -342,7 +332,7 @@ impl PamHooks for PamQuickEmbedded {
                     ServiceOperationResult::Ok => {
                         pamh.log(
                             pam_binding::module::LogLevel::Info,
-                            "login_ng: sm_open_session: pam_polyauth-service was successful".to_string(),
+                            "polyauth: sm_open_session: pam_polyauth-service was successful".to_string(),
                         );
 
                         let uid = uid;
@@ -352,11 +342,11 @@ impl PamHooks for PamQuickEmbedded {
                         match pamh.env_set(Cow::from("XDG_RUNTIME_DIR"), xdg_user_path.to_string_lossy()) {
                             Ok(_) => pamh.log(
                                     pam_binding::module::LogLevel::Info,
-                                    "login_ng: sm_open_session: session opened and XDG_RUNTIME_DIR set".to_string(),
+                                    "polyauth: sm_open_session: session opened and XDG_RUNTIME_DIR set".to_string(),
                                 ),
                             Err(err) => pamh.log(
                                     pam_binding::module::LogLevel::Warning,
-                                    format!("login_ng: sm_open_session: could not set XDG_RUNTIME_DIR: {err}"),
+                                    format!("polyauth: sm_open_session: could not set XDG_RUNTIME_DIR: {err}"),
                                 ),
                         }
 
@@ -366,7 +356,7 @@ impl PamHooks for PamQuickEmbedded {
                         pamh.log(
                             pam_binding::module::LogLevel::Error,
                             format!(
-                                "login_ng: sm_open_session: pam_polyauth-service errored: {err}"
+                                "polyauth: sm_open_session: pam_polyauth-service errored: {err}"
                             ),
                         );
 
@@ -380,8 +370,32 @@ impl PamHooks for PamQuickEmbedded {
     fn sm_setcred(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
         pamh.log(
             pam_binding::module::LogLevel::Debug,
-            format!("login_ng: sm_setcred: enter"),
+            format!("polyauth: sm_setcred: enter"),
         );
+
+        match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
+            Ok(value) => pamh.log(
+                pam_binding::module::LogLevel::Debug,
+                format!("Using dbus service on socket {value}"),
+            ),
+            Err(err) => {
+                pamh.log(
+                    pam_binding::module::LogLevel::Debug,
+                    format!("Couldn't read dbus socket address: {err} - using default..."),
+                );
+                std::env::set_var(
+                    "DBUS_SESSION_BUS_ADDRESS",
+                    "unix:path=/run/dbus/system_bus_socket",
+                );
+            }
+        }
+
+        INIT.call_once(|| {
+            // Initialize the Tokio runtime
+            unsafe {
+                RUNTIME = Some(Runtime::new().unwrap());
+            }
+        });
 
         let username = match pamh.get_user(None)? {
             Some(res) => res,
@@ -390,7 +404,7 @@ impl PamHooks for PamQuickEmbedded {
                 None => {
                     pamh.log(
                         pam_binding::module::LogLevel::Error,
-                        "login_ng: sm_setcred: get_item<User> returned nothing but did not fail".to_string(),
+                        "polyauth: sm_setcred: get_item<User> returned nothing but did not fail".to_string(),
                     );
                     
                     return Err(PamErrorCode::AUTH_ERR)
@@ -398,11 +412,23 @@ impl PamHooks for PamQuickEmbedded {
             },
         };
 
-        // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
-        // TODO: this should probably be asked to the service
-        let user_cfg = PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string())?;
+        // Check if the user is polyauth-enabled by asking the service
+        unsafe {
+            let runtime_ptr = &raw const RUNTIME;
+            match &*runtime_ptr {
+                Some(runtime) => runtime.block_on(async {
+                    let Ok(result) = PamQuickEmbedded::is_user_polyauth_enabled(&String::from(username)).await else {
+                        return Err(PamErrorCode::SERVICE_ERR);
+                    };
 
-        Ok(())
+                    match ServiceOperationResult::from(result) {
+                        ServiceOperationResult::Ok => Ok(()),
+                        _ => Err(PamErrorCode::USER_UNKNOWN),
+                    }
+                }),
+                None => Err(PamErrorCode::SERVICE_ERR),
+            }
+        }
     }
 
     /*
@@ -415,13 +441,13 @@ impl PamHooks for PamQuickEmbedded {
     fn sm_authenticate(pamh: &mut PamHandle, _args: Vec<&CStr>, _flags: PamFlag) -> PamResult<()> {
         pamh.log(
             pam_binding::module::LogLevel::Error,
-            format!("login_ng: sm_authenticate: enter"),
+            format!("polyauth: sm_authenticate: enter"),
         );
 
         let username = match pamh.get_user(None).map_err(|err| {
             pamh.log(
                 pam_binding::module::LogLevel::Error,
-                format!("login_ng: open_session: get_user failed: {err}"),
+                format!("polyauth: open_session: get_user failed: {err}"),
             );
 
             err
@@ -432,7 +458,7 @@ impl PamHooks for PamQuickEmbedded {
                 .ok_or({
                     pamh.log(
                         pam_binding::module::LogLevel::Error,
-                        format!("login_ng: sm_authenticate: get_item<User> returned nothing"),
+                        format!("polyauth: sm_authenticate: get_item<User> returned nothing"),
                     );
 
                     PamErrorCode::AUTH_ERR
@@ -442,9 +468,12 @@ impl PamHooks for PamQuickEmbedded {
         };
 
         // try to load the user and return PAM_USER_UNKNOWN if it cannot be loaded
-        let user_cfg = PamQuickEmbedded::load_user_auth_data_from_username(&username.to_string())?;
+        let user_cfg = match load_user_auth_data(&StorageSource::Username(username.to_string())) {
+            Ok(Some(auth_data)) if auth_data.has_main() => auth_data,
+            _ => return Err(PamErrorCode::USER_UNKNOWN),
+        };
 
-        let cred_data = format!("{}-login_ng", username);
+        let cred_data = format!("{}-polyauth", username);
 
         // NOTE: if main_by_auth returns a main password the authentication was successful:
         // there is no need to check if the returned main password is the same as the stored one.
@@ -454,7 +483,7 @@ impl PamHooks for PamQuickEmbedded {
                 .map_err(|err| {
                     pamh.log(
                         pam_binding::module::LogLevel::Error,
-                        format!("login_ng: sm_authenticate: set_data error {err}"),
+                        format!("polyauth: sm_authenticate: set_data error {err}"),
                     );
 
                     err
@@ -491,7 +520,7 @@ impl PamHooks for PamQuickEmbedded {
         let main_password = user_cfg.main_by_auth(&Some(password)).map_err(|err| {
             pamh.log(
                 pam_binding::module::LogLevel::Error,
-                format!("login_ng: sm_authenticate: authentication error: {err}"),
+                format!("polyauth: sm_authenticate: authentication error: {err}"),
             );
 
             PamErrorCode::AUTH_ERR
@@ -500,7 +529,7 @@ impl PamHooks for PamQuickEmbedded {
             .map_err(|err| {
                 pamh.log(
                     pam_binding::module::LogLevel::Error,
-                    format!("login_ng: sm_authenticate: set_data error {err}"),
+                    format!("polyauth: sm_authenticate: set_data error {err}"),
                 );
 
                 err

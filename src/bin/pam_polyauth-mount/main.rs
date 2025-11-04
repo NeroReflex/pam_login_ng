@@ -69,9 +69,9 @@ async fn main() -> Result<(), ServiceError> {
     let args: Args = argh::from_env();
 
     match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
-        Ok(value) => println!("Connecting to dbus service on socket {value}"),
+        Ok(value) => println!("🔌 Connecting to dbus service on socket {value}"),
         Err(err) => {
-            println!("Couldn't read dbus socket address: {err} - using default...");
+            println!("🟠 Couldn't read dbus socket address: {err} - using default...");
             std::env::set_var(
                 "DBUS_SESSION_BUS_ADDRESS",
                 "unix:path=/run/dbus/system_bus_socket",
@@ -86,10 +86,10 @@ async fn main() -> Result<(), ServiceError> {
     match args.command {
         Command::Info(_) => {
             let version = pam_polyauth::LIBRARY_VERSION;
-            println!("polyauth version {version}, Copyright (C) 2024-2025 Denis Benato");
-            println!("polyauth comes with ABSOLUTELY NO WARRANTY;");
-            println!("This is free software, and you are welcome to redistribute it");
-            println!("under certain conditions.");
+            println!("🔐 polyauth version {version}, Copyright (C) 2024-2025 Denis Benato");
+            println!("⚠️  polyauth comes with ABSOLUTELY NO WARRANTY;");
+            println!("📜 This is free software, and you are welcome to redistribute it");
+            println!("   under certain conditions.");
             println!("\n");
         }
         Command::Authorize(auth_data) => {
@@ -101,13 +101,13 @@ async fn main() -> Result<(), ServiceError> {
             let user_mounts = match load_user_mountpoints(&storage_source) {
                 Ok(existing_data) => existing_data,
                 Err(err) => {
-                    eprintln!("Error in loading user mounts data: {err}");
+                    eprintln!("❌ Error in loading user mounts data: {err}");
                     std::process::exit(-1)
                 }
             };
 
             let Some(loaded_mounts) = user_mounts else {
-                eprintln!("User does not have mounts configured");
+                eprintln!("⚠️  User does not have mounts configured");
                 std::process::exit(-1)
             };
 
@@ -118,7 +118,7 @@ async fn main() -> Result<(), ServiceError> {
             let result = ServiceOperationResult::from(reply);
 
             if result != ServiceOperationResult::Ok {
-                eprintln!("Error in authorizing the user mouunt: {result}");
+                eprintln!("❌ Error in authorizing the user mount: {result}");
                 std::process::exit(-1)
             }
         }

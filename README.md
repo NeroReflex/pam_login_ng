@@ -11,7 +11,7 @@ behind another password that can be unlocked by various means while logging in:
 
 By default polyauth will behave exactly as any other greeter: you type your password to access your account.
 
-Using *login_ng-ctl* utility you can set more authentication options or even configure autologin for a systemd-homed
+Using *polyauthctl* utility you can set more authentication options or even configure autologin for a systemd-homed
 account with an encrypted home directory.
 
 ## Additional authentication

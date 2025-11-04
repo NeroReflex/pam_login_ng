@@ -1,10 +1,10 @@
 [Unit]
-Description=pam service for login_ng
+Description=pam service for polyauth
 Before=greetd.service
 
 [Service]
 Type=dbus
-BusName=org.neroreflex.login_ng_mount
+BusName=org.neroreflex.polyauth_mount
 ExecStart=pam_polyauth-service
 Restart=always
 IgnoreSIGPIPE=no

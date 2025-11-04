@@ -328,10 +328,10 @@ impl MountAuthDBus {
 }
 
 #[interface(
-    name = "org.neroreflex.login_ng_mount1",
+    name = "org.neroreflex.polyauth_mount1",
     proxy(
-        default_service = "org.neroreflex.login_ng_mount",
-        default_path = "/org/neroreflex/login_ng_mount"
+        default_service = "org.neroreflex.polyauth_mount",
+        default_path = "/org/neroreflex/polyauth_mount"
     )
 )]
 impl MountAuthDBus {

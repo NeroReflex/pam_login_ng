@@ -49,9 +49,9 @@ async fn main() -> Result<(), ServiceError> {
 
     let private_key_file_name_str = "private_key_pkcs1.pem";
     let authorization_file_name_str = "authorized_mounts.json";
-    let dir_path_str = match std::fs::exists("/usr/lib/login_ng/").unwrap_or(false) {
-        true => "/usr/lib/login_ng/",
-        false => "/etc/login_ng/",
+    let dir_path_str = match std::fs::exists("/usr/lib/polyauth/").unwrap_or(false) {
+        true => "/usr/lib/polyauth/",
+        false => "/etc/polyauth/",
     };
 
     create_directory(PathBuf::from(dir_path_str)).await?;
@@ -75,10 +75,10 @@ async fn main() -> Result<(), ServiceError> {
 
     let dbus_mounts_auth_con = connection::Builder::session()
         .map_err(ServiceError::ZbusError)?
-        .name("org.neroreflex.login_ng_mount")
+        .name("org.neroreflex.polyauth_mount")
         .map_err(ServiceError::ZbusError)?
         .serve_at(
-            "/org/neroreflex/login_ng_mount",
+            "/org/neroreflex/polyauth_mount",
             MountAuthDBus::new(mounts_auth.clone()),
         )
         .map_err(ServiceError::ZbusError)?
@@ -88,10 +88,10 @@ async fn main() -> Result<(), ServiceError> {
 
     let dbus_session_conn = connection::Builder::session()
         .map_err(ServiceError::ZbusError)?
-        .name("org.neroreflex.login_ng_session")
+        .name("org.neroreflex.polyauth_session")
         .map_err(ServiceError::ZbusError)?
         .serve_at(
-            "/org/neroreflex/login_ng_session",
+            "/org/neroreflex/polyauth_session",
             Sessions::new(
                 Path::new(dir_path_str).join(private_key_file_name_str),
                 mounts_auth,
