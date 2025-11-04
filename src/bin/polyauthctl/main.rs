@@ -24,6 +24,7 @@ use chrono::Local;
 use chrono::TimeZone;
 use pam_polyauth::command::SessionCommand;
 use pam_polyauth::mount::MountParams;
+use pam_polyauth::pam::{mount::MountAuthDBusProxy, result::ServiceOperationResult};
 use pam_polyauth::storage::load_user_mountpoints;
 use pam_polyauth::storage::load_user_session_command;
 use pam_polyauth::storage::store_user_mountpoints;
@@ -35,6 +36,7 @@ use pam_polyauth::user::UserAuthData;
 use rpassword::prompt_password;
 
 use argh::FromArgs;
+use zbus::Connection;
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Command line tool for managing polyauth authentication methods
@@ -71,6 +73,7 @@ enum Command {
     SetSession(SetSessionCommand),
     ChangeMainMount(ChangeMainMountCommand),
     ChangeSecondaryMount(ChangeSecondaryMountCommand),
+    Mount(MountCommand),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -180,7 +183,28 @@ struct AddAuthPasswordCommand {
     secondary_pw: Option<String>,
 }
 
-fn main() {
+#[derive(FromArgs, PartialEq, Debug)]
+/// Mount management commands
+#[argh(subcommand, name = "mount")]
+struct MountCommand {
+    #[argh(subcommand)]
+    action: MountAction,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+#[argh(subcommand)]
+/// Mount action subcommands
+enum MountAction {
+    Authorize(MountAuthorizeCommand),
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Authorize a user to mount devices on each login
+#[argh(subcommand, name = "authorize")]
+struct MountAuthorizeCommand {}
+
+#[tokio::main]
+async fn main() {
     let args: Args = argh::from_env();
 
     let (storage_source, maybe_main_password) = match args.config_file {
@@ -209,10 +233,67 @@ fn main() {
 
     let mut write_file = args.update_as_needed;
     match args.command {
+        Command::Mount(mount_cmd) => match mount_cmd.action {
+            MountAction::Authorize(_) => {
+                let username = match args.username {
+                    Some(ref user) => user.clone(),
+                    None => match &storage_source {
+                        StorageSource::Username(user) => user.clone(),
+                        StorageSource::File(_) => {
+                            eprintln!("❌ Username must be specified when using a config file");
+                            std::process::exit(-1)
+                        }
+                    },
+                };
+
+                let storage_source_for_mount = StorageSource::Username(username.clone());
+
+                let user_mounts = match load_user_mountpoints(&storage_source_for_mount) {
+                    Ok(existing_data) => existing_data,
+                    Err(err) => {
+                        eprintln!("❌ Error in loading user mounts data: {err}");
+                        std::process::exit(-1)
+                    }
+                };
+
+                let Some(loaded_mounts) = user_mounts else {
+                    eprintln!("⚠️  User does not have mounts configured");
+                    std::process::exit(-1)
+                };
+
+                let connection = Connection::system().await.map_err(|err| {
+                    eprintln!("❌ Error connecting to system bus: {err}");
+                    std::process::exit(-1)
+                }).unwrap();
+
+                let proxy = MountAuthDBusProxy::new(&connection).await.map_err(|err| {
+                    eprintln!("❌ Error creating mount auth proxy: {err}");
+                    std::process::exit(-1)
+                }).unwrap();
+
+                let reply = proxy
+                    .authorize(username.as_str(), loaded_mounts.hash())
+                    .await
+                    .map_err(|err| {
+                        eprintln!("❌ Error authorizing mount: {err}");
+                        std::process::exit(-1)
+                    })
+                    .unwrap();
+
+                let result = ServiceOperationResult::from(reply);
+
+                if result != ServiceOperationResult::Ok {
+                    eprintln!("❌ Error in authorizing the user mount: {result}");
+                    std::process::exit(-1)
+                }
+
+                println!("✅ Mount authorized for user '{}'", username);
+            }
+        },
         Command::Info(_) => {
             let version = pam_polyauth::LIBRARY_VERSION;
-            println!("polyauth version {version}, Copyright (C) 2024-2025 Denis Benato");
-            println!("polyauth comes with ABSOLUTELY NO WARRANTY;");
+            println!("pam_polyauth version {version}, Copyright (C) 2024-2025 Denis Benato");
+            println!("pam_polyauth comes with ABSOLUTELY NO WARRANTY;");
             println!("This is free software, and you are welcome to redistribute it");
             println!("under certain conditions.");
             println!("\n");

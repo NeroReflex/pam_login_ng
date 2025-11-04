@@ -19,10 +19,6 @@ path = "src/bin/polyauthctl/main.rs"
 name = "pam_polyauth-service"
 path = "src/bin/pam_polyauth-service/main.rs"
 
-[[bin]]
-name = "pam_polyauth-mount"
-path = "src/bin/pam_polyauth-mount/main.rs"
-
 [dependencies]
 users = "^0"
 aes-gcm = "^0"
@@ -53,10 +49,13 @@ depends = "$auto"
 section = "utility"
 priority = "optional"
 assets = [
+    ["target/release/polyauthctl", "usr/bin/", "755"],
     ["target/release/pam_polyauth-service", "usr/bin/", "755"],
-    ["target/release/pam_polyauth-mount", "usr/bin/", "755"],
     ["rootfs/usr/lib/systemd/system/pam_polyauth.service", "usr/lib/systemd/system/", "644"],
     ["rootfs/usr/lib/systemd/system/greetd.service.d/override.conf", "usr/lib/systemd/system/greetd.service.d/", "644"],
     ["rootfs/usr/share/dbus-1/system.d/org.neroreflex.polyauth_session.conf", "usr/share/dbus-1/system.d/", "644"],
     ["rootfs/usr/share/dbus-1/system.d/org.neroreflex.polyauth_mount.conf", "usr/share/dbus-1/system.d/", "644"],
+    ["Manual/polyauthctl.1", "usr/share/man/man1/", "644"],
+    ["completions/polyauthctl.bash", "usr/share/bash-completion/completions/polyauthctl", "644"],
+    ["completions/polyauthctl.zsh", "usr/share/zsh/site-functions/_polyauthctl", "644"],
 ]

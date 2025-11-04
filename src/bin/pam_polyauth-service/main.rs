@@ -56,24 +56,13 @@ async fn main() -> Result<(), ServiceError> {
 
     create_directory(PathBuf::from(dir_path_str)).await?;
 
-    match std::env::var("DBUS_SESSION_BUS_ADDRESS") {
-        Ok(value) => println!("Connecting to dbus service on socket {value}"),
-        Err(err) => {
-            println!("🟠 Couldn't read dbus socket address: {err} - using default...");
-            std::env::set_var(
-                "DBUS_SESSION_BUS_ADDRESS",
-                "unix:path=/run/dbus/system_bus_socket",
-            );
-        }
-    }
-
     let mounts_auth = Arc::new(RwLock::new(MountAuthOperations::new(
         Path::new(dir_path_str).join(authorization_file_name_str),
     )));
 
     println!("🔧 Building the dbus object...");
 
-    let dbus_mounts_auth_con = connection::Builder::session()
+    let dbus_mounts_auth_con = connection::Builder::system()
         .map_err(ServiceError::ZbusError)?
         .name("org.neroreflex.polyauth_mount")
         .map_err(ServiceError::ZbusError)?
@@ -86,7 +75,7 @@ async fn main() -> Result<(), ServiceError> {
         .await
         .map_err(ServiceError::ZbusError)?;
 
-    let dbus_session_conn = connection::Builder::session()
+    let dbus_session_conn = connection::Builder::system()
         .map_err(ServiceError::ZbusError)?
         .name("org.neroreflex.polyauth_session")
         .map_err(ServiceError::ZbusError)?

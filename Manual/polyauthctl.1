@@ -1,0 +1,338 @@
+.TH POLYAUTHCTL 1 "November 2025" "pam_polyauth 0.8.5" "User Commands"
+.SH NAME
+polyauthctl \- command line tool for managing polyauth authentication methods
+.SH SYNOPSIS
+.B polyauthctl
+[\fB\-u\fR \fIUSERNAME\fR] [\fB\-c\fR \fICONFIG_FILE\fR] [\fB\-p\fR \fIPASSWORD\fR]
+[\fB\-\-update\-as\-needed\fR]
+\fICOMMAND\fR [\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B polyauthctl
+is a command-line tool for managing polyauth authentication methods. It provides
+a comprehensive interface for setting up multi-factor authentication, managing
+user mounts, and configuring user sessions.
+
+The tool supports various authentication methods and allows users to configure
+automatic mounting of encrypted or network filesystems during login.
+.SH GLOBAL OPTIONS
+.TP
+.BR \-u ", " \-\-username " " \fIUSERNAME\fR
+Specify a username to operate on. If not specified, the current user is used.
+.TP
+.BR \-c ", " \-\-config\-file " " \fIPATH\fR
+Force the use of a specific configuration file instead of the default user configuration.
+.TP
+.BR \-p ", " \-\-password " " \fIPASSWORD\fR
+Provide the main password for authentication. Not recommended for security reasons
+as the password will be visible in the process list.
+.TP
+.BR \-\-update\-as\-needed
+Force update of the user configuration if required.
+.SH COMMANDS
+.SS info
+Display version and copyright information about polyauthctl.
+.PP
+.RS
+.B polyauthctl info
+.RE
+.SS setup
+Initialize authentication data and create a new intermediate key.
+.PP
+.RS
+.B polyauthctl setup
+[\fB\-i\fR \fIINTERMEDIATE_KEY\fR]
+.RE
+.PP
+Options:
+.RS
+.TP
+.BR \-i ", " \-\-intermediate " " \fIKEY\fR
+Provide the intermediate key directly instead of being prompted.
+.RE
+.PP
+The intermediate key is used to unlock additional authentication methods.
+If not provided, you will be prompted to enter it twice for confirmation.
+.SS reset
+Remove all additional authentication data and destroy the intermediate key.
+.PP
+.RS
+.B polyauthctl reset
+.RE
+.PP
+This is a destructive operation that will remove all secondary authentication
+methods and require you to run
+.B setup
+again.
+.SS inspect
+Display current user authentication settings, mounts, and configured authentication methods.
+.PP
+.RS
+.B polyauthctl inspect
+.RE
+.PP
+The output includes:
+.RS
+.IP \(bu 2
+User or configuration file path
+.IP \(bu 2
+Mount configuration hash
+.IP \(bu 2
+Primary mount device and filesystem
+.IP \(bu 2
+Mount flags and options
+.IP \(bu 2
+Pre-mount configurations
+.IP \(bu 2
+Default session command
+.IP \(bu 2
+List of all configured authentication methods
+.RE
+.SS add
+Add a new authentication method.
+.PP
+.RS
+.B polyauthctl add \-\-name
+.I NAME
+[\fB\-\-intermediate\fR \fIKEY\fR]
+.I METHOD
+.RE
+.PP
+Options:
+.RS
+.TP
+.BR \-\-name " " \fINAME\fR
+Name for the authentication method (required).
+.TP
+.BR \-\-intermediate " " \fIKEY\fR
+Intermediate key (prompted if not provided).
+.RE
+.PP
+Methods:
+.RS
+.TP
+.B password
+Add password-based authentication.
+.RS
+.TP
+.BR \-\-secondary\-pw " " \fIPASSWORD\fR
+Secondary password (prompted if not provided).
+.RE
+.RE
+.PP
+Example:
+.RS
+polyauthctl add \-\-name backup\-password password
+.RE
+.SS set\-session
+Configure the default session command to execute when a user logs in.
+.PP
+.RS
+.B polyauthctl set\-session \-\-cmd
+.I COMMAND
+[\fB\-\-args\fR \fIARG\fR]...
+.RE
+.PP
+Options:
+.RS
+.TP
+.BR \-\-cmd " " \fICOMMAND\fR
+Command to execute (required).
+.TP
+.BR \-\-args " " \fIARG\fR
+Additional arguments for the command (can be repeated).
+.RE
+.PP
+Example:
+.RS
+polyauthctl set\-session \-\-cmd /usr/bin/gnome\-session
+.RE
+.SS set\-home\-mount
+Configure the mount command for the user's home directory.
+.PP
+.RS
+.B polyauthctl set\-home\-mount \-\-device
+.I DEVICE
+.B \-\-fstype
+.I TYPE
+[\fB\-\-flags\fR \fIFLAG\fR]...
+.RE
+.PP
+Options:
+.RS
+.TP
+.BR \-\-device " " \fIDEVICE\fR
+Device to mount (required).
+.TP
+.BR \-\-fstype " " \fITYPE\fR
+Filesystem type, e.g., ext4, btrfs, xfs (required).
+.TP
+.BR \-\-flags " " \fIFLAG\fR
+Mount options (can be repeated).
+.RE
+.PP
+Common filesystem types: ext4, btrfs, xfs, f2fs, ntfs
+.PP
+Common mount flags: rw, ro, nosuid, nodev, noexec, relatime, user_xattr, acl
+.PP
+Example:
+.RS
+polyauthctl set\-home\-mount \-\-device /dev/sda1 \-\-fstype ext4 \-\-flags rw \-\-flags relatime
+.RE
+.SS set\-pre\-mount
+Configure additional mounts that should be performed before mounting the home directory.
+.PP
+.RS
+.B polyauthctl set\-pre\-mount \-\-dir
+.I DIRECTORY
+.B \-\-device
+.I DEVICE
+.B \-\-fstype
+.I TYPE
+[\fB\-\-flags\fR \fIFLAG\fR]...
+.RE
+.PP
+Options:
+.RS
+.TP
+.BR \-\-dir " " \fIDIRECTORY\fR
+Directory to mount the device into (required).
+.TP
+.BR \-\-device " " \fIDEVICE\fR
+Device to mount (required).
+.TP
+.BR \-\-fstype " " \fITYPE\fR
+Filesystem type (required).
+.TP
+.BR \-\-flags " " \fIFLAG\fR
+Mount options (can be repeated).
+.RE
+.PP
+Example:
+.RS
+polyauthctl set\-pre\-mount \-\-dir /mnt/data \-\-device /dev/sdb1 \-\-fstype ext4 \-\-flags rw
+.RE
+.SS mount
+Manage mount authorizations.
+.PP
+.B mount authorize
+.RS
+Authorize a user to mount configured devices on each login.
+.PP
+.RS
+.B polyauthctl mount authorize
+[\fB\-u\fR \fIUSERNAME\fR]
+.RE
+.PP
+Options:
+.RS
+.TP
+.BR \-u ", " \-\-username " " \fIUSER\fR
+Username to authorize mount for (defaults to current user).
+.RE
+.PP
+This command:
+.RS
+.IP \(bu 2
+Loads the user's mount configuration
+.IP \(bu 2
+Calculates a hash of the mount configuration
+.IP \(bu 2
+Registers the hash with the mount authentication service
+.IP \(bu 2
+Allows automatic mounting during login
+.RE
+.PP
+Example:
+.RS
+polyauthctl mount authorize
+.RE
+.RE
+.SH EXAMPLES
+.SS Complete Setup for a New User
+.RS
+.nf
+# Initialize authentication
+polyauthctl setup
+
+# Configure home directory mount
+polyauthctl set\-home\-mount \-\-device /dev/sda1 \-\-fstype ext4 \-\-flags rw \-\-flags relatime
+
+# Add a backup authentication method
+polyauthctl add \-\-name backup\-password password
+
+# Set default session
+polyauthctl set\-session \-\-cmd /usr/bin/gnome\-session
+
+# Authorize mounts
+polyauthctl mount authorize
+
+# Verify configuration
+polyauthctl inspect
+.fi
+.RE
+.SS Adding Multiple Pre-Mounts
+.RS
+.nf
+# Mount encrypted data partition
+polyauthctl set\-pre\-mount \-\-dir /mnt/encrypted \-\-device /dev/mapper/data \-\-fstype ext4 \-\-flags rw
+
+# Mount network storage
+polyauthctl set\-pre\-mount \-\-dir /mnt/nfs \-\-device server:/export \-\-fstype nfs \-\-flags ro
+.fi
+.RE
+.SH FILES
+.TP
+.I /var/lib/polyauth/<username>/
+Default directory for user configuration files.
+.TP
+.I /var/lib/polyauth/<username>/auth.json
+User authentication data including encrypted passwords.
+.TP
+.I /var/lib/polyauth/<username>/mounts.json
+User mount configuration.
+.TP
+.I /var/lib/polyauth/<username>/session.json
+User session configuration.
+.SH SECURITY CONSIDERATIONS
+.SS Intermediate Keys
+The intermediate key is used to encrypt secondary authentication methods.
+Choose a strong, unique intermediate key and never share it.
+.SS Passwords on Command Line
+Avoid using the
+.B \-p
+flag to provide passwords on the command line, as they will be visible in
+the process list. Use interactive prompts instead.
+.SS File Permissions
+Configuration files should be readable only by the user and root (permissions 0600).
+.SS Mount Security
+Use
+.B nosuid
+and
+.B nodev
+flags for non-system mounts. Be cautious with network mounts (NFS, CIFS).
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+General error
+.TP
+.B \-1
+Fatal error (authentication failure, configuration error, etc.)
+.SH SEE ALSO
+.BR pam (8),
+.BR mount (8),
+.BR pam_polyauth-service (1)
+.SH BUGS
+Report bugs to: https://github.com/NeroReflex/polyauth/issues
+.SH AUTHOR
+Written by Denis Benato.
+.SH COPYRIGHT
+Copyright \(co 2024-2025 Denis Benato.
+.br
+License GPLv2: GNU GPL version 2 <https://gnu.org/licenses/gpl-2.0.html>.
+.br
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+

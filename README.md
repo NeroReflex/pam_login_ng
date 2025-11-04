@@ -47,6 +47,52 @@ changing the main password won't suffice!
 The good part is that knowing the main password will __NOT__ disclose the intermediate key nor any secondary authentication method,
 and knowing the intermediate key will __NOT__ disclose secondary authentication methods.
 
+## Documentation
+
+Comprehensive documentation is available in the `Manual/` directory:
+
+- **[Manual/README.md](Manual/README.md)** - Complete user manual with detailed command reference, examples, and troubleshooting
+- **[Manual/polyauthctl.1](Manual/polyauthctl.1)** - Man page for `polyauthctl` command
+- **[Manual/INSTALL.md](Manual/INSTALL.md)** - Instructions for installing documentation
+- **[Manual/MIGRATION.md](Manual/MIGRATION.md)** - Migration guide from `pam_polyauth-mount` to `polyauthctl mount`
+- **[Manual/INDEX.md](Manual/INDEX.md)** - Documentation overview and quick start guide
+
+### Quick Start with polyauthctl
+
+```bash
+# Initialize authentication
+polyauthctl setup
+
+# Configure home directory mount
+polyauthctl set-home-mount --device /dev/sda1 --fstype ext4 --flags rw
+
+# Add a backup authentication method
+polyauthctl add --name backup-password password
+
+# Authorize mounts
+polyauthctl mount authorize
+
+# Verify configuration
+polyauthctl inspect
+```
+
+For detailed usage, see `man polyauthctl` or the comprehensive manual in `Manual/README.md`.
+
+### Shell Completion
+
+Tab-completion is available for both **bash** and **zsh**:
+
+**Installation:**
+```bash
+# Bash (system-wide)
+sudo cp completions/polyauthctl.bash /usr/share/bash-completion/completions/polyauthctl
+
+# Zsh (system-wide)
+sudo cp completions/polyauthctl.zsh /usr/share/zsh/site-functions/_polyauthctl
+```
+
+Completions are automatically installed when using the package manager. See `completions/README.md` for detailed installation instructions and troubleshooting.
+
 ## Additional notes
 
 Here is some notes of general interest:
