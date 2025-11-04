@@ -1,5 +1,7 @@
 /*
-    login-ng A greeter written in rust that also supports autologin with systemd-homed
+    pam_polyauth: A pam module written in rust that supports multiple
+    authentication modes (including autologin).
+
     Copyright (C) 2024-2025  Denis Benato
 
     This program is free software; you can redistribute it and/or modify
@@ -21,16 +23,16 @@ extern crate tokio;
 
 use std::path::PathBuf;
 
-use login_ng::{
+use pam_polyauth::{
     pam::{mount::MountAuthDBusProxy, result::ServiceOperationResult, ServiceError},
     storage::{load_user_mountpoints, StorageSource},
-    zbus::Connection,
 };
 
+use zbus::Connection;
 use argh::FromArgs;
 
 #[derive(FromArgs, PartialEq, Debug)]
-/// Command line tool for managing login-ng authentication methods
+/// Command line tool for managing polyauth authentication methods
 struct Args {
     #[argh(subcommand)]
     command: Command,
@@ -83,16 +85,16 @@ async fn main() -> Result<(), ServiceError> {
 
     match args.command {
         Command::Info(_) => {
-            let version = login_ng::LIBRARY_VERSION;
-            println!("login-ng version {version}, Copyright (C) 2024 Denis Benato");
-            println!("login-ng comes with ABSOLUTELY NO WARRANTY;");
+            let version = pam_polyauth::LIBRARY_VERSION;
+            println!("polyauth version {version}, Copyright (C) 2024-2025 Denis Benato");
+            println!("polyauth comes with ABSOLUTELY NO WARRANTY;");
             println!("This is free software, and you are welcome to redistribute it");
             println!("under certain conditions.");
             println!("\n");
         }
         Command::Authorize(auth_data) => {
             let storage_source = match auth_data.directory {
-                Some(path) => StorageSource::Path(path),
+                Some(path) => StorageSource::File(path),
                 _ => StorageSource::Username(auth_data.username.clone()),
             };
 

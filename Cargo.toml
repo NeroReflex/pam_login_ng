@@ -1,5 +1,5 @@
 [package]
-name = "pam_login_ng"
+name = "pam_polyauth"
 version = "0.8.5"
 description = "Additional pam module and service to login the user."
 homepage = "https://github.com/NeroReflex/login_ng"
@@ -8,21 +8,36 @@ authors = ["Denis Benato <benato.denis96@gmail.com>"]
 license-file = "LICENSE.md"
 
 [lib]
-name = "pam_login_ng"
-crate-type = ["cdylib"]
+name = "pam_polyauth"
+crate-type = ["cdylib", "rlib"]
 
 [[bin]]
-name = "pam_login_ng-service"
-path = "src/pam_login_ng-service/main.rs"
+name = "pam_polyauth-service"
+path = "src/bin/pam_polyauth-service/main.rs"
 
 [[bin]]
-name = "pam_login_ng-mount"
-path = "src/pam_login_ng-mount/main.rs"
+name = "pam_polyauth-mount"
+path = "src/bin/pam_polyauth-mount/main.rs"
 
 [dependencies]
-login_ng = { git = "https://github.com/NeroReflex/login_ng.git", rev = "0.8.8" }
+users = "^0"
+aes-gcm = "^0"
+base64 = "^0"
+bcrypt = "^0"
+hkdf = { version = "^0", features = [] }
+sha2 = "^0"
+bytevec2 = "^0"
+rs_sha512 = "^0"
+thiserror = "^2"
 argh = "^0"
-tokio = { version = "^1", features = ["macros", "rt-multi-thread", "sync", "signal"] }
+tokio = { version = "^1", features = ["macros", "rt-multi-thread", "sync", "signal", "time"] }
+zbus = "^5" # pam
+rand = "0.8.5" # pam
+rsa = { version = "0.9.7", features = ["pem", "std", "u64_digit"] } # pam
+serde = { version = "^1", features = ["derive"] } # pam
+serde_json = "^1" # pam
+sys-mount = "^3" # pam
+pam = { git = "https://github.com/NeroReflex/pam-rs.git", rev = "7e2d531db8f8b274e30121d1f65ca5aac6912adc" } # pam
 
 [package.metadata.deb]
 license-file = ["LICENSE.md", "4"]
@@ -32,9 +47,9 @@ depends = "$auto"
 section = "utility"
 priority = "optional"
 assets = [
-    ["target/release/pam_login_ng-service", "usr/bin/", "755"],
-    ["target/release/pam_login_ng-mount", "usr/bin/", "755"],
-    ["rootfs/usr/lib/systemd/system/pam_login_ng.service", "usr/lib/systemd/system/", "644"],
+    ["target/release/pam_polyauth-service", "usr/bin/", "755"],
+    ["target/release/pam_polyauth-mount", "usr/bin/", "755"],
+    ["rootfs/usr/lib/systemd/system/pam_polyauth.service", "usr/lib/systemd/system/", "644"],
     ["rootfs/usr/lib/systemd/system/greetd.service.d/override.conf", "usr/lib/systemd/system/greetd.service.d/", "644"],
     ["rootfs/usr/share/dbus-1/system.d/org.neroreflex.login_ng_session.conf", "usr/share/dbus-1/system.d/", "644"],
     ["rootfs/usr/share/dbus-1/system.d/org.neroreflex.login_ng_mount.conf", "usr/share/dbus-1/system.d/", "644"],

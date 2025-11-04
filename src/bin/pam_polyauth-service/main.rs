@@ -1,5 +1,7 @@
 /*
-    login-ng A greeter written in rust that also supports autologin with systemd-homed
+    pam_polyauth: A pam module written in rust that supports multiple
+    authentication modes (including autologin).
+
     Copyright (C) 2024-2025  Denis Benato
 
     This program is free software; you can redistribute it and/or modify
@@ -19,17 +21,17 @@
 
 extern crate tokio;
 
-use login_ng::{
+use pam_polyauth::{
     pam::{
         disk::create_directory,
         mount::{MountAuthDBus, MountAuthOperations},
         session::Sessions,
         ServiceError,
     },
-    users,
-    zbus::connection,
 };
 
+use users;
+use zbus::connection;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::RwLock;
 

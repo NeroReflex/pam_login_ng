@@ -1,4 +1,4 @@
-# login-ng
+# polyauth
 
 A greeter with the additional (and totally optional) feature of shielding the real password
 behind another password that can be unlocked by various means while logging in:
@@ -9,7 +9,7 @@ behind another password that can be unlocked by various means while logging in:
     - __files__ use a specific file on some kind of removable media to authenticate
     - __pin__ a numeric pin just as in your phone
 
-By default login-ng will behave exactly as any other greeter: you type your password to access your account.
+By default polyauth will behave exactly as any other greeter: you type your password to access your account.
 
 Using *login_ng-ctl* utility you can set more authentication options or even configure autologin for a systemd-homed
 account with an encrypted home directory.
