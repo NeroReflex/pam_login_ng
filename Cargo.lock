@@ -933,7 +933,7 @@ dependencies = [
 
 [[package]]
 name = "pam_polyauth"
-version = "0.8.6"
+version = "0.8.7"
 dependencies = [
  "aes-gcm",
  "argh",

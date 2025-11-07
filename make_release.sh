@@ -7,6 +7,7 @@ version=$(grep -oP 'version\s*=\s*"\K[0-9]+\.[0-9]+\.[0-9]+' Cargo.toml | head -
 echo "Replacing version $version with $new_version"
 find . -name "*.toml" -type f -exec sed -i '0,/"'"$version"'"/s//"'"$new_version"'"/' {} +
 #sed -i "s/\"$version\"/\"$new_version\"/g" Cargo.lock
+cargo build
 git add .
 git commit -m "Bump version to $new_version"
 git tag $new_version

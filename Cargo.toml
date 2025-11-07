@@ -1,6 +1,6 @@
 [package]
 name = "pam_polyauth"
-version = "0.8.6"
+version = "0.8.7"
 description = "Additional pam module and service to login the user."
 homepage = "https://github.com/NeroReflex/polyauth"
 edition = "2021"
