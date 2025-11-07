@@ -18,7 +18,6 @@
 */
 
 use std::fmt::Debug;
-use std::os::unix::fs::chown;
 use std::path::PathBuf;
 
 use chrono::Local;
@@ -26,12 +25,10 @@ use chrono::TimeZone;
 use pam_polyauth::command::SessionCommand;
 use pam_polyauth::mount::MountParams;
 use pam_polyauth::pam::{mount::MountAuthDBusProxy, result::ServiceOperationResult};
-use pam_polyauth::storage::load_user_mountpoints;
-use pam_polyauth::storage::load_user_session_command;
-use pam_polyauth::storage::store_user_mountpoints;
-use pam_polyauth::storage::store_user_session_command;
-use pam_polyauth::storage::StorageSource;
-use pam_polyauth::storage::{load_user_auth_data, remove_user_data, store_user_auth_data};
+use pam_polyauth::storage::{
+    load_user_auth_data, load_user_mountpoints, load_user_session_command, remove_user_data,
+    store_user_auth_data, store_user_mountpoints, store_user_session_command, StorageSource,
+};
 use pam_polyauth::user::UserAuthData;
 
 use rpassword::prompt_password;
@@ -349,7 +346,7 @@ async fn main() {
         Command::SetSession(session_data) => {
             let command = SessionCommand::new(session_data.cmd);
 
-            match store_user_session_command(&command, &storage_source) {
+            match store_user_session_command(&command, &storage_source, None, None) {
                 Ok(_) => {}
                 Err(err) => {
                     eprintln!("❌ Error changing the user default session: {err}");
@@ -374,8 +371,12 @@ async fn main() {
 
             let Some(user_info) = get_user_by_name(&setup_username) else {
                 eprintln!("❌ Username '{setup_username}' does not exist in the system");
-                std::process::exit(-1)   
+                std::process::exit(-1)
             };
+
+            // Collect uid and gid to change ownership to the setup username (user exists)
+            let uid = user_info.uid();
+            let gid = user_info.primary_group_id();
 
             // Determine the correct storage source for setup
             let setup_storage_source = match &args.config_file {
@@ -412,7 +413,9 @@ async fn main() {
             match user_cfg.set_main(&password, &intermediate_key) {
                 Ok(_) => {
                     // Save the setup configuration
-                    if let Err(err) = store_user_auth_data(&user_cfg, &setup_storage_source) {
+                    if let Err(err) =
+                        store_user_auth_data(&user_cfg, &setup_storage_source, Some(uid), Some(gid))
+                    {
                         eprintln!("❌ Error saving the user authentication data: {err}");
                         std::process::exit(-1)
                     }
@@ -427,27 +430,14 @@ async fn main() {
                     };
 
                     // Save mounts if any
-                    if let Err(err) =
-                        store_user_mountpoints(setup_user_mounts.clone(), &setup_storage_source)
-                    {
+                    if let Err(err) = store_user_mountpoints(
+                        setup_user_mounts.clone(),
+                        &setup_storage_source,
+                        None,
+                        None,
+                    ) {
                         eprintln!("❌ Error saving the user mount data: {err}");
                         std::process::exit(-1)
-                    }
-
-                    // Get the config file path to change ownership
-                    let config_path = match &setup_storage_source {
-                        StorageSource::Username(username) => {
-                            PathBuf::from("/etc/polyauth").join(format!("{}.json", username))
-                        }
-                        StorageSource::File(path) => path.clone(),
-                    };
-
-                    // Change ownership to the setup username (user exists)
-                    let uid = user_info.uid();
-                    let gid = user_info.primary_group_id();
-
-                    if let Err(err) = chown(&config_path, Some(uid), Some(gid)) {
-                        eprintln!("⚠️  Warning: Could not change ownership of config file: {err}");
                     }
 
                     // If config_file was not specified, authorize default mount
@@ -679,10 +669,10 @@ async fn main() {
     }
 
     if write_file.unwrap_or_default() {
-        store_user_auth_data(&user_cfg, &storage_source)
+        store_user_auth_data(&user_cfg, &storage_source, None, None)
             .expect("❌ Error saving the updated user auth data");
 
-        store_user_mountpoints(user_mounts, &storage_source)
+        store_user_mountpoints(user_mounts, &storage_source, None, None)
             .expect("❌ Error saving the updated user mount data");
     }
 }

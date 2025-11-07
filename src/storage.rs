@@ -19,7 +19,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, fs, os::unix::fs::chown, path::PathBuf};
 
 use crate::{
     auth::{SecondaryAuth, SecondaryAuthMethod, SecondaryPassword},
@@ -144,10 +144,10 @@ struct SecondaryAuthItem {
 
 // Helper functions for config file paths
 fn config_path_for_username(username: &str) -> PathBuf {
-    PathBuf::from(POLYAUTH_CONFIG_DIR).join(format!("{}.json", username))
+    PathBuf::from(POLYAUTH_CONFIG_DIR).join(format!("{username}.json"))
 }
 
-fn config_path_from_source(source: &StorageSource) -> PathBuf {
+pub fn config_path_from_source(source: &StorageSource) -> PathBuf {
     match source {
         StorageSource::Username(username) => config_path_for_username(username),
         StorageSource::File(path) => path.clone(),
@@ -166,7 +166,12 @@ fn load_config_from_source(source: &StorageSource) -> Result<Option<UserConfig>,
     Ok(Some(config))
 }
 
-fn save_config_to_source(source: &StorageSource, config: &UserConfig) -> Result<(), StorageError> {
+fn save_config_to_source(
+    source: &StorageSource,
+    config: &UserConfig,
+    uid: Option<u32>,
+    gid: Option<u32>,
+) -> Result<(), StorageError> {
     let config_path = config_path_from_source(source);
 
     // Create parent directory if it doesn't exist
@@ -178,6 +183,12 @@ fn save_config_to_source(source: &StorageSource, config: &UserConfig) -> Result<
 
     let contents = serde_json::to_string_pretty(config)?;
     fs::write(&config_path, contents)?;
+
+    if uid.is_some() {
+        chown(&config_path, uid, gid)
+            .map_err(|e| StorageError::IoError(std::io::Error::from(e)))?;
+    }
+
     Ok(())
 }
 
@@ -191,10 +202,12 @@ pub fn load_user_session_command(
 pub fn store_user_session_command(
     settings: &SessionCommand,
     source: &StorageSource,
+    uid: Option<u32>,
+    gid: Option<u32>,
 ) -> Result<(), StorageError> {
     let mut config = load_config_from_source(source)?.unwrap_or_else(UserConfig::new);
     config.session_command = Some(settings.clone());
-    save_config_to_source(source, &config)?;
+    save_config_to_source(source, &config, uid, gid)?;
     Ok(())
 }
 
@@ -255,6 +268,8 @@ pub fn remove_user_data(source: &StorageSource) -> Result<(), StorageError> {
 pub fn store_user_auth_data(
     auth_data: &UserAuthData,
     source: &StorageSource,
+    uid: Option<u32>,
+    gid: Option<u32>,
 ) -> Result<(), StorageError> {
     let mut config = load_config_from_source(source)?.unwrap_or_else(UserConfig::new);
 
@@ -293,7 +308,8 @@ pub fn store_user_auth_data(
         secondary,
     });
 
-    save_config_to_source(source, &config)?;
+    save_config_to_source(source, &config, uid, gid)?;
+
     Ok(())
 }
 
@@ -328,12 +344,14 @@ pub fn load_user_mountpoints(source: &StorageSource) -> Result<Option<MountPoint
 pub fn store_user_mountpoints(
     mountpoints_data: Option<MountPoints>,
     source: &StorageSource,
+    uid: Option<u32>,
+    gid: Option<u32>,
 ) -> Result<(), StorageError> {
     let mut config = load_config_from_source(source)?.unwrap_or_else(UserConfig::new);
 
     let Some(mountpoints) = mountpoints_data else {
         config.mountpoints = None;
-        save_config_to_source(source, &config)?;
+        save_config_to_source(source, &config, uid, gid)?;
         return Ok(());
     };
 
@@ -354,6 +372,6 @@ pub fn store_user_mountpoints(
     });
 
     config.mountpoints = Some(MountPointsConfig { home, additional });
-    save_config_to_source(source, &config)?;
+    save_config_to_source(source, &config, uid, gid)?;
     Ok(())
 }
