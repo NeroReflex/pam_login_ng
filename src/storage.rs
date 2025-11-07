@@ -253,7 +253,7 @@ pub fn remove_user_data(source: &StorageSource) -> Result<(), StorageError> {
 }
 
 pub fn store_user_auth_data(
-    auth_data: UserAuthData,
+    auth_data: &UserAuthData,
     source: &StorageSource,
 ) -> Result<(), StorageError> {
     let mut config = load_config_from_source(source)?.unwrap_or_else(UserConfig::new);

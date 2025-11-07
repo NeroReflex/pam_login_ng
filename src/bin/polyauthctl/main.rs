@@ -231,9 +231,7 @@ async fn main() {
         },
         Err(err) => {
             if let Command::Setup(_) = &args.command {
-                eprintln!(
-                    "❌ There is a problem loading your configuration file: {err}.\nAborting."
-                );
+                eprintln!("❌ There is a problem loading your configuration file: {err}");
                 std::process::exit(-1)
             }
 
@@ -354,7 +352,7 @@ async fn main() {
             match store_user_session_command(&command, &storage_source) {
                 Ok(_) => {}
                 Err(err) => {
-                    eprintln!("❌ Error in changing the user default session: {err}");
+                    eprintln!("❌ Error changing the user default session: {err}");
                     std::process::exit(-1)
                 }
             }
@@ -369,20 +367,15 @@ async fn main() {
             let setup_username = match &args.username {
                 Some(user) => user.clone(),
                 None => {
-                    eprintln!("❌ Username must be specified for setup command.\nAborting.");
+                    eprintln!("❌ Username must be specified for setup command");
                     std::process::exit(-1)
                 }
             };
 
-            let user_info = get_user_by_name(&setup_username);
-            if user_info.is_none() {
-                eprintln!(
-                    "❌ Username '{}' does not exist in the system.\nAborting.",
-                    setup_username
-                );
-                std::process::exit(-1)
-            }
-            let user_info = user_info.unwrap();
+            let Some(user_info) = get_user_by_name(&setup_username) else {
+                eprintln!("❌ Username '{setup_username}' does not exist in the system");
+                std::process::exit(-1)   
+            };
 
             // Determine the correct storage source for setup
             let setup_storage_source = match &args.config_file {
@@ -393,20 +386,6 @@ async fn main() {
                 None => {
                     // If no config_file specified, use the location that will be searched by the service
                     StorageSource::Username(setup_username.clone())
-                }
-            };
-
-            // Load existing config from the setup storage source
-            let mut setup_user_cfg = match load_user_auth_data(&setup_storage_source) {
-                Ok(load_res) => match load_res {
-                    Some(auth_data) => auth_data,
-                    None => UserAuthData::new(),
-                },
-                Err(err) => {
-                    eprintln!(
-                        "❌ There is a problem loading the configuration file: {err}.\nAborting."
-                    );
-                    std::process::exit(-1)
                 }
             };
 
@@ -430,14 +409,11 @@ async fn main() {
                 None => prompt_password("main password:").unwrap(),
             };
 
-            setup_user_cfg = UserAuthData::new();
-            match setup_user_cfg.set_main(&password, &intermediate_key) {
+            match user_cfg.set_main(&password, &intermediate_key) {
                 Ok(_) => {
                     // Save the setup configuration
-                    if let Err(err) = store_user_auth_data(setup_user_cfg, &setup_storage_source) {
-                        eprintln!(
-                            "❌ Error saving the user authentication data: {err}.\nAborting."
-                        );
+                    if let Err(err) = store_user_auth_data(&user_cfg, &setup_storage_source) {
+                        eprintln!("❌ Error saving the user authentication data: {err}");
                         std::process::exit(-1)
                     }
 
@@ -445,7 +421,7 @@ async fn main() {
                     let setup_user_mounts = match load_user_mountpoints(&setup_storage_source) {
                         Ok(existing_data) => existing_data,
                         Err(err) => {
-                            eprintln!("❌ Error in loading user mounts data: {err}.\nAborting.");
+                            eprintln!("❌ Error loading user mounts data: {err}");
                             std::process::exit(-1)
                         }
                     };
@@ -454,7 +430,7 @@ async fn main() {
                     if let Err(err) =
                         store_user_mountpoints(setup_user_mounts.clone(), &setup_storage_source)
                     {
-                        eprintln!("❌ Error saving the user mount data: {err}.\nAborting.");
+                        eprintln!("❌ Error saving the user mount data: {err}");
                         std::process::exit(-1)
                     }
 
@@ -492,7 +468,7 @@ async fn main() {
                                                     if result != ServiceOperationResult::Ok {
                                                         eprintln!("⚠️  Warning: Could not authorize mount: {result}");
                                                     } else {
-                                                        println!("✅ Default mount authorized for user '{}'", setup_username);
+                                                        println!("✅ Default mount authorized for user '{setup_username}'");
                                                     }
                                                 }
                                                 Err(err) => {
@@ -512,16 +488,13 @@ async fn main() {
                         }
                     }
 
-                    println!(
-                        "✅ Setup completed successfully for user '{}'",
-                        setup_username
-                    );
+                    println!("✅ Setup completed successfully for user '{setup_username}'",);
 
                     // Prevent the normal file write at the end since we already wrote it
                     write_file = Some(false);
                 }
                 Err(err) => {
-                    eprintln!("❌ Error in initializing the user authentication data: {err}");
+                    eprintln!("❌ Error initializing the user authentication data: {err}");
                     std::process::exit(-1)
                 }
             };
@@ -533,9 +506,7 @@ async fn main() {
                     write_file = Some(false)
                 }
                 Err(err) => {
-                    eprintln!(
-                        "❌ Error in resetting user additional authentication methods: {err}"
-                    );
+                    eprintln!("❌ Error resetting user additional authentication methods: {err}");
                     std::process::exit(-1)
                 }
             }
@@ -675,7 +646,7 @@ async fn main() {
                             let repeat = prompt_password("Secondary password (repeat):")
                                 .expect("Failed to read secondary password (repeat)");
                             if secondary_password != repeat {
-                                eprintln!("❌ Passwords do not match.\nAborting.");
+                                eprintln!("❌ Passwords do not match");
                                 std::process::exit(-1)
                             }
 
@@ -684,7 +655,7 @@ async fn main() {
                     };
 
                     if !user_cfg.has_main() {
-                        eprintln!("❌ Cannot add a secondary password for an account with no main password.\nAborting.");
+                        eprintln!("❌ Cannot add a secondary password for an account with no main password");
                         std::process::exit(-1);
                     }
 
@@ -698,7 +669,7 @@ async fn main() {
                             println!("✅ Secondary password added.");
                         }
                         Err(err) => {
-                            eprintln!("❌ Error adding a secondary password: {err}.\nAborting.");
+                            eprintln!("❌ Error adding a secondary password: {err}");
                             std::process::exit(-1);
                         }
                     }
@@ -708,10 +679,10 @@ async fn main() {
     }
 
     if write_file.unwrap_or_default() {
-        store_user_auth_data(user_cfg, &storage_source)
-            .expect("Error saving the updated user auth data.\nAborting.");
+        store_user_auth_data(&user_cfg, &storage_source)
+            .expect("❌ Error saving the updated user auth data");
 
         store_user_mountpoints(user_mounts, &storage_source)
-            .expect("Error saving the updated user mount data.\nAborting.");
+            .expect("❌ Error saving the updated user mount data");
     }
 }
